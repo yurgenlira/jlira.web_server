@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Include generic.web_server.php.install.yml
+  ansible.builtin.include_tasks:
+    file: install.yml
+    apply:
+      tags:
+        - install
+        - php_install
+  tags:
+    - install
+    - php_install

@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT-0
+---
+# The PPA repository for PHP that is added to the system.
+# This is necessary to install the latest version of PHP and its extensions.
+# Type: String
+php_ppa_repository: "ppa:ondrej/php"
+
+# The file where the PPA repository is stored.
+# This file is created when the PPA repository is added to the system.
+# Type: String
+php_ppa_file: ondrej-ubuntu-php-noble.sources

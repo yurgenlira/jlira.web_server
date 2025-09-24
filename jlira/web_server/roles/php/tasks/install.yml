@@ -1,0 +1,33 @@
+---
+- name: Add Ondrej PHP PPA
+  ansible.builtin.command:
+    cmd: "apt-add-repository {{ php_ppa_repository }} -y"
+  args:
+    creates: "/etc/apt/sources.list.d/{{ php_ppa_file }}"
+
+- name: Install basic packages {{ php_version }}
+  ansible.builtin.apt:
+    name: "{{ php_packages }}"
+    state: present
+
+- name: Install fpm package {{ php_version }}
+  ansible.builtin.apt:
+    name:
+      - "php{{ php_version }}-fpm"
+    state: present
+  when: php_fpm_enabled
+
+- name: Download and install Composer
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer --quiet
+  args:
+    creates: /usr/local/bin/composer
+    executable: /bin/bash
+  when: php_composer_enabled
+
+- name: Make Composer executable
+  ansible.builtin.file:
+    path: /usr/local/bin/composer
+    mode: '0755'
+  when: php_composer_enabled

@@ -1,0 +1,39 @@
+#SPDX-License-Identifier: MIT-0
+---
+# PHP version to be installed and configured.
+# This specifies the major and minor version of PHP.
+# Type: String
+php_version: 8.4
+
+# # List of PHP packages to be installed.
+# # This includes the main PHP package and various extensions.
+# # Type: List of Strings
+php_packages:
+  - "php{{ php_version }}"
+#   - php{{ php_version }}-bcmath
+  - "php{{ php_version }}-cli"
+#   - php{{ php_version }}-curl
+#   - php{{ php_version }}-dev
+#   - php{{ php_version }}-fpm
+#   - php{{ php_version }}-gd
+#   - php{{ php_version }}-imagick
+#   - php{{ php_version }}-imap
+#   - php{{ php_version }}-intl
+#   - php{{ php_version }}-mbstring
+#   - php{{ php_version }}-mysql
+#   - php{{ php_version }}-opcache
+
+# Determines if Composer should be installed.
+# If set to true, the playbook will install Composer globally using the installation script.
+# Type: Boolean
+php_composer_enabled: false
+
+# # Determines if the newly installed PHP version should be set as the default CLI version.
+# # If set to true, the PHP version specified in `php_version` will be made the default.
+# # Type: Boolean
+# php_cli_set_as_default_version: false
+
+# Determines if PHP-FPM should be enabled and configured.
+# If set to true, the playbook will handle PHP-FPM setup.
+# Type: Boolean
+php_fpm_enabled: false
