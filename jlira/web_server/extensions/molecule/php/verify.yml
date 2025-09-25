@@ -1,0 +1,7 @@
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Include install tests
+      ansible.builtin.include_tasks:
+        file: ../../tests/install.yml

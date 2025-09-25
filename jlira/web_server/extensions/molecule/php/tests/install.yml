@@ -1,0 +1,32 @@
+---
+- name: Check PHP version
+  ansible.builtin.command: php --version
+  register: php_version
+  changed_when: false
+
+- name: Assert PHP 8.4 is installed
+  ansible.builtin.assert:
+    that: "'PHP 8.4' in php_version.stdout"
+    fail_msg: "PHP 8.4 is not installed"
+
+- name: Check PHP extensions
+  ansible.builtin.command: php -m
+  register: php_modules
+  changed_when: false
+
+- name: Assert core extensions are loaded
+  ansible.builtin.assert:
+    that:
+      - "'curl' in php_modules.stdout"
+      - "'mbstring' in php_modules.stdout"
+    fail_msg: "Core PHP extensions are not loaded"
+
+- name: Test basic PHP execution
+  ansible.builtin.command: php -r "echo 'PHP is working';"
+  register: php_test
+  changed_when: false
+
+- name: Assert PHP basic functionality
+  ansible.builtin.assert:
+    that: "'PHP is working' in php_test.stdout"
+    fail_msg: "Basic PHP execution failed"
