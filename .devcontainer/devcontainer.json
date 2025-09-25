@@ -1,0 +1,45 @@
+// For format details, see https://aka.ms/devcontainer.json.
+{
+	"name": "ansible-dev-tools-ubuntu",
+	"image": "mcr.microsoft.com/devcontainers/base:noble",
+	"features": {
+    "ghcr.io/devcontainers/features/python:1": {},
+    "ghcr.io/devcontainers-extra/features/pipx-package:1": {
+      "includeDeps": true,
+      "package": "ansible-dev-tools",
+      "version": "latest",
+      "injections": "molecule-plugins[docker]"
+    },
+    "ghcr.io/wxw-matt/devcontainer-features/script_runner:0": {},
+		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {}
+	},
+  "postCreateCommand": "ansible-galaxy collection install community.docker community.general ansible.posix",
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+  "runArgs": [
+    "--security-opt",
+    "seccomp=unconfined",
+    "--security-opt",
+    "label=disable",
+    "--cap-add=SYS_ADMIN",
+    "--cap-add=SYS_RESOURCE",
+    "--device",
+    "/dev/fuse",
+    "--security-opt",
+    "apparmor=unconfined",
+    "--hostname=ansible-dev-container"
+  ],
+  "updateRemoteUserUID": true,
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "redhat.ansible",
+        "redhat.vscode-redhat-account",
+        "samuelcolvin.jinjahtml"
+      ]
+    }
+  },
+	"remoteUser": "root"
+}
