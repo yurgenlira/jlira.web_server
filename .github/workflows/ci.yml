@@ -1,0 +1,51 @@
+name: 'CI'
+
+'on':
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the codebase.
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install test dependencies.
+        run: pip install yamllint ansible-lint
+
+      - name: Lint code.
+        run: |
+          yamllint .
+
+      - name: Ansible Lint
+        run: |
+          ansible-lint jlira/web_server
+
+  test:
+    name: molecule tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: pip install ansible molecule-plugins[docker]
+
+      - name: Run molecule test for php role
+        run: cd jlira/web_server/extensions && molecule test --all
