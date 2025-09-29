@@ -20,6 +20,7 @@ ansible:
     defaults:
       host_key_checking: false
       verbosity: 1
+      roles_path: '$MOLECULE_PROJECT_DIRECTORY/../../../jlira/web_server/roles'
     ssh_connection:
       pipelining: true
   env:

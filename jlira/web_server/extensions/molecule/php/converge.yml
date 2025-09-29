@@ -5,4 +5,4 @@
   tasks:
     - name: Apply role under test
       ansible.builtin.include_role:
-        name: jlira.web_server.php
+        name: php
