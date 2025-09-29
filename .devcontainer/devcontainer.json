@@ -12,9 +12,11 @@
     },
     "ghcr.io/wxw-matt/devcontainer-features/script_runner:0": {},
 		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
-    "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {}
+    "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {},
+    "ghcr.io/dhoeric/features/act:1": {}
 	},
-  "postCreateCommand": "ansible-galaxy collection install community.docker community.general ansible.posix",
+  "postCreateCommand": "ansible-galaxy collection install community.docker community.general ansible.posix && echo '-P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest\\n-P ubuntu-24.04=ghcr.io/catthehacker/ubuntu:act-24.04\\n-P ubuntu-22.04=ghcr.io/catthehacker/ubuntu:act-22.04' >> ~/.actrc",
+
   "mounts": [
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
@@ -37,9 +39,14 @@
       "extensions": [
         "redhat.ansible",
         "redhat.vscode-redhat-account",
-        "samuelcolvin.jinjahtml"
-      ]
+        "samuelcolvin.jinjahtml",
+        "SanjulaGanepola.github-local-actions"
+      ],
+      "settings": {
+        "files.insertFinalNewline": true,
+        "files.trimTrailingWhitespace": true
+      }
     }
   },
-	"remoteUser": "root"
+  "remoteUser": "root"
 }
