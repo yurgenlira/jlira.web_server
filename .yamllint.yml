@@ -1,0 +1,8 @@
+---
+rules:
+  comments-indentation: disable
+  document-start: disable
+  line-length:
+    max: 120
+ignore: |
+  .venv
