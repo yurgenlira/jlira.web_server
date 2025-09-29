@@ -1,4 +1,4 @@
-#SPDX-License-Identifier: MIT-0
+# SPDX-License-Identifier: MIT-0
 ---
 # PHP version to be installed and configured.
 # This specifies the major and minor version of PHP.
@@ -37,3 +37,190 @@ php_composer_enabled: false
 # If set to true, the playbook will handle PHP-FPM setup.
 # Type: Boolean
 php_fpm_enabled: false
+
+# # Web server being used with PHP (e.g., Apache or Nginx).
+# # If is set to 'apache' it will set env var PHP_VERSION in /etc/apache2/envvars
+# php_web_server: apache
+
+# # Determines if the newly installed PHP version should be set as the default FPM version.
+# # If set to true, It will set env var `PHP_VERSION={{ php_version }}` in /etc/apache2/envvars.
+# # Type: Boolean
+# php_fpm_set_as_default_version: false
+
+# # Enable or disable the installation and configuration of Microsoft SQL Server drivers for PHP.
+# # Type: Boolean
+# php_mssql_extension_enabled: false
+
+# # Version of the Microsoft SQL Server driver for PHP to be installed.
+# # This is used when `php_mssql_extension_enabled` is set to true.
+# # Type: Integer
+# php_mssql_package_version: 18
+
+# # Settings for the `php.ini` configuration file for PHP-CLI.
+# # These settings customize PHP's behavior such as memory limits, error reporting, and file upload sizes.
+# # Type: Dictionary
+# php_cli_ini_settings:
+#   short_open_tag: false                           # Allow the use of short PHP tags.
+#   max_execution_time: 30                          # Maximum execution time of each script, in seconds.
+#   max_input_time: 60                              # Maximum amount of time each script may spend parsing request data.
+#   max_input_vars: 1000                            # Maximum number of input variables that can be accepted.
+#   memory_limit: -1                                # Maximum amount of memory a script may consume.
+#   error_reporting: E_ALL & ~E_DEPRECATED          # Error reporting level.
+#   display_errors: false                           # Display errors in output.
+#   display_startup_errors: false                   # Display PHP startup errors.
+#   ignore_repeated_errors: false                   # Do not log repeated messages.
+#   ignore_repeated_source: false                   # Do not log repeated errors from the same source.
+#   html_errors: true                               # Disable HTML formatting in error messages.
+#   error_log: /var/log/php/php_errors.log          # Path to the error log file.
+#   post_max_size: 8M                               # Maximum size of POST data that PHP will accept.
+#   upload_max_filesize: 2M                         # Maximum allowed size for uploaded files.
+#   max_file_uploads: 20                            # Maximum number of files that can be uploaded via a single request.
+#   mail_add_x_header: false                        # Add X-PHP-Originating-Script header to mail.
+
+# # Settings to be applied to `php.ini` for CLI usage.
+# # Each setting is defined by a regular expression to match and the new value to set.
+# # Type: List of Dictionaries
+# # Additional settings follow similar structure...
+# php_cli_ini_regex_settings:
+#   - regex: '^short_open_tag = .*$'
+#     new_value: 'short_open_tag = {{ "On" if php_cli_ini_settings.short_open_tag else "Off" }}'
+#   - regex: '^max_execution_time = [0-9]+$'
+#     new_value: 'max_execution_time = {{ php_cli_ini_settings.max_execution_time }}'
+#   - regex: '^max_input_time = [0-9]+$'
+#     new_value: 'max_input_time = {{ php_cli_ini_settings.max_input_time }}'
+#   - regex: '^;max_input_vars = [0-9]+$'
+#     new_value: 'max_input_vars = {{ php_cli_ini_settings.max_input_vars }}'
+#   - regex: '^memory_limit\s*=\s*(-1|[0-9]+[MG])'
+#     new_value: 'memory_limit = {{ php_cli_ini_settings.memory_limit }}'
+#   - regex: '^error_reporting = .*$'
+#     new_value: 'error_reporting = {{ php_cli_ini_settings.error_reporting }}'
+#   - regex: '^display_errors = .*$'
+#     new_value: 'display_errors = {{ "On" if php_cli_ini_settings.display_errors else "Off" }}'
+#   - regex: '^display_startup_errors = .*$'
+#     new_value: 'display_startup_errors = {{ "On" if php_cli_ini_settings.display_startup_errors else "Off" }}'
+#   - regex: '^ignore_repeated_errors = .*$'
+#     new_value: 'ignore_repeated_errors = {{ "On" if php_cli_ini_settings.ignore_repeated_errors else "Off" }}'
+#   - regex: '^ignore_repeated_source = .*$'
+#     new_value: 'ignore_repeated_source = {{ "On" if php_cli_ini_settings.ignore_repeated_source else "Off" }}'
+#   - regex: '^;?html_errors = .*$'
+#     new_value: 'html_errors = {{ "On" if php_cli_ini_settings.html_errors else "Off" }}'
+#   - regex: '^;?error_log = .*$'
+#     new_value: 'error_log = {{ php_cli_ini_settings.error_log }}' # mandatory
+#   - regex: '^post_max_size = [0-9]+M$'
+#     new_value: 'post_max_size = {{ php_cli_ini_settings.post_max_size }}'
+#   - regex: '^upload_max_filesize = [0-9]+M$'
+#     new_value: 'upload_max_filesize = {{ php_cli_ini_settings.upload_max_filesize }}'
+#   - regex: '^max_file_uploads = [0-9]+$'
+#     new_value: 'max_file_uploads = {{ php_cli_ini_settings.max_file_uploads }}'
+#   - regex: '^mail.add_x_header = .*$'
+#     new_value: 'mail.add_x_header = {{ "On" if php_cli_ini_settings.mail_add_x_header else "Off" }}'
+
+# # Settings for the `php.ini` configuration file for PHP-FPM.
+# # These settings customize PHP's behavior such as memory limits, error reporting, and file upload sizes.
+# # Type: Dictionary
+# php_fpm_ini_settings:
+#   short_open_tag: false                           # Allow the use of short PHP tags.
+#   max_execution_time: 30                          # Maximum execution time of each script, in seconds.
+#   max_input_time: 60                              # Maximum amount of time each script may spend parsing request data.
+#   max_input_vars: 1000                            # Maximum number of input variables that can be accepted.
+#   memory_limit: 128M                              # Maximum amount of memory a script may consume.
+#   error_reporting: E_ALL & ~E_DEPRECATED          # Error reporting level.
+#   display_errors: false                           # Display errors in output.
+#   display_startup_errors: false                   # Display PHP startup errors.
+#   ignore_repeated_errors: false                   # Do not log repeated messages.
+#   ignore_repeated_source: false                   # Do not log repeated errors from the same source.
+#   html_errors: true                               # Disable HTML formatting in error messages.
+#   error_log: /var/log/php/php_errors.log          # Path to the error log file.
+#   post_max_size: 8M                               # Maximum size of POST data that PHP will accept.
+#   upload_max_filesize: 2M                         # Maximum allowed size for uploaded files.
+#   max_file_uploads: 20                            # Maximum number of files that can be uploaded via a single request.
+#   mail_add_x_header: false                        # Add X-PHP-Originating-Script header to mail.
+
+# # Same as `php_cli_ini_settings` but specifically for PHP-FPM.
+# # This mirrors the CLI settings for consistency.
+# # Type: List of Dictionaries
+# php_fpm_ini_regex_settings:
+#   - regex: '^short_open_tag = .*$'
+#     new_value: 'short_open_tag = {{ "On" if php_fpm_ini_settings.short_open_tag else "Off" }}'
+#   - regex: '^max_execution_time = [0-9]+$'
+#     new_value: 'max_execution_time = {{ php_fpm_ini_settings.max_execution_time }}'
+#   - regex: '^max_input_time = [0-9]+$'
+#     new_value: 'max_input_time = {{ php_fpm_ini_settings.max_input_time }}'
+#   - regex: '^;max_input_vars = [0-9]+$'
+#     new_value: 'max_input_vars = {{ php_fpm_ini_settings.max_input_vars }}'
+#   - regex: '^memory_limit\s*=\s*(-1|[0-9]+[MG])'
+#     new_value: 'memory_limit = {{ php_fpm_ini_settings.memory_limit }}'
+#   - regex: '^error_reporting = .*$'
+#     new_value: 'error_reporting = {{ php_fpm_ini_settings.error_reporting }}'
+#   - regex: '^display_errors = .*$'
+#     new_value: 'display_errors = {{ "On" if php_fpm_ini_settings.display_errors else "Off" }}'
+#   - regex: '^display_startup_errors = .*$'
+#     new_value: 'display_startup_errors = {{ "On" if php_fpm_ini_settings.display_startup_errors else "Off" }}'
+#   - regex: '^ignore_repeated_errors = .*$'
+#     new_value: 'ignore_repeated_errors = {{ "On" if php_fpm_ini_settings.ignore_repeated_errors else "Off" }}'
+#   - regex: '^ignore_repeated_source = .*$'
+#     new_value: 'ignore_repeated_source = {{ "On" if php_fpm_ini_settings.ignore_repeated_source else "Off" }}'
+#   - regex: '^;?html_errors = .*$'
+#     new_value: 'html_errors = {{ "On" if php_fpm_ini_settings.html_errors else "Off" }}'
+#   - regex: '^;?error_log = .*$'
+#     new_value: 'error_log = {{ php_fpm_ini_settings.error_log }}'
+#   - regex: '^post_max_size = [0-9]+M$'
+#     new_value: 'post_max_size = {{ php_fpm_ini_settings.post_max_size }}'
+#   - regex: '^upload_max_filesize = [0-9]+M$'
+#     new_value: 'upload_max_filesize = {{ php_fpm_ini_settings.upload_max_filesize }}'
+#   - regex: '^max_file_uploads = [0-9]+$'
+#     new_value: 'max_file_uploads = {{ php_fpm_ini_settings.max_file_uploads }}'
+#   - regex: '^mail.add_x_header = .*$'
+#     new_value: 'mail.add_x_header = {{ "On" if php_fpm_ini_settings.mail_add_x_header else "Off" }}'
+
+# # Path for storing PHP CLI logs, derived from the error log path.
+# # Type: String
+# php_cli_log_path: "{{ php_cli_ini_settings.error_log | regex_replace('/[^/]+$', '') }}"
+
+# # Path for storing PHP-FPM logs, derived similarly from the error log path.
+# # Type: String
+# php_fpm_log_path: "{{ php_fpm_ini_settings.error_log | regex_replace('/[^/]+$', '') }}"
+
+# # Configuration settings for PHP-FPM pools.
+# # This defines how PHP-FPM should manage its child processes.
+# # Type: Dictionary
+# php_pool_settings:
+#   pm: dynamic                                    # Process manager settings.
+#   pm_max_children: 5                             # Maximum number of child processes.
+#   pm_start_servers: 2                            # Number of child processes created on startup.
+#   pm_min_spare_servers: 1                        # Minimum number of spare idle processes.
+#   pm_max_spare_servers: 3                        # Maximum number of spare idle processes.
+
+# # Timeout value for proxying requests to PHP-FPM.
+# # Type: Integer
+# php_proxy_timeout: 60
+
+# # List of hosts allowed to access the PHP-FPM status page.
+# # Each entry includes an IP address and a comment describing its purpose.
+# # Type: List of Dictionaries
+# php_status_page_allowed_hosts: []
+#   # - ip: 10.0.0.1
+#   #   comment: allow access to host
+
+# # # Path where PHP error reports scripts are stored.
+# # # Type: String
+# # php_error_reporting_path: /data/error-reporting
+
+# # # Path where PHP error reporting cron jobs are stored.
+# # # Type: String
+# # php_error_reporting_cron_path: /data/crons
+
+# # # Schedule for generating general PHP error reports.
+# # # Format: Cron expression (minute hour day month weekday)
+# # # Type: String
+# # php_error_report_schedule: "30 23 * * *"
+
+# # # Schedule for generating PHP warning reports.
+# # # Format: Cron expression (minute hour day month weekday)
+# # # Type: String
+# # php_warning_report_schedule: "30 23 * * *"
+
+# # # Schedule for generating PHP database error reports.
+# # # Format: Cron expression (minute hour day month weekday)
+# # # Type: String
+# # php_db_error_report_schedule: "30 23 * * *"

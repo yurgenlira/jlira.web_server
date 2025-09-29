@@ -9,3 +9,18 @@ php_ppa_repository: "ppa:ondrej/php"
 # This file is created when the PPA repository is added to the system.
 # Type: String
 php_ppa_file: ondrej-ubuntu-php-noble.sources
+
+# # The repository for Microsoft SQL Server PHP extensions.
+# # This is necessary to install the SQL Server extension for PHP.
+# # Type: Dictionary
+# php_mssql_apt:
+#   key_url: https://packages.microsoft.com/keys/microsoft.asc
+#   key_file: /usr/share/keyrings/microsoft.gpg
+#   repository: "deb [arch=amd64,armhf,arm64 signed-by=/usr/share/keyrings/microsoft.gpg] \
+#            https://packages.microsoft.com/ubuntu/{{ ansible_distribution_version }}/prod \
+#            {{ ansible_distribution_release }} main"
+
+# # PHP version without the period, used for creating directory paths or filenames.
+# # Derived from `php_version` by removing the dot.
+# # Type: String
+# php_version_no_dot: "{{ php_version | replace('.', '') }}"
