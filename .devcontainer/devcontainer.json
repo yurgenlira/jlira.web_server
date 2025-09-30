@@ -15,10 +15,10 @@
     "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {},
     "ghcr.io/dhoeric/features/act:1": {}
 	},
-  "postCreateCommand": "ansible-galaxy collection install community.docker community.general ansible.posix && echo '-P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest\\n-P ubuntu-24.04=ghcr.io/catthehacker/ubuntu:act-24.04\\n-P ubuntu-22.04=ghcr.io/catthehacker/ubuntu:act-22.04' >> ~/.actrc",
+  "postCreateCommand": "ansible-galaxy collection install community.docker community.general ansible.posix && echo '-P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest\\n-P ubuntu-24.04=ghcr.io/catthehacker/ubuntu:act-24.04-20250915\\n-P ubuntu-22.04=ghcr.io/catthehacker/ubuntu:act-22.04' >> ~/.actrc",
 
   "mounts": [
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+    "source=/home/yurgenlira/.docker/desktop/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
   "runArgs": [
     "--security-opt",
