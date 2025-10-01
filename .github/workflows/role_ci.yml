@@ -12,11 +12,11 @@ on:
         type: string
         default: 'ubuntu-24.04'
       python-version:
-        required: true
+        required: false
         type: string
         default: '3.12'
       working-directory:
-        required: true
+        required: false
         type: string
         default: 'jlira/web_server'
 
