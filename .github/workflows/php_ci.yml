@@ -1,0 +1,23 @@
+name: CI - php
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'jlira/web_server/php/**'
+      - 'jlira/web_server/extensions/molecule/php/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'jlira/web_server/php/**'
+      - 'jlira/web_server/extensions/molecule/php/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  call-role-ci:
+    uses: ./.github/workflows/role_ci.yml
+    with:
+      role-name: 'php'
