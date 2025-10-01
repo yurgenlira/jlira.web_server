@@ -7,16 +7,23 @@ on:
       role-name:
         required: true
         type: string
-
-env:
-  PYTHON_VERSION: '3.12'
-  UBUNTU_VERSION: 'ubuntu-24.04'
-  WORKING_DIR: 'jlira/web_server'
+      runner-os:
+        required: false
+        type: string
+        default: 'ubuntu-24.04'
+      python-version:
+        required: true
+        type: string
+        default: '3.12'
+      working-directory:
+        required: true
+        type: string
+        default: 'jlira/web_server'
 
 jobs:
   lint:
     name: Lint code for ${{ inputs.role-name }} role
-    runs-on: ${{ env.UBUNTU_VERSION }}
+    runs-on: ${{ inputs.runner-os }}
 
     steps:
       - name: Check out the codebase.
@@ -25,22 +32,22 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ inputs.python-version }}
           cache: 'pip'
-          cache-dependency-path: ${{ env.WORKING_DIR }}/extensions/requirements-lint.txt
+          cache-dependency-path: ${{ inputs.working-directory }}/extensions/requirements-lint.txt
 
       - run: echo '${{ steps.cp312.outputs.cache-hit }}' # true if cache-hit occurred on the primary key
 
       - name: Install lint dependencies.
-        run: pip install -r ${{ env.WORKING_DIR }}/extensions/requirements-lint.txt
+        run: pip install -r ${{ inputs.working-directory }}/extensions/requirements-lint.txt
 
       - name: Run ansible lint
-        run: ansible-lint ${{ env.WORKING_DIR }}/roles/${{ inputs.role-name }} ${{ env.WORKING_DIR }}/extensions/molecule/${{ inputs.role-name }}
+        run: ansible-lint ${{ inputs.working-directory }}/roles/${{ inputs.role-name }} ${{ inputs.working-directory }}/extensions/molecule/${{ inputs.role-name }}
 
 
   test:
     name: Run molecule tests for ${{ inputs.role-name }} role
-    runs-on: ${{ env.UBUNTU_VERSION }}
+    runs-on: ${{ inputs.runner-os }}
 
     steps:
       - name: Checkout code
@@ -49,14 +56,14 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ inputs.python-version }}
           cache: 'pip'
-          cache-dependency-path: ${{ env.WORKING_DIR }}/extensions/requirements-test.txt
+          cache-dependency-path: ${{ inputs.working-directory }}/extensions/requirements-test.txt
 
       - name: Install molecule test dependencies
-        run: pip install -r ${{ env.WORKING_DIR }}/extensions/requirements.txt
+        run: pip install -r ${{ inputs.working-directory }}/extensions/requirements-test.txt
 
       # The 'extensions' directory contains Ansible roles for Molecule testing.
       - name: Run molecule test for ${{ inputs.role-name }} role
-        working-directory: ${{ env.WORKING_DIR }}/extensions
+        working-directory: ${{ inputs.working-directory }}/extensions
         run: molecule test -s ${{ inputs.role-name }}
