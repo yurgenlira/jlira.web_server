@@ -20,7 +20,7 @@
 #     - php_remove_old_version
 #   when: php_old_version is defined
 
-- name: Include generic.web_server.php.install.yml
+- name: Include jlira.web_server.php.install.yml
   ansible.builtin.include_tasks:
     file: install.yml
     apply:
