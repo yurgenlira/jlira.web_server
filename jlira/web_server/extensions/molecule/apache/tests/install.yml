@@ -1,0 +1,19 @@
+---
+- name: Check if apache2 package is installed
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Assert apache2 package is installed
+  ansible.builtin.assert:
+    that:
+      - "'apache2' in ansible_facts.packages"
+    fail_msg: "Apache2 package is not installed."
+
+- name: Check if apache2 service is running and enabled
+  ansible.builtin.service_facts:
+
+- name: Assert apache2 service is running
+  ansible.builtin.assert:
+    that:
+      - "ansible_facts.services['apache2'].state == 'running'"
+    fail_msg: "Apache2 service is not running."
