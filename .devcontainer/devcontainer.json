@@ -13,12 +13,19 @@
     "ghcr.io/wxw-matt/devcontainer-features/script_runner:0": {},
 		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
     "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {},
-    "ghcr.io/dhoeric/features/act:1": {}
+    "ghcr.io/dhoeric/features/act:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "latest"
+    }
 	},
-  "postCreateCommand": "ansible-galaxy collection install community.docker community.general ansible.posix && echo '-P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest\\n-P ubuntu-24.04=ghcr.io/catthehacker/ubuntu:act-24.04-20250915\\n-P ubuntu-22.04=ghcr.io/catthehacker/ubuntu:act-22.04' >> ~/.actrc",
-
+  "postCreateCommand": {
+    "install-galaxy-dependencies": "ansible-galaxy collection install community.docker community.general ansible.posix",
+    "set-act-settings": "echo '-P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest\\n-P ubuntu-24.04=ghcr.io/catthehacker/ubuntu:act-24.04-20250915\\n-P ubuntu-22.04=ghcr.io/catthehacker/ubuntu:act-22.04' >> ~/.actrc",
+    "install-gemini": "npm install -g @google/gemini-cli"
+  },
   "mounts": [
-    "source=/home/yurgenlira/.docker/desktop/docker.sock,target=/var/run/docker.sock,type=bind"
+    // "source=/home/yurgenlira/.docker/desktop/docker.sock,target=/var/run/docker.sock,type=bind",
+    "source=/home/yurgenlira/.gemini,target=/root/.gemini,type=bind,consistency=cached"
   ],
   "runArgs": [
     "--security-opt",
