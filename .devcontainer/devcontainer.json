@@ -47,7 +47,8 @@
         "redhat.ansible",
         "redhat.vscode-redhat-account",
         "samuelcolvin.jinjahtml",
-        "SanjulaGanepola.github-local-actions"
+        "SanjulaGanepola.github-local-actions",
+        "google.gemini-cli-vscode-ide-companion"
       ],
       "settings": {
         "files.insertFinalNewline": true,
