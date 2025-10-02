@@ -4,13 +4,13 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'jlira/web_server/apache/**'
-      - 'jlira/web_server/extensions/molecule/apache/**'
+      - 'roles/apache/**'
+      - 'extensions/molecule/apache/**'
   push:
     branches: [ main ]
     paths:
-      - 'jlira/web_server/apache/**'
-      - 'jlira/web_server/extensions/molecule/apache/**'
+      - 'roles/apache/**'
+      - 'extensions/molecule/apache/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
