@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Install apache
+  ansible.builtin.package:
+    name:
+      - apache2
+      - apache2-utils
+    state: present
+    update_cache: true
+
+- name: Start and enable apache2 service
+  ansible.builtin.service:
+    name: apache2
+    state: started
+    enabled: true

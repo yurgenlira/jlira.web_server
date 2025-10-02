@@ -1,0 +1,23 @@
+name: CI - apache
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'roles/apache/**'
+      - 'extensions/molecule/apache/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'roles/apache/**'
+      - 'extensions/molecule/apache/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  call-role-ci:
+    uses: ./.github/workflows/role_ci.yml
+    with:
+      role-name: 'apache'

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Include jlira.web_server.apache.install.yml
+  ansible.builtin.include_tasks:
+    file: install.yml
+    apply:
+      tags:
+        - install
+        - apache_install
+  tags:
+    - install
+    - apache_install

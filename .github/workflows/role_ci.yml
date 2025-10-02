@@ -1,0 +1,65 @@
+name: CI - Generic Role
+
+# This makes the workflow reusable
+on:
+  workflow_call:
+    inputs:
+      role-name:
+        required: true
+        type: string
+      runner-os:
+        required: false
+        type: string
+        default: 'ubuntu-24.04'
+      python-version:
+        required: false
+        type: string
+        default: '3.12'
+
+jobs:
+  lint:
+    name: Lint code for ${{ inputs.role-name }} role
+    runs-on: ${{ inputs.runner-os }}
+
+    steps:
+      - name: Check out the codebase.
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: 'pip'
+          cache-dependency-path: extensions/requirements-lint.txt
+
+      - run: echo '${{ steps.cp312.outputs.cache-hit }}' # true if cache-hit occurred on the primary key
+
+      - name: Install lint dependencies.
+        run: pip install -r extensions/requirements-lint.txt
+
+      - name: Run ansible lint
+        run: ansible-lint roles/${{ inputs.role-name }} extensions/molecule/${{ inputs.role-name }}
+
+
+  test:
+    name: Run molecule tests for ${{ inputs.role-name }} role
+    runs-on: ${{ inputs.runner-os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: 'pip'
+          cache-dependency-path: extensions/requirements-test.txt
+
+      - name: Install molecule test dependencies
+        run: pip install -r extensions/requirements-test.txt
+
+      # The 'extensions' directory contains Ansible roles for Molecule testing.
+      - name: Run molecule test for ${{ inputs.role-name }} role
+        working-directory: extensions
+        run: molecule test -s ${{ inputs.role-name }}
