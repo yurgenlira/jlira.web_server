@@ -49,6 +49,8 @@
         "samuelcolvin.jinjahtml",
         "SanjulaGanepola.github-local-actions",
         "google.gemini-cli-vscode-ide-companion"
+        // # There is a bug, don't allow to connect to gemini cli inside a devcontainer because it use a dynamic port
+        // # and the devcontainer don't forward it
       ],
       "settings": {
         "files.insertFinalNewline": true,
