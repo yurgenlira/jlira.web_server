@@ -64,6 +64,18 @@ For more details, see the [php role README](./roles/php/README.md).
 
 Contributions are welcome! Please feel free to open an issue or submit a pull request on the [GitHub repository](https://github.com/yurgenlira/jlira.web_server).
 
+## Testing
+
+This collection uses [Molecule](https://molecule.readthedocs.io/en/latest/) for testing roles. Each role has its own Molecule scenario to ensure functionality and idempotency across different environments.
+
+To run tests for a specific role (e.g., `apache`), navigate to the `extensions` directory and execute the following command:
+
+```bash
+molecule test -s <role_name>
+```
+
+Replace `<role_name>` with the actual name of the role you want to test (e.g., `apache`, `php`).
+
 ## License
 
 This collection is licensed under the [GPL-2.0-or-later](https://spdx.org/licenses/GPL-2.0-or-later.html) license.

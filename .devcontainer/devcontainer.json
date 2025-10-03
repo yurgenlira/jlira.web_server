@@ -54,7 +54,8 @@
       ],
       "settings": {
         "files.insertFinalNewline": true,
-        "files.trimTrailingWhitespace": true
+        "files.trimTrailingWhitespace": true,
+        "python.terminal.activateEnvironment": false
       }
     }
   },
