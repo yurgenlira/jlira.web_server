@@ -1,15 +1,62 @@
-# GEMINI.md for Ansible Collection
+# Project Overview
+This project, `jlira.web_server`, is an Ansible collection designed to automate the setup, configuration, and management of web servers on Linux systems. Its primary goal is to provide idempotent, reusable, and well-documented roles for provisioning Apache web servers and PHP runtimes. The intended audience is system administrators, DevOps engineers, and developers who need a standardized and automated way to deploy and maintain web infrastructure.
 
-## Project Workflow
-1. User requests changes or assistance
-2. Gemini analyzes request and workspace context
-3. Gemini explains planned actions before execution
-4. VS Code shows side-by-side diff (if required)
-5. I approve and changes are implemented using appropriate tools
-6. Real-time feedback and validation
+## Technology Stack
+- **Ansible**: The core automation engine used for configuration management and application deployment.
+- **YAML**: The language used for writing Ansible playbooks and role definitions.
+- **Jinja2**: The templating engine used for creating dynamic configuration files.
+- **Molecule**: The testing framework used for developing and verifying the functionality of Ansible roles across different environments.
+- **Docker**: Used by Molecule to create containerized environments for testing roles.
+- **GitHub Actions**: The CI/CD platform used for automating linting, testing, and validation of the collection.
 
-## Project and Style Guidelines
--   **Purpose:** This ansible collection is designed to automate the setup and management of Linux systems. It must be portable, idempotent, and well-documented.
+## Key Features
+The collection provides the following Ansible roles and functionalities:
+- **`jlira.web_server.apache`**:
+    - Installs the Apache web server (`apache2`).
+    - Manages the Apache service (start, stop, restart, enable).
+    - Deploys custom web pages.
+    - Configures virtual hosts.
+- **`jlira.web_server.php`**:
+    - Installs specific versions of PHP.
+    - Configures PHP for both CLI and FPM (FastCGI Process Manager) usage.
+    - Manages PHP-FPM service.
+    - Adjusts `php.ini` settings for performance and security.
+
+## Folder Structure
+A high-level overview of the project's directory layout:
+```
+/
+├── roles/ - Contains the core Ansible roles.
+│   ├── apache/ - Role for managing the Apache web server.
+│   └── php/ - Role for managing PHP.
+├── extensions/ - Houses extensions and testing configurations.
+│   └── molecule/ - Contains Molecule testing scenarios for the roles.
+│       ├── apache/ - Tests for the `apache` role.
+│       └── php/ - Tests for the `php` role.
+├── .github/ - CI/CD workflows.
+│   └── workflows/ - GitHub Actions workflows for automated testing.
+├── galaxy.yml - Ansible collection metadata.
+├── README.md - The main README file for the project.
+└── ... (other configuration and documentation files)
+```
+
+## Architecture and Design Principles
+The project is structured as an Ansible collection, which is the standard way to distribute and reuse Ansible content. It follows the official Ansible role directory structure.
+
+- **Idempotency**: All roles and tasks are designed to be idempotent. Running them multiple times will result in the same system state, preventing unintended changes.
+- **Modularity**: Each role has a single, clear purpose (e.g., managing Apache, managing PHP). This separation of concerns makes the roles easier to maintain, test, and reuse.
+- **Default Variables**: Roles provide sensible default variables in `defaults/main.yml`, which can be easily overridden by the user for customization.
+- **Testing**: Every role is accompanied by a Molecule test suite to ensure its correctness and reliability. Tests cover installation, configuration, and idempotency.
+- **CI/CD**: The repository is configured with GitHub Actions workflows to automatically run `ansible-lint`, `yamllint`, and Molecule tests on every pull request and merge to the main branch.
+
+## Technical Constraints and Guidelines
+- **Linting**: All YAML and Ansible files must pass `yamllint` and `ansible-lint` checks before being committed. Configuration for these linters is provided in `.yamllint.yml` and `.ansible-lint`.
+- **Variable Naming**: Role variables should be prefixed with the role name (e.g., `apache_port`, `php_version`) to avoid naming conflicts.
+- **Commits**: Commit messages should follow a conventional format, clearly describing the change.
+- **Documentation**: New features or changes to existing roles must be documented in the role's `README.md` file.
+- **Testing**: Any new functionality must be accompanied by corresponding Molecule tests to validate its behavior.
+
+## Best Practices and Tips
 -   **Generic Best Practices:**
     - Prefer YAML instead of JSON: Although Ansible allows JSON syntax, using YAML is preferred and improves the readability of files and projects.
     - Use consistent whitespaces: To separate things nicely and improve readability, consider leaving a blank line between blocks, tasks, or other components.
@@ -181,100 +228,48 @@
     - Control playbook execution strategy: By default, Ansible finishes the execution of each task on all hosts before moving to the next task. If you wish to select another execution strategy
 
 
-## Technology Stack & Architecture Decisions
-### **Ansible Automation Platform**
-- **Ansible Core**: Latest stable version for playbook execution
-- **Ansible Galaxy**: Role and collection management
-- **Ansible Vault**: Secrets and sensitive data encryption
-- **Ansible Lint**: Code quality and best practices enforcement
-- **Molecule**: Role testing and validation framework
+## General Workflow
 
-### Architecture Design Principles
-Role structure
-```
-roles
-├── common			# this hierarchy represents a "role"
-│   ├── defaults		#
-│   │   └── main.yml	#  default lower priority variables for this role
-│   ├── files		#
-│   │   ├── bar.txt	#  files for use with the copy resource
-│   │   └── foo.sh	#  script files for use with the script resource
-│   ├── handlers		#
-│   │   └── main.yml	#  handlers file
-│   ├── meta		#
-│   │   └── main.yml	#  role dependencies
-│   ├── tasks		#
-│   │   └── main.yml	#  tasks file can include smaller files if warranted
-│   ├── templates		#
-│   │   └── ntp.conf.j2	#  templates end in .j2
-│   ├── vars		#
-│   │   └── main.yml	#  variables associated with this role
-│   ├── module_utils	# roles can also include custom module_utils
-│   ├── library		# roles can also include custom modules
-│   └── lookup_plugins 	# or other types of plugins, like lookup in this case
-│
-├── monitoring		# another role with the same structure
-└── webtier			# another role with the same structure
-```
+1.  The user starts a task from `tasks.md`.
+2.  The AI agent analyzes the task and workspace context.
+3.  The AI agent explains the planned actions based on the task flow and context.
+4.  The AI agent shows a side-by-side diff in vscode GUI if it's possible.
+5.  The user approves the plan, and the changes are implemented using the appropriate tools.
+6.  Real-time feedback and validation are provided.
 
-Collection structure
-```
-my_collection
-├── galaxy.yml
-├── meta
-│   └── runtime.yml
-├── plugins
-│   └── README.md
-├── README.md
-├── playbooks
-└── roles
-    ├── role1
-    └── role2
-```
+## Ansible Development Workflow
 
-## **Gated Execution Protocols**
+1.  Initialize the repository if needed.
+2.  Create a Collection if needed:
+    -   Edit `galaxy.yml`.
+    -   Add `CHANGELOG.md`.
+    -   Edit `meta/runtime.yml`.
+3.  Create a branch for the role if needed.
+4.  Create a role if needed.
+5.  Develop Content (Playbooks/Tasks/Templates):
+    -   Create the tasks first, then the variables.
+    -   Write tasks in YAML, adhering to style guidelines.
+    -   Ensure tasks are idempotent.
+    -   Use appropriate variables, templates, handlers, files, etc.
+    -   Implement documentation and comments.
+    -   Update the role's `meta/main.yml` and `README.md`.
+6.  Create Tests (Mandatory):
+    -   Create a scenario for each role (molecule scenario should match the role name).
+    -   Design and implement Molecule tests for the new role or feature.
+    -   Define scenarios, platforms, verifiers, etc.
+7.  Local Validation:
+    -   Molecule should be executed from the extensions directory.
+    -   Run a syntax check.
+    -   Run the linter.
+8.  Review and Submit:
+    -   Organize and review the changes.
+    -   Present the solution and test results to the user.
 
-### <PROTOCOL:EXPLAIN>
+Develop one role at time using serial and requirement-driven as Development strategy. Start with the highest priority requirement and complete the following four-step cycle for it. Only upon full completion of this cycle should you proceed to the next requirement:
 
-This protocol is for when I ask you to explain a concept, module, or code snippet. Your goal is to provide a clear, educational response, follow these guidelines:
+Plan: Define the specific implementation tasks.
+Code & Test: Write the code and its corresponding tests.
+Verify: Provide local validation steps.
+Next: Move to the next requirement.
 
--   **Start with a High-Level Summary:** Begin with a single sentence that concisely explains the main purpose. For example, "This module manages user accounts on a system."
--   **Use a Structured Format:** Use a bulleted list to break down the explanation.
-    -   **Purpose:** Detail what the component does and why it's used in the project.
-    -   **Key Parameters:** List the most important parameters or options and briefly describe their function.
-    -   **Example:** Provide a small, commented code snippet that shows how to use the component.
--   **Link to Documentation:** If applicable, mention where to find the official Ansible documentation for the module or plugin.
--   **Stay in Context:** All explanations must be relevant to the current project and its established conventions. Do not provide generic, unrelated information.
 
----
-
-### <PROTOCOL:PLAN>
-
-This protocol is for when I ask you to propose a solution or create a new component. Your response must be a structured plan, not code.
-
-1.  **High-Level Overview:** Begin with a brief summary of the proposed solution.
-2.  **Actionable Steps:** Use a numbered list for the step-by-step plan. Each step should be clear and distinct.
-    -   Example steps: "Create directory structure," "Write module code," "Add documentation," "Create test playbook."
-3.  **No Code:** Do not include any code snippets in this protocol. Focus solely on the strategy.
-
----
-
-### <PROTOCOL:IMPLEMENT>
-
-When implementing code, strictly follow these guidelines.
-
--   **Ansible Best Practices:** Follow the best practices from 'Project and Style Guidelines' section
--   **Documentation:** Every new role, module, or plugin must have a `README.md` file that explains its purpose, parameters, and examples of usage.
--   **Testing:** Create a `tests/` directory with `test.yml` playbooks to validate the functionality of new components.
-
----
-
-### <PROTOCOL:IMPLEMENT>
-
-This protocol is for when I have approved a plan and ask you to write or modify code. Your output should be the requested code, following all project rules.
-
-1.  **Strict Adherence:** All code must strictly follow the style, security, and idempotence rules defined in the "Project and Style Guidelines" section.
-2.  **Documentation:** Any new module or role must include a `README.md` file.
-3.  **Idempotence Check:** Before generating the code, verify that the proposed solution is idempotent.
-
----
