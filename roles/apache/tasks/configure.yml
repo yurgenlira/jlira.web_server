@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Configure Apache security settings
+  ansible.builtin.lineinfile:
+    path: /etc/apache2/conf-available/security.conf
+    regexp: '^{{ item.name }}'
+    line: '{{ item.name }} {{ item.value }}'
+    state: present
+  loop: "{{ apache_security_settings }}"
+  notify: Reload apache2
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers

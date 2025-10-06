@@ -10,3 +10,14 @@
   tags:
     - install
     - apache_install
+
+- name: Include jlira.web_server.apache.configure.yml
+  ansible.builtin.include_tasks:
+    file: configure.yml
+    apply:
+      tags:
+        - configure
+        - apache_configure
+  tags:
+    - configure
+    - apache_configure

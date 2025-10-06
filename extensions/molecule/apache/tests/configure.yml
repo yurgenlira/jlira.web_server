@@ -1,0 +1,27 @@
+---
+- name: Make HTTP request to Apache
+  ansible.builtin.uri:
+    url: http://localhost
+    return_content: true
+  register: http_response
+
+- name: Assert Server header does not contain version info
+  ansible.builtin.assert:
+    that:
+      - http_response.server is defined
+      - http_response.server == "Apache"
+      - "'/' not in http_response.server"
+    fail_msg: "Server header contains version info: '{{ http_response.server }}'"
+
+- name: Request non-existent page to check error response
+  ansible.builtin.uri:
+    url: http://localhost/nonexistent
+    status_code: 404
+    return_content: true
+  register: error_response
+
+- name: Verify no server signature in error page footer
+  ansible.builtin.assert:
+    that:
+      - "'<address>' not in error_response.content or '<address>Apache' in error_response.content"
+    fail_msg: "Server signature with version appears in error page"

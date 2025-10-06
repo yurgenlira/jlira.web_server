@@ -1,3 +1,19 @@
 # SPDX-License-Identifier: MIT-0
 ---
-# defaults file for apache
+# Apache global directives to configure in security.conf.
+# Each setting is defined as a dictionary with the following keys:
+# - `name`: The Apache directive name (e.g., ServerTokens, ServerSignature).
+# - `value`: The value to assign to the directive.
+#
+# Example:
+# apache_security_settings:
+#   - name: ServerTokens
+#     value: Prod
+#   - name: ServerSignature
+#     value: "Off"
+# Type: List of Dictionaries
+apache_security_settings:
+  - name: ServerTokens
+    value: Prod
+  - name: ServerSignature
+    value: "Off"
