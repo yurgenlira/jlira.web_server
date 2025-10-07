@@ -32,7 +32,9 @@
   ansible.builtin.command:
     cmd: "a2dissite {{ item.name }}"
   register: apache_disable_template_vhost_result
-  changed_when: "'Site' in apache_disable_template_vhost_result.stdout and 'disabled' in apache_disable_template_vhost_result.stdout"
+  changed_when:
+    - "'Site' in apache_disable_template_vhost_result.stdout"
+    - "'disabled' in apache_disable_template_vhost_result.stdout"
   loop: "{{ apache_vhosts_from_templates }}"
   when:
     - apache_vhosts_from_templates | length > 0

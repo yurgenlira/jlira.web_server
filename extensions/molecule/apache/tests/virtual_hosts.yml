@@ -110,8 +110,12 @@
 - name: Verify HTTPS virtual host has SSL certificate configuration
   ansible.builtin.assert:
     that:
-      - "'SSLCertificateFile /etc/ssl/certs/ssl-cert-snakeoil.pem' in (apache_https_vhost_config_content.content | b64decode)"
-      - "'SSLCertificateKeyFile /etc/ssl/private/ssl-cert-snakeoil.key' in (apache_https_vhost_config_content.content | b64decode)"
+      - >-
+        'SSLCertificateFile /etc/ssl/certs/ssl-cert-snakeoil.pem'
+        in (apache_https_vhost_config_content.content | b64decode)
+      - >-
+        'SSLCertificateKeyFile /etc/ssl/private/ssl-cert-snakeoil.key'
+        in (apache_https_vhost_config_content.content | b64decode)
     fail_msg: "HTTPS virtual host does not contain SSL certificate configuration"
 
 - name: Check if HTTPS virtual host is enabled
