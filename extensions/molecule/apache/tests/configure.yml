@@ -1,11 +1,129 @@
 ---
+- name: Test ServerName configuration in apache2.conf
+  ansible.builtin.command:
+    cmd: grep -E "^ServerName" /etc/apache2/apache2.conf
+  register: servername_check
+  changed_when: false
+
+- name: Verify ServerName is configured
+  ansible.builtin.assert:
+    that:
+      - servername_check.rc == 0
+      - "'ServerName' in servername_check.stdout"
+    fail_msg: "ServerName not configured in apache2.conf"
+
+- name: Test ports.conf configuration
+  ansible.builtin.command:
+    cmd: cat /etc/apache2/ports.conf
+  register: ports_check
+  changed_when: false
+
+- name: Verify HTTP port 80 is configured
+  ansible.builtin.assert:
+    that:
+      - "'Listen 80' in ports_check.stdout"
+    fail_msg: "HTTP port 80 not configured in ports.conf"
+
+- name: Verify HTTPS port 443 is configured
+  ansible.builtin.assert:
+    that:
+      - "'Listen 443' in ports_check.stdout"
+    fail_msg: "HTTPS port 443 not configured in ports.conf"
+
+- name: Check if SSL module is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/mods-enabled/ssl.load
+  register: ssl_module_check
+
+- name: Verify SSL module is enabled
+  ansible.builtin.assert:
+    that:
+      - ssl_module_check.stat.exists
+    fail_msg: "SSL module is not enabled"
+
+- name: Check default HTTP virtual host exists
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-available/000-default.conf
+  register: default_vhost_check
+
+- name: Verify default HTTP virtual host is configured
+  ansible.builtin.assert:
+    that:
+      - default_vhost_check.stat.exists
+    fail_msg: "Default HTTP virtual host configuration not found"
+
+- name: Check default SSL virtual host exists
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-available/000-default-ssl.conf
+  register: default_ssl_vhost_check
+
+- name: Verify default SSL virtual host is configured
+  ansible.builtin.assert:
+    that:
+      - default_ssl_vhost_check.stat.exists
+    fail_msg: "Default SSL virtual host configuration not found"
+
+- name: Check if SSL site is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-enabled/000-default-ssl.conf
+  register: ssl_site_enabled_check
+
+- name: Verify SSL site is enabled
+  ansible.builtin.assert:
+    that:
+      - ssl_site_enabled_check.stat.exists
+    fail_msg: "SSL site is not enabled"
+
+- name: Check default index page exists
+  ansible.builtin.stat:
+    path: /var/www/html/index.html
+  register: index_page_check
+
+- name: Verify default index page exists
+  ansible.builtin.assert:
+    that:
+      - index_page_check.stat.exists
+      - index_page_check.stat.mode == "0644"
+    fail_msg: "Default index page not found or has incorrect permissions"
+
+- name: Test security configuration
+  ansible.builtin.command:
+    cmd: grep -E "^(ServerTokens|ServerSignature|TraceEnable)" /etc/apache2/conf-available/security.conf
+  register: security_config_check
+  changed_when: false
+
+- name: Verify security settings are configured
+  ansible.builtin.assert:
+    that:
+      - "'ServerTokens Prod' in security_config_check.stdout"
+      - "'ServerSignature Off' in security_config_check.stdout"
+      - "'TraceEnable Off' in security_config_check.stdout"
+    fail_msg: "Security settings not properly configured"
+
+- name: Check if security configuration is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/conf-enabled/security.conf
+  register: security_conf_enabled_check
+
+- name: Verify security configuration is enabled
+  ansible.builtin.assert:
+    that:
+      - security_conf_enabled_check.stat.exists
+    fail_msg: "Security configuration is not enabled"
+
 - name: Make HTTP request to Apache
   ansible.builtin.uri:
     url: http://localhost
     return_content: true
   register: http_response
 
-- name: Assert Server header does not contain version info
+- name: Verify Apache responds on HTTP
+  ansible.builtin.assert:
+    that:
+      - http_response.status == 200
+    fail_msg: "Apache not responding on HTTP port 80"
+
+- name: Verify Server header does not contain version info
   ansible.builtin.assert:
     that:
       - http_response.server is defined
