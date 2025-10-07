@@ -21,3 +21,15 @@
   tags:
     - configure
     - apache_configure
+
+- name: Include jlira.web_server.apache.add_custom_configs.yml
+  ansible.builtin.include_tasks:
+    file: add_custom_configs.yml
+    apply:
+      tags:
+        - custom_configs
+        - apache_custom_configs
+  when: apache_custom_configs | length > 0
+  tags:
+    - custom_configs
+    - apache_custom_configs

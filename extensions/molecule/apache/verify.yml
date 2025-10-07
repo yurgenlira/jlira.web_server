@@ -10,3 +10,7 @@
     - name: Include configure tests
       ansible.builtin.include_tasks:
         file: tests/configure.yml
+
+    - name: Include add_custom_configs tests
+      ansible.builtin.include_tasks:
+        file: tests/add_custom_configs.yml

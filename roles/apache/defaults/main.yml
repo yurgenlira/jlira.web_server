@@ -1,19 +1,120 @@
 # SPDX-License-Identifier: MIT-0
 ---
-# Apache global directives to configure in security.conf.
+# ============================================================================
+# Basic Configuration
+# ============================================================================
+
+# Server hostname for Apache ServerName directive.
+# Defaults to the system hostname.
+# Type: String
+apache_server_name: "{{ ansible_hostname }}"
+
+# Enable or disable SSL support.
+# Type: Boolean
+apache_ssl_enabled: true
+
+# ============================================================================
+# Apache Main Settings
+# ============================================================================
+
+# List of main Apache settings to be configured in apache2.conf.
+# Each setting is defined as a dictionary with the following keys:
+# - `name`: The name of the Apache directive to configure (e.g., LimitRequestLine, LimitRequestFieldSize).
+# - `value`: The value to assign to the Apache directive.
+# - `comment` (optional): A comment to include above the directive in the configuration file.
+#
+# The name `ServerName` is reserved for use with the `apache_server_name` setting,
+# so it will be ignored to prevent conflicts.
+#
+# Example:
+# apache_main_settings:
+#   - name: LimitRequestLine
+#     value: 8190
+#     comment: |
+#       Maximum size of the request line in bytes.
+#       Helps prevent buffer overflow attacks.
+#   - name: LimitRequestFieldSize
+#     value: 8190
+#     comment: Maximum size of each HTTP request header field in bytes.
+# Type: List of Dictionaries
+apache_main_settings: []
+
+# ============================================================================
+# Environment Variables
+# ============================================================================
+
+# List of custom environment variables to be configured in envvars file.
+# Each variable is defined as a dictionary with the following keys:
+# - `name`: The environment variable name (e.g., APACHE_LOG_DIR, CUSTOM_VAR).
+# - `value`: The value to assign to the environment variable.
+# - `comment` (optional): A comment to include above the variable definition.
+#
+# Example:
+# apache_envvars:
+#   - name: APACHE_CUSTOM_LOG_DIR
+#     value: /var/log/apache2/custom
+#     comment: Custom log directory for application logs
+# Type: List of Dictionaries
+apache_envvars: []
+
+# ============================================================================
+# Port Configuration
+# ============================================================================
+
+# List of HTTP ports to listen on.
+# Type: List of Integers
+apache_http_ports:
+  - 80
+
+# List of HTTPS ports to listen on (when SSL is enabled).
+# Type: List of Integers
+apache_https_ports:
+  - 443
+
+# ============================================================================
+# Module Management
+# ============================================================================
+
+# List of Apache modules to enable.
+# Type: List of Strings
+apache_modules_enabled: []
+
+# ============================================================================
+# Custom Configuration Files
+# ============================================================================
+
+# List of custom Apache configuration files to create.
+# Each configuration file is defined as a dictionary with the following keys:
+# - `name`: A descriptive name for the configuration (used in comments).
+# - `path`: The absolute path where the file should be created
+#           (e.g., "/data/apache-conf/custom-headers.conf").
+# - `content`: The configuration content to write to the file.
+#
+# Example:
+# apache_custom_configs:
+#   - name: Custom security headers
+#     path: /data/apache-conf/custom-headers.conf
+#     content: |
+#       # Custom security headers
+#       Header always set X-Frame-Options "SAMEORIGIN"
+#       Header always set X-Content-Type-Options "nosniff"
+#       Header always set X-XSS-Protection "1; mode=block"
+# Type: List of Dictionaries
+apache_custom_configs: []
+
+# ============================================================================
+# Security Configuration
+# ============================================================================
+
+# Apache security settings to configure in security.conf.
 # Each setting is defined as a dictionary with the following keys:
 # - `name`: The Apache directive name (e.g., ServerTokens, ServerSignature).
 # - `value`: The value to assign to the directive.
-#
-# Example:
-# apache_security_settings:
-#   - name: ServerTokens
-#     value: Prod
-#   - name: ServerSignature
-#     value: "Off"
 # Type: List of Dictionaries
 apache_security_settings:
   - name: ServerTokens
     value: Prod
   - name: ServerSignature
+    value: "Off"
+  - name: TraceEnable
     value: "Off"

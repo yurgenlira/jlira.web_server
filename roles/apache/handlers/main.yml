@@ -1,6 +1,14 @@
 # SPDX-License-Identifier: MIT-0
 ---
-- name: Reload apache2
+# Handlers are executed in the order they are defined
+- name: Check Apache config syntax
+  listen: Reload apache
+  ansible.builtin.command:
+    cmd: apachectl configtest
+  changed_when: false
+
+- name: Reload Apache service
+  listen: Reload apache
   ansible.builtin.service:
     name: apache2
     state: reloaded

@@ -2,6 +2,13 @@
 - name: Converge
   hosts: all
   gather_facts: true
+  vars:
+    apache_custom_configs:
+      - name: Test custom configuration
+        path: /data/apache-conf/custom-headers.conf
+        content: |
+          # Test custom configuration
+          ServerSignature Off
   tasks:
     - name: Apply role under test
       ansible.builtin.include_role:
