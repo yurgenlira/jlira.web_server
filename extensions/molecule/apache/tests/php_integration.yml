@@ -1,0 +1,23 @@
+---
+- name: Check if PHP is installed
+  ansible.builtin.command: php --version
+  register: php_version_check
+  changed_when: false
+
+- name: Verify PHP is installed
+  ansible.builtin.assert:
+    that:
+      - php_version_check.rc == 0
+      - "'PHP' in php_version_check.stdout"
+    fail_msg: "PHP is not installed or not accessible"
+
+- name: Check PHP CLI configuration
+  ansible.builtin.stat:
+    path: /etc/php/8.4/cli/php.ini
+  register: php_cli_ini_check
+
+- name: Verify PHP CLI configuration exists
+  ansible.builtin.assert:
+    that:
+      - php_cli_ini_check.stat.exists
+    fail_msg: "PHP CLI configuration file does not exist"

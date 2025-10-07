@@ -13,6 +13,11 @@ apache_server_name: "{{ ansible_hostname }}"
 # Type: Boolean
 apache_ssl_enabled: true
 
+# Enable or disable PHP integration.
+# When enabled, the PHP role will be automatically included and configured.
+# Type: Boolean
+apache_install_php: false
+
 # ============================================================================
 # Apache Main Settings
 # ============================================================================

@@ -18,3 +18,7 @@
     - name: Include virtual_hosts tests
       ansible.builtin.include_tasks:
         file: tests/virtual_hosts.yml
+
+    - name: Include php_integration tests
+      ansible.builtin.include_tasks:
+        file: tests/php_integration.yml
