@@ -14,3 +14,7 @@
     - name: Include add_custom_configs tests
       ansible.builtin.include_tasks:
         file: tests/add_custom_configs.yml
+
+    - name: Include virtual_hosts tests
+      ansible.builtin.include_tasks:
+        file: tests/virtual_hosts.yml

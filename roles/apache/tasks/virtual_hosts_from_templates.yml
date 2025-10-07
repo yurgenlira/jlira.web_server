@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Create virtual host configuration files from templates
+  ansible.builtin.template:
+    src: vhost_from_template.conf.j2
+    dest: "/etc/apache2/sites-available/{{ item.name }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ apache_vhosts_from_templates }}"
+  when:
+    - apache_vhosts_from_templates | length > 0
+    - item.state | default('present') == 'present'
+  vars:
+    vhost_template: "{{ apache_vhost_templates | selectattr('name', 'equalto', item.template) | first }}"
+    template_vars: "{{ item.vars | default({}) }}"
+  notify: Reload apache
+
+- name: Enable virtual hosts from templates
+  ansible.builtin.command:
+    cmd: "a2ensite {{ item.name }}"
+  register: apache_enable_template_vhost_result
+  changed_when: "'Enabling site' in apache_enable_template_vhost_result.stdout"
+  loop: "{{ apache_vhosts_from_templates }}"
+  when:
+    - apache_vhosts_from_templates | length > 0
+    - item.state | default('present') == 'present'
+    - item.enabled | default(true)
+  notify: Reload apache
+
+- name: Disable virtual hosts from templates
+  ansible.builtin.command:
+    cmd: "a2dissite {{ item.name }}"
+  register: apache_disable_template_vhost_result
+  changed_when: "'Site' in apache_disable_template_vhost_result.stdout and 'disabled' in apache_disable_template_vhost_result.stdout"
+  loop: "{{ apache_vhosts_from_templates }}"
+  when:
+    - apache_vhosts_from_templates | length > 0
+    - item.state | default('present') == 'present'
+    - not (item.enabled | default(true))
+  notify: Reload apache
+
+- name: Remove virtual host configuration files from templates
+  ansible.builtin.file:
+    path: "/etc/apache2/sites-available/{{ item.name }}.conf"
+    state: absent
+  loop: "{{ apache_vhosts_from_templates }}"
+  when:
+    - apache_vhosts_from_templates | length > 0
+    - item.state | default('present') == 'absent'
+  notify: Reload apache

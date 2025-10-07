@@ -1,0 +1,127 @@
+---
+# Test HTTP Virtual Host (testsite.local)
+- name: Check if HTTP virtual host document root exists
+  ansible.builtin.stat:
+    path: /var/www/testsite.local
+  register: apache_http_vhost_docroot_check
+
+- name: Verify HTTP virtual host document root exists
+  ansible.builtin.assert:
+    that:
+      - apache_http_vhost_docroot_check.stat.exists
+      - apache_http_vhost_docroot_check.stat.isdir
+      - apache_http_vhost_docroot_check.stat.mode == "0755"
+      - apache_http_vhost_docroot_check.stat.pw_name == "www-data"
+      - apache_http_vhost_docroot_check.stat.gr_name == "www-data"
+    fail_msg: "HTTP virtual host document root does not exist or has incorrect permissions"
+
+- name: Check if HTTP virtual host configuration file exists
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-available/testsite.local.conf
+  register: apache_http_vhost_config_check
+
+- name: Verify HTTP virtual host configuration file exists
+  ansible.builtin.assert:
+    that:
+      - apache_http_vhost_config_check.stat.exists
+      - apache_http_vhost_config_check.stat.mode == "0644"
+      - apache_http_vhost_config_check.stat.pw_name == "root"
+      - apache_http_vhost_config_check.stat.gr_name == "root"
+    fail_msg: "HTTP virtual host configuration file does not exist or has incorrect permissions"
+
+- name: Read HTTP virtual host configuration file content
+  ansible.builtin.slurp:
+    path: /etc/apache2/sites-available/testsite.local.conf
+  register: apache_http_vhost_config_content
+
+- name: Verify HTTP virtual host has correct server name
+  ansible.builtin.assert:
+    that:
+      - "'ServerName testsite.local' in (apache_http_vhost_config_content.content | b64decode)"
+    fail_msg: "HTTP virtual host configuration does not contain correct ServerName"
+
+- name: Verify HTTP virtual host has correct document root
+  ansible.builtin.assert:
+    that:
+      - "'DocumentRoot /var/www/testsite.local' in (apache_http_vhost_config_content.content | b64decode)"
+    fail_msg: "HTTP virtual host configuration does not contain correct DocumentRoot"
+
+- name: Check if HTTP virtual host is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-enabled/testsite.local.conf
+  register: apache_http_vhost_enabled_check
+
+- name: Verify HTTP virtual host is enabled
+  ansible.builtin.assert:
+    that:
+      - apache_http_vhost_enabled_check.stat.exists
+      - apache_http_vhost_enabled_check.stat.islnk
+    fail_msg: "HTTP virtual host is not enabled"
+
+# Test HTTPS Virtual Host (securesite.local)
+- name: Check if HTTPS virtual host document root exists
+  ansible.builtin.stat:
+    path: /var/www/securesite.local
+  register: apache_https_vhost_docroot_check
+
+- name: Verify HTTPS virtual host document root exists
+  ansible.builtin.assert:
+    that:
+      - apache_https_vhost_docroot_check.stat.exists
+      - apache_https_vhost_docroot_check.stat.isdir
+      - apache_https_vhost_docroot_check.stat.mode == "0755"
+      - apache_https_vhost_docroot_check.stat.pw_name == "www-data"
+      - apache_https_vhost_docroot_check.stat.gr_name == "www-data"
+    fail_msg: "HTTPS virtual host document root does not exist or has incorrect permissions"
+
+- name: Check if HTTPS virtual host configuration file exists
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-available/securesite.local.conf
+  register: apache_https_vhost_config_check
+
+- name: Verify HTTPS virtual host configuration file exists
+  ansible.builtin.assert:
+    that:
+      - apache_https_vhost_config_check.stat.exists
+      - apache_https_vhost_config_check.stat.mode == "0644"
+      - apache_https_vhost_config_check.stat.pw_name == "root"
+      - apache_https_vhost_config_check.stat.gr_name == "root"
+    fail_msg: "HTTPS virtual host configuration file does not exist or has incorrect permissions"
+
+- name: Read HTTPS virtual host configuration file content
+  ansible.builtin.slurp:
+    path: /etc/apache2/sites-available/securesite.local.conf
+  register: apache_https_vhost_config_content
+
+- name: Verify HTTPS virtual host has HTTP section with redirect
+  ansible.builtin.assert:
+    that:
+      - "'# HTTP Virtual Host' in (apache_https_vhost_config_content.content | b64decode)"
+      - "'Redirect permanent / https://securesite.local/' in (apache_https_vhost_config_content.content | b64decode)"
+    fail_msg: "HTTPS virtual host does not contain HTTP redirect configuration"
+
+- name: Verify HTTPS virtual host has HTTPS section
+  ansible.builtin.assert:
+    that:
+      - "'# HTTPS Virtual Host' in (apache_https_vhost_config_content.content | b64decode)"
+      - "'SSLEngine on' in (apache_https_vhost_config_content.content | b64decode)"
+    fail_msg: "HTTPS virtual host does not contain HTTPS configuration"
+
+- name: Verify HTTPS virtual host has SSL certificate configuration
+  ansible.builtin.assert:
+    that:
+      - "'SSLCertificateFile /etc/ssl/certs/ssl-cert-snakeoil.pem' in (apache_https_vhost_config_content.content | b64decode)"
+      - "'SSLCertificateKeyFile /etc/ssl/private/ssl-cert-snakeoil.key' in (apache_https_vhost_config_content.content | b64decode)"
+    fail_msg: "HTTPS virtual host does not contain SSL certificate configuration"
+
+- name: Check if HTTPS virtual host is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-enabled/securesite.local.conf
+  register: apache_https_vhost_enabled_check
+
+- name: Verify HTTPS virtual host is enabled
+  ansible.builtin.assert:
+    that:
+      - apache_https_vhost_enabled_check.stat.exists
+      - apache_https_vhost_enabled_check.stat.islnk
+    fail_msg: "HTTPS virtual host is not enabled"

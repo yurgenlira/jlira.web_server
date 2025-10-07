@@ -1,0 +1,92 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Create document root directories for virtual hosts
+  ansible.builtin.file:
+    path: "{{ item.document_root }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0755"
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.state | default('present') == 'present'
+
+- name: Create virtual host configuration files
+  ansible.builtin.template:
+    src: vhost.conf.j2
+    dest: "/etc/apache2/sites-available/{{ item.name }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.state | default('present') == 'present'
+  notify: Reload apache
+
+- name: Enable HTTP virtual hosts
+  ansible.builtin.command:
+    cmd: "a2ensite {{ item.name }}"
+  register: apache_enable_http_vhost_result
+  changed_when: "'Enabling site' in apache_enable_http_vhost_result.stdout"
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.state | default('present') == 'present'
+    - item.http is defined
+    - item.http.enabled | default(true)
+  notify: Reload apache
+
+- name: Disable HTTP virtual hosts
+  ansible.builtin.command:
+    cmd: "a2dissite {{ item.name }}"
+  register: apache_disable_http_vhost_result
+  changed_when:
+    - "'Site' in apache_disable_http_vhost_result.stdout"
+    - "'disabled' in apache_disable_http_vhost_result.stdout"
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.state | default('present') == 'present'
+    - item.http is defined
+    - not (item.http.enabled | default(true))
+  notify: Reload apache
+
+- name: Enable HTTPS virtual hosts
+  ansible.builtin.command:
+    cmd: "a2ensite {{ item.name }}"
+  register: apache_enable_https_vhost_result
+  changed_when: "'Enabling site' in apache_enable_https_vhost_result.stdout"
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.state | default('present') == 'present'
+    - item.https is defined
+    - item.https.enabled | default(true)
+  notify: Reload apache
+
+- name: Disable HTTPS virtual hosts
+  ansible.builtin.command:
+    cmd: "a2dissite {{ item.name }}"
+  register: apache_disable_https_vhost_result
+  changed_when:
+    - "'Site' in apache_disable_https_vhost_result.stdout"
+    - "'disabled' in apache_disable_https_vhost_result.stdout"
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.state | default('present') == 'present'
+    - item.https is defined
+    - not (item.https.enabled | default(true))
+  notify: Reload apache
+
+- name: Remove virtual host configuration files
+  ansible.builtin.file:
+    path: "/etc/apache2/sites-available/{{ item.name }}.conf"
+    state: absent
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.state | default('present') == 'absent'
+  notify: Reload apache

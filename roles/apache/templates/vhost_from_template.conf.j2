@@ -1,0 +1,17 @@
+# {{ ansible_managed }}
+# Virtual Host from Template: {{ item.name }}
+# Template: {{ item.template }}
+
+{% if vhost_template.http is defined %}
+{% for key, value in template_vars.items() %}
+{% set _ = vhost_template.http.update({'content': vhost_template.http.content | replace('{{ ' + key + ' }}', value | string)}) %}
+{% endfor %}
+{{ vhost_template.http.content }}
+{% endif %}
+
+{% if vhost_template.https is defined %}
+{% for key, value in template_vars.items() %}
+{% set _ = vhost_template.https.update({'content': vhost_template.https.content | replace('{{ ' + key + ' }}', value | string)}) %}
+{% endfor %}
+{{ vhost_template.https.content }}
+{% endif %}

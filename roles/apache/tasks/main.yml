@@ -33,3 +33,27 @@
   tags:
     - custom_configs
     - apache_custom_configs
+
+- name: Include jlira.web_server.apache.virtual_hosts.yml
+  ansible.builtin.include_tasks:
+    file: virtual_hosts.yml
+    apply:
+      tags:
+        - virtual_hosts
+        - apache_virtual_hosts
+  when: apache_virtual_hosts | length > 0
+  tags:
+    - virtual_hosts
+    - apache_virtual_hosts
+
+- name: Include jlira.web_server.apache.virtual_hosts_from_templates.yml
+  ansible.builtin.include_tasks:
+    file: virtual_hosts_from_templates.yml
+    apply:
+      tags:
+        - virtual_hosts
+        - apache_virtual_hosts_from_templates
+  when: apache_vhosts_from_templates | length > 0
+  tags:
+    - virtual_hosts
+    - apache_virtual_hosts_from_templates

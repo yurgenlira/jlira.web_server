@@ -9,6 +9,30 @@
         content: |
           # Test custom configuration
           ServerSignature Off
+    apache_virtual_hosts:
+      - name: testsite.local
+        server_name: testsite.local
+        server_alias:
+          - www.testsite.local
+        server_admin: admin@testsite.local
+        document_root: /var/www/testsite.local
+        http:
+          enabled: true
+        custom_directives: |
+          DirectoryIndex index.html
+      - name: securesite.local
+        server_name: securesite.local
+        server_admin: admin@securesite.local
+        document_root: /var/www/securesite.local
+        http:
+          enabled: true
+          custom_directives: |
+            # Redirect to HTTPS
+            Redirect permanent / https://securesite.local/
+        https:
+          enabled: true
+          certificate_file: /etc/ssl/certs/ssl-cert-snakeoil.pem
+          certificate_key_file: /etc/ssl/private/ssl-cert-snakeoil.key
   tasks:
     - name: Apply role under test
       ansible.builtin.include_role:
