@@ -113,12 +113,12 @@
   - ✅ Automatic validation and reload after changes
   - ✅ Support for modular configuration via includes
 
-## 5. Status Page Requirements
+## ✅ 5. Status Page Requirements
 
-### 5.1 Apache Status Page
-- Configure server status monitoring endpoint
-- Support access control via allowed hosts list
-- Trigger validation and reload after changes
+### ✅ 5.1 Apache Status Page
+- ✅ Configure server status monitoring endpoint
+- ✅ Support access control via allowed hosts list
+- ✅ Trigger validation and reload after changes
 
 ## 6. Authentication Requirements
 
