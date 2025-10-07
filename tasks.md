@@ -12,6 +12,11 @@
   - ✅ Support selective execution via tags
   - ✅ Allow granular control of PHP features
 
+**Technical Debt:**
+- ⚠️ PHP role `configure_cli.yml` requires `php_cli_ini_regex_settings` variable to be defined in defaults
+- ⚠️ PHP integration tests temporarily disabled in Apache molecule tests
+- ⚠️ Need to complete PHP role implementation before re-enabling integration tests
+
 ## 3. Configuration Requirements
 
 ### 3.1 Main Apache Configuration

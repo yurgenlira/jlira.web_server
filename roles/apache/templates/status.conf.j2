@@ -1,0 +1,9 @@
+# {{ ansible_managed }}
+# Apache Status Page Configuration
+
+<Location /server-status>
+    SetHandler server-status
+{% for host in apache_status_page_allowed_hosts %}
+    Require ip {{ host }}
+{% endfor %}
+</Location>

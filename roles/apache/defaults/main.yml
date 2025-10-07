@@ -236,6 +236,26 @@ apache_vhost_templates: []
 apache_vhosts_from_templates: []
 
 # ============================================================================
+# Status Page Configuration
+# ============================================================================
+
+# Enable or disable Apache status page.
+# When enabled, creates a /server-status endpoint for monitoring.
+# Type: Boolean
+apache_status_page_enabled: false
+
+# List of hosts allowed to access the Apache status page.
+# Each entry can be an IP address, hostname, or network range.
+# Type: List of Strings
+# Example:
+# apache_status_page_allowed_hosts:
+#   - 127.0.0.1
+#   - 10.0.0.0/24
+#   - monitoring.example.com
+apache_status_page_allowed_hosts:
+  - 127.0.0.1
+
+# ============================================================================
 # Security Configuration
 # ============================================================================
 

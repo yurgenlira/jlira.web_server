@@ -4,6 +4,7 @@
   gather_facts: true
   vars:
     apache_install_php: false
+    apache_status_page_enabled: true
     apache_custom_configs:
       - name: Test custom configuration
         path: /data/apache-conf/custom-headers.conf

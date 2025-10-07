@@ -57,3 +57,14 @@
   tags:
     - virtual_hosts
     - apache_virtual_hosts_from_templates
+
+- name: Include jlira.web_server.apache.status_page.yml
+  ansible.builtin.include_tasks:
+    file: status_page.yml
+    apply:
+      tags:
+        - status_page
+        - apache_status_page
+  tags:
+    - status_page
+    - apache_status_page
