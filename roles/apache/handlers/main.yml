@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: MIT-0
 ---
-# Handlers are executed in the order they are defined
+# Handlers with the same listen tag are executed in the order they are defined
 - name: Check Apache config syntax
-  listen: Reload apache
+  listen:
+    - Reload apache
+    - Restart apache
   ansible.builtin.command:
     cmd: apachectl configtest
   changed_when: false
@@ -12,3 +14,9 @@
   ansible.builtin.service:
     name: apache2
     state: reloaded
+
+- name: Restart Apache service
+  listen: Restart apache
+  ansible.builtin.service:
+    name: apache2
+    state: restarted
