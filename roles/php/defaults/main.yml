@@ -56,10 +56,63 @@ php_composer_enabled: false
 # Version Management
 # ============================================================================
 
-# # Determines if the newly installed PHP version should be set as the default CLI version.
-# # If set to true, the PHP version specified in `php_version` will be made the default.
-# # Type: Boolean
-# php_cli_set_as_default_version: false
+# Determines if the newly installed PHP version should be set as the default CLI version.
+# When enabled, the PHP version specified in `php_version` will become the system default
+# for command-line PHP execution (updates /usr/bin/php symlink).
+#
+# This is useful when:
+# - Installing PHP for the first time
+# - Upgrading to a newer PHP version
+# - Managing multiple PHP versions and wanting to switch the default
+#
+# Note: This uses the Debian alternatives system to manage version priority.
+# Higher versions automatically receive higher priority.
+#
+# Type: Boolean
+php_cli_set_as_default_version: true
+
+# Determines if the newly installed PHP-FPM version should be configured as the default
+# for web server integration. When enabled, sets the PHP_VERSION environment variable
+# in the web server configuration.
+#
+# This is useful when:
+# - Using PHP-FPM with a web server (Apache/Nginx)
+# - Running multiple PHP-FPM versions and needing to specify which one to use
+# - Ensuring the web server knows which PHP version to proxy requests to
+#
+# Requires:
+# - php_fpm_enabled: true
+# - php_web_server: must be set to 'apache' or 'nginx'
+#
+# Type: Boolean
+php_fpm_set_as_default_version: false
+
+# Specifies the web server being used with PHP-FPM for environment variable configuration.
+# Currently supported values: 'apache', 'nginx'
+#
+# When set to 'apache': Updates /etc/apache2/envvars with PHP_VERSION
+# When set to 'nginx': Updates /etc/default/php{version}-fpm with PHP_VERSION
+#
+# Type: String (Options: apache, nginx)
+php_web_server: "apache"
+
+# Previous PHP version to remove during version upgrades or migrations.
+# When defined, triggers complete cleanup of the old PHP installation including:
+# - PHP packages and extensions
+# - PHP-FPM service (stopped and disabled)
+# - Configuration files
+# - Log files and directories
+# - Extension configuration files
+#
+# Safety measures:
+# - Must be different from php_version (cannot remove the version being installed)
+# - Removal only occurs when this variable is explicitly defined
+# - Supports clean migration between major or minor PHP versions
+#
+# Example: When upgrading from PHP 8.3 to 8.4, set php_old_version: "8.3"
+#
+# Type: String
+# php_old_version: ""
 
 # Settings for the `php.ini` configuration file for PHP-CLI.
 # These settings customize PHP's behavior such as memory limits, error reporting, and file upload sizes.
@@ -81,15 +134,6 @@ php_cli_settings:
   upload_max_filesize: 2M                         # Maximum allowed size for uploaded files.
   max_file_uploads: 20                            # Maximum number of files that can be uploaded via a single request.
   mail_add_x_header: false                        # Add X-PHP-Originating-Script header to mail.
-
-# # Web server being used with PHP (e.g., Apache or Nginx).
-# # If is set to 'apache' it will set env var PHP_VERSION in /etc/apache2/envvars
-# php_web_server: apache
-
-# # Determines if the newly installed PHP version should be set as the default FPM version.
-# # If set to true, It will set env var `PHP_VERSION={{ php_version }}` in /etc/apache2/envvars.
-# # Type: Boolean
-# php_fpm_set_as_default_version: false
 
 # # Enable or disable the installation and configuration of Microsoft SQL Server drivers for PHP.
 # # Type: Boolean

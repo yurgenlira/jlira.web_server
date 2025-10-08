@@ -10,6 +10,23 @@ php_ppa_repository: "ppa:ondrej/php"
 # Type: String
 php_ppa_file: ondrej-ubuntu-php-noble.sources
 
+# PHP version without the period, used for creating directory paths or filenames.
+# Derived from `php_version` by removing the dot.
+# Example: "8.4" becomes "84"
+# Type: String
+php_version_no_dot: "{{ php_version | replace('.', '') }}"
+
+# Priority value for update-alternatives based on PHP version number.
+# Higher version numbers receive higher priority automatically.
+# Example: PHP 8.4 gets priority 84, PHP 8.3 gets priority 83
+# Type: String
+php_priority: "{{ php_version_no_dot }}"
+
+# PHP-FPM service name based on the PHP version.
+# Example: "php8.4-fpm" for PHP 8.4
+# Type: String
+php_fpm_service_name: "php{{ php_version }}-fpm"
+
 # # The repository for Microsoft SQL Server PHP extensions.
 # # This is necessary to install the SQL Server extension for PHP.
 # # Type: Dictionary
@@ -19,8 +36,3 @@ php_ppa_file: ondrej-ubuntu-php-noble.sources
 #   repository: "deb [arch=amd64,armhf,arm64 signed-by=/usr/share/keyrings/microsoft.gpg] \
 #            https://packages.microsoft.com/ubuntu/{{ ansible_distribution_version }}/prod \
 #            {{ ansible_distribution_release }} main"
-
-# # PHP version without the period, used for creating directory paths or filenames.
-# # Derived from `php_version` by removing the dot.
-# # Type: String
-# php_version_no_dot: "{{ php_version | replace('.', '') }}"

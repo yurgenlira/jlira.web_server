@@ -8,17 +8,17 @@
 ##       - '!min'
         # #  - os_family
 
-# - name: Include generic.web_server.php.remove_old_version.yml
-#   ansible.builtin.include_tasks:
-#     file: remove_old_version.yml
-#     apply:
-#       tags:
-#         - remove_old_version
-#         - php_remove_old_version
-#   tags:
-#     - remove_old_version
-#     - php_remove_old_version
-#   when: php_old_version is defined
+- name: Include jlira.web_server.php.remove_old_version.yml
+  ansible.builtin.include_tasks:
+    file: remove_old_version.yml
+    apply:
+      tags:
+        - remove_old_version
+        - php_remove_old_version
+  tags:
+    - remove_old_version
+    - php_remove_old_version
+  when: php_old_version is defined and php_old_version | length > 0
 
 - name: Include jlira.web_server.php.install.yml
   ansible.builtin.include_tasks:
@@ -31,19 +31,31 @@
     - install
     - php_install
 
-# - name: Include generic.web_server.php.set_cli_version.yml
-#   ansible.builtin.include_tasks:
-#     file: set_cli_version.yml
-#     apply:
-#       tags:
-#         - set_cli_version
-#         - php_set_cli_version
-#   tags:
-#     - set_cli_version
-#     - php_set_cli_version
-#   when: php_cli_set_as_default_version
+- name: Include jlira.web_server.php.set_cli_version.yml
+  ansible.builtin.include_tasks:
+    file: set_cli_version.yml
+    apply:
+      tags:
+        - set_cli_version
+        - php_set_cli_version
+  tags:
+    - set_cli_version
+    - php_set_cli_version
+  when: php_cli_set_as_default_version
 
-# - name: Include generic.web_server.php.install_mssql_extension.yml
+- name: Include jlira.web_server.php.set_fpm_version.yml
+  ansible.builtin.include_tasks:
+    file: set_fpm_version.yml
+    apply:
+      tags:
+        - set_fpm_version
+        - php_set_fpm_version
+  tags:
+    - set_fpm_version
+    - php_set_fpm_version
+  when: php_fpm_enabled and php_fpm_set_as_default_version
+
+# - name: Include jlira.web_server.php.install_mssql_extension.yml
 #   ansible.builtin.include_tasks:
 #     file: install_mssql_extension.yml
 #     apply:
@@ -55,18 +67,18 @@
 #     - php_install_mssql_extension
 #   when: php_mssql_extension_enabled
 
-# - name: Include generic.web_server.php.configure_cli.yml
-#   ansible.builtin.include_tasks:
-#     file: configure_cli.yml
-#     apply:
-#       tags:
-#         - configure_cli
-#         - php_configure_cli
-#   tags:
-#     - configure_cli
-#     - php_configure_cli
+- name: Include jlira.web_server.php.configure_cli.yml
+  ansible.builtin.include_tasks:
+    file: configure_cli.yml
+    apply:
+      tags:
+        - configure_cli
+        - php_configure_cli
+  tags:
+    - configure_cli
+    - php_configure_cli
 
-# - name: Include generic.web_server.php.logrotate_cli.yml
+# - name: Include jlira.web_server.php.logrotate_cli.yml
 #   ansible.builtin.include_tasks:
 #     file: logrotate_cli.yml
 #     apply:
@@ -77,7 +89,7 @@
 #     - logrotate_cli
 #     - php_logrotate_cli
 
-# - name: Include generic.web_server.php.configure_fpm.yml
+# - name: Include jlira.web_server.php.configure_fpm.yml
 #   ansible.builtin.include_tasks:
 #     file: configure_fpm.yml
 #     apply:
@@ -89,7 +101,7 @@
 #     - php_configure_fpm
 #   when: php_fpm_enabled
 
-# - name: Include generic.web_server.php.logrotate_fpm.yml
+# - name: Include jlira.web_server.php.logrotate_fpm.yml
 #   ansible.builtin.include_tasks:
 #     file: logrotate_fpm.yml
 #     apply:
@@ -101,7 +113,7 @@
 #     - php_logrotate_fpm
 #   when: php_fpm_enabled
 
-# - name: Include generic.web_server.php.configure_status_page.yml
+# - name: Include jlira.web_server.php.configure_status_page.yml
 #   ansible.builtin.include_tasks:
 #     file: configure_status_page.yml
 #     apply:
@@ -113,7 +125,7 @@
 #     - php_configure_status_page
 #   when: php_fpm_enabled
 
-# # - name: Include generic.web_server.php.error_reporting.yml
+# # - name: Include jlira.web_server.php.error_reporting.yml
 # #   ansible.builtin.include_tasks:
 # #     file: error_reporting.yml
 # #     apply:

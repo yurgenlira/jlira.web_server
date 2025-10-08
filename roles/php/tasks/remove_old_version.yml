@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Verify old version is different from current version
+  ansible.builtin.assert:
+    that:
+      - php_old_version is defined
+      - php_old_version != php_version
+    fail_msg: "Cannot remove the same version being installed (php_old_version: {{ php_old_version | default('undefined') }}, php_version: {{ php_version }})"
+    quiet: true
+
+- name: Stop old PHP-FPM service
+  ansible.builtin.service:
+    name: "php{{ php_old_version }}-fpm"
+    state: stopped
+  failed_when: false
+  when: php_fpm_enabled
+  tags:
+    - php_remove_old_version
+    - php_version_management
+
+- name: Disable old PHP-FPM service
+  ansible.builtin.service:
+    name: "php{{ php_old_version }}-fpm"
+    enabled: false
+  failed_when: false
+  when: php_fpm_enabled
+  tags:
+    - php_remove_old_version
+    - php_version_management
+
+- name: Remove old PHP {{ php_old_version }} packages
+  ansible.builtin.apt:
+    name: "php{{ php_old_version }}*"
+    state: absent
+    purge: true
+  tags:
+    - php_remove_old_version
+    - php_version_management
+
+- name: Remove old PHP {{ php_old_version }} configuration directory
+  ansible.builtin.file:
+    path: "/etc/php/{{ php_old_version }}"
+    state: absent
+  tags:
+    - php_remove_old_version
+    - php_version_management
+
+- name: Remove old PHP {{ php_old_version }} log directory
+  ansible.builtin.file:
+    path: "/var/log/php{{ php_old_version }}"
+    state: absent
+  failed_when: false
+  tags:
+    - php_remove_old_version
+    - php_version_management
+
+- name: Clean up APT cache after removal
+  ansible.builtin.apt:
+    autoclean: true
+    autoremove: true
+  tags:
+    - php_remove_old_version
+    - php_version_management
