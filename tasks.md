@@ -141,20 +141,20 @@
 - ✅ Restart service when required for disruptive changes
 - ✅ Manage service via system service manager
 
-## 8. Idempotency Requirements
+## ✅ 8. Idempotency Requirements
 
-### 8.1 Change Detection
-- Use appropriate automation modules to detect changes
-- Avoid unnecessary service disruptions
-- Check current state before making changes
-- Support dry-run validation mode
-- Report changes accurately
+### ✅ 8.1 Change Detection
+- ✅ Use appropriate automation modules to detect changes
+- ✅ Avoid unnecessary service disruptions
+- ✅ Check current state before making changes
+- ✅ Support dry-run validation mode
+- ✅ Report changes accurately
 
-### 8.2 File Management
-- Mark managed configuration sections
-- Preserve existing configuration outside managed blocks
-- Create files conditionally when needed
-- Support idempotent command execution
+### ✅ 8.2 File Management
+- ✅ Mark managed configuration sections
+- ✅ Preserve existing configuration outside managed blocks
+- ✅ Create files conditionally when needed
+- ✅ Support idempotent command execution
 
 ## 9. Dependency Requirements
 
