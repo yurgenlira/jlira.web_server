@@ -19,48 +19,48 @@
 
 ## 3. Configuration Requirements
 
-### 3.1 Main Apache Configuration
-- **ServerName Configuration:**
-  - Configure server hostname
-  - Support system hostname as default
-  - Allow custom server names
+### ✅ 3.1 Main Apache Configuration
+- ✅ **ServerName Configuration:**
+  - ✅ Configure server hostname
+  - ✅ Support system hostname as default
+  - ✅ Allow custom server names
 
-- **Apache Main Settings:**
-  - Support custom Apache directives like LimitRequestLine, LimitRequestFieldSize, etc
-  - Support documentation via comments
-  - Support arbitrary user-defined environment variables
+- ✅ **Apache Main Settings:**
+  - ✅ Support custom Apache directives like LimitRequestLine, LimitRequestFieldSize, etc
+  - ✅ Support documentation via comments
+  - ✅ Support arbitrary user-defined environment variables
   - Allow to use a custom configuration directory path
   - Allow to set custom log directory path if you want
 
-- **SSL Configuration:**
-  - Enable SSL site by default
-  - Manage site enablement
+- ✅ **SSL Configuration:**
+  - ✅ Enable SSL site by default
+  - ✅ Manage site enablement
 
-- **Port Configuration:**
+- ✅ **Port Configuration:**
   - ✅ Configure multiple HTTP ports (default: 80)
   - ✅ Configure multiple HTTPS ports (default: 443, when SSL enabled)
   - ✅ Manage port configuration
 
-- **Firewall Configuration:**
-  - Detect firewall presence
-  - Configure HTTP port access
-  - Configure HTTPS port access (when SSL enabled)
-  - Configure custom port access
-  - Manage firewall state
+- ✅ **Firewall Configuration:**
+  - ✅ Detect firewall presence
+  - ✅ Configure HTTP port access
+  - ✅ Configure HTTPS port access (when SSL enabled)
+  - ✅ Configure custom port access
+  - ✅ Manage firewall state
 
-- **Module Management:**
-  - Enable additional modules
-  - Activate modules idempotently
+- ✅ **Module Management:**
+  - ✅ Enable additional modules
+  - ✅ Activate modules idempotently
 
-- **Default Index Page:**
-  - Create default welcome page
-  - Set appropriate file ownership and permissions
+- ✅ **Default Index Page:**
+  - ✅ Create default welcome page
+  - ✅ Set appropriate file ownership and permissions
 
-- **Default Virtual Host Configuration:**
-  - Organize default virtual host files
-  - Integrate PHP-FPM when PHP is enabled
-  - Configure SSL virtual hosts
-  - Support custom ports in SSL virtual hosts
+- ✅ **Default Virtual Host Configuration:**
+  - ✅ Organize default virtual host files
+  - ✅ Integrate PHP-FPM when PHP is enabled
+  - ✅ Configure SSL virtual hosts
+  - ✅ Support custom ports in SSL virtual hosts
 
 - **Security Configuration:**
   - ✅ Configure server information disclosure settings
