@@ -23,6 +23,10 @@
       ansible.builtin.include_tasks:
         file: tests/status_page.yml
 
+    - name: Include authentication tests
+      ansible.builtin.include_tasks:
+        file: tests/authentication.yml
+
     # Disabled until PHP role configure_cli.yml is fixed
     # - name: Include php_integration tests
     #   ansible.builtin.include_tasks:

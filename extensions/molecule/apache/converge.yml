@@ -5,6 +5,17 @@
   vars:
     apache_install_php: false
     apache_status_page_enabled: true
+    apache_htpasswd_files:
+      - path: /etc/apache2/.htpasswd
+        users:
+          - name: admin
+            password: adminpass123
+          - name: testuser
+            password: testpass456
+      - path: /etc/apache2/.htpasswd-api
+        users:
+          - name: api_user
+            password: apisecret789
     apache_custom_configs:
       - name: Test custom configuration
         path: /data/apache-conf/custom-headers.conf

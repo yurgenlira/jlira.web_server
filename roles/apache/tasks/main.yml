@@ -68,3 +68,15 @@
   tags:
     - status_page
     - apache_status_page
+
+- name: Include jlira.web_server.apache.authentication.yml
+  ansible.builtin.include_tasks:
+    file: authentication.yml
+    apply:
+      tags:
+        - authentication
+        - apache_authentication
+  when: apache_htpasswd_files | length > 0
+  tags:
+    - authentication
+    - apache_authentication

@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Install passlib for htpasswd module
+  ansible.builtin.apt:
+    name: python3-passlib
+    state: present
+    update_cache: true
+
+- name: Create htpasswd files with users
+  community.general.htpasswd:
+    path: "{{ item.0.path }}"
+    name: "{{ item.1.name }}"
+    password: "{{ item.1.password }}"
+    owner: root
+    group: www-data
+    mode: "0640"
+    state: "{{ item.1.state | default('present') }}"
+    create: true
+  loop: "{{ apache_htpasswd_files | subelements('users') }}"
+  when: apache_htpasswd_files | length > 0
+  no_log: true

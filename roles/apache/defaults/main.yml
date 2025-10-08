@@ -256,6 +256,36 @@ apache_status_page_allowed_hosts:
   - 127.0.0.1
 
 # ============================================================================
+# HTTP Authentication Configuration
+# ============================================================================
+
+# List of htpasswd files to create and manage.
+# Each entry defines a password file with one or more users.
+# Type: List of Dictionaries
+#
+# - `path`: Absolute path to the htpasswd file
+# - `users`: List of users to add/update in the file
+#   - `name`: Username
+#   - `password`: Password in plaintext (will be hashed)
+#   - `state`: present or absent (default: present)
+#
+# Example:
+# apache_htpasswd_files:
+#   - path: /etc/apache2/.htpasswd
+#     users:
+#       - name: admin
+#         password: secure_password
+#       - name: user1
+#         password: another_password
+#   - path: /etc/apache2/.htpasswd-api
+#     users:
+#       - name: api_user
+#         password: api_secret
+#
+# Type: List of Dictionaries
+apache_htpasswd_files: []
+
+# ============================================================================
 # Security Configuration
 # ============================================================================
 
