@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: MIT-0
+# {{ ansible_managed }}
+# PHP {{ php_version }} FPM Status Page Configuration
+
+# Status page endpoint
+<Location "{{ php_pool_settings.status_path | default('/status-' + php_version) }}">
+    # Proxy timeout for FPM connections
+    ProxyTimeout {{ php_proxy_timeout | default(60) }}
+
+    # File existence check for security
+    <If "-f %{REQUEST_FILENAME}">
+        Require all denied
+    </If>
+
+    # Proxy to PHP-FPM
+    ProxyPass "unix:/run/php/php{{ php_version }}-fpm.sock|fcgi://localhost{{ php_pool_settings.status_path | default('/status-' + php_version) }}"
+
+    # Access control
+{% if php_status_page_allowed_hosts is defined and php_status_page_allowed_hosts | length > 0 %}
+    Require ip 127.0.0.1 ::1
+{% for host in php_status_page_allowed_hosts %}
+    # {{ host.comment | default('Allowed host') }}
+    Require ip {{ host.ip }}
+{% endfor %}
+{% else %}
+    Require ip 127.0.0.1 ::1
+{% endif %}
+</Location>
+
+# Ping endpoint
+<Location "{{ php_pool_settings.ping_path | default('/ping-' + php_version) }}">
+    # Proxy timeout for FPM connections
+    ProxyTimeout {{ php_proxy_timeout | default(60) }}
+
+    # File existence check for security
+    <If "-f %{REQUEST_FILENAME}">
+        Require all denied
+    </If>
+
+    # Proxy to PHP-FPM
+    ProxyPass "unix:/run/php/php{{ php_version }}-fpm.sock|fcgi://localhost{{ php_pool_settings.ping_path | default('/ping-' + php_version) }}"
+
+    # Access control
+{% if php_status_page_allowed_hosts is defined and php_status_page_allowed_hosts | length > 0 %}
+    Require ip 127.0.0.1 ::1
+{% for host in php_status_page_allowed_hosts %}
+    # {{ host.comment | default('Allowed host') }}
+    Require ip {{ host.ip }}
+{% endfor %}
+{% else %}
+    Require ip 127.0.0.1 ::1
+{% endif %}
+</Location>

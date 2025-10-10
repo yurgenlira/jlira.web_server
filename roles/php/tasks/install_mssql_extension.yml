@@ -7,10 +7,13 @@
       - os_family
       - distribution
 
-- name: Install prerequisites for installation
+- name: Install development packages
   ansible.builtin.apt:
     name:
+      - unixodbc-dev
+      - php-pear
       - php{{ php_version }}-dev
+      - php{{ php_version }}-xml
     state: present
     update_cache: true
 
@@ -49,14 +52,6 @@
     mode: '0755'
     line: 'export PATH="$PATH:/opt/mssql-tools{{ php_mssql_package_version }}/bin"'
     create: true
-    state: present
-
-- name: Install development packages
-  ansible.builtin.apt:
-    name:
-      - unixodbc-dev
-      - php-pear
-      - php-dev
     state: present
 
 - name: Get PHP extension directory

@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Configure Apache for PHP-FPM status page proxy
+  ansible.builtin.template:
+    src: php-fpm-status.conf.j2
+    dest: "/etc/apache2/conf-available/php{{ item.version }}-fpm-status.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ apache_php_fpm_status_configs }}"
+  when:
+    - apache_php_fpm_status_configs is defined
+    - apache_php_fpm_status_configs | length > 0
+  notify: Reload apache
+
+- name: Enable PHP-FPM status page configuration
+  ansible.builtin.command:
+    cmd: "a2enconf php{{ item.version }}-fpm-status"
+    creates: "/etc/apache2/conf-enabled/php{{ item.version }}-fpm-status.conf"
+  loop: "{{ apache_php_fpm_status_configs }}"
+  when:
+    - apache_php_fpm_status_configs is defined
+    - apache_php_fpm_status_configs | length > 0
+  notify: Reload apache

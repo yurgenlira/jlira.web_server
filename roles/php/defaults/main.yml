@@ -295,3 +295,43 @@ php_pool_additional_settings:
 # php_status_page_allowed_hosts: []
 # #   - ip: 10.0.0.1
 # #     comment: allow access to host
+
+# ============================================================================
+# Logrotate Configuration
+# ============================================================================
+
+# Enable logrotate for PHP CLI.
+# Type: Boolean
+php_cli_logrotate_enabled: true
+
+# Path to the PHP CLI log file for log rotation.
+# Type: String
+php_cli_logrotate_path: "{{ php_cli_settings.error_log.value }}"
+
+# Options for logrotate.
+# Type: List of Strings
+php_cli_logrotate_options:
+  - daily
+  - rotate 7
+  - missingok
+  - notifempty
+  - compress
+  - delaycompress
+
+# Enable logrotate for PHP FPM.
+# Type: Boolean
+php_fpm_logrotate_enabled: true
+
+# Path to the PHP FPM log file for log rotation.
+# Type: String
+php_fpm_logrotate_path: "/var/log/php/php{{ php_version }}-fpm.log"
+
+# Options for logrotate.
+# Type: List of Strings
+php_fpm_logrotate_options:
+  - daily
+  - rotate 7
+  - missingok
+  - notifempty
+  - compress
+  - delaycompress

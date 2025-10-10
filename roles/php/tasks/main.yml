@@ -73,16 +73,17 @@
     - configure_cli
     - php_configure_cli
 
-# # - name: Include jlira.web_server.php.logrotate_cli.yml
-# #   ansible.builtin.include_tasks:
-# #     file: logrotate_cli.yml
-# #     apply:
-# #       tags:
-# #         - logrotate_cli
-# #         - php_logrotate_cli
-# #   tags:
-# #     - logrotate_cli
-# #     - php_logrotate_cli
+- name: Include jlira.web_server.php.logrotate_cli.yml
+  ansible.builtin.include_tasks:
+    file: logrotate_cli.yml
+    apply:
+      tags:
+        - logrotate_cli
+        - php_logrotate_cli
+  tags:
+    - logrotate_cli
+    - php_logrotate_cli
+  when: php_cli_logrotate_enabled
 
 - name: Include jlira.web_server.php.configure_fpm.yml
   ansible.builtin.include_tasks:
@@ -96,17 +97,17 @@
     - php_configure_fpm
   when: php_fpm_enabled
 
-# # - name: Include jlira.web_server.php.logrotate_fpm.yml
-# #   ansible.builtin.include_tasks:
-# #     file: logrotate_fpm.yml
-# #     apply:
-# #       tags:
-# #         - logrotate_fpm
-# #         - php_logrotate_fpm
-# #   tags:
-# #     - logrotate_fpm
-# #     - php_logrotate_fpm
-# #   when: php_fpm_enabled
+- name: Include jlira.web_server.php.logrotate_fpm.yml
+  ansible.builtin.include_tasks:
+    file: logrotate_fpm.yml
+    apply:
+      tags:
+        - logrotate_fpm
+        - php_logrotate_fpm
+  tags:
+    - logrotate_fpm
+    - php_logrotate_fpm
+  when: php_fpm_enabled and php_fpm_logrotate_enabled
 
 # - name: Include jlira.web_server.php.configure_status_page.yml
 #   ansible.builtin.include_tasks:

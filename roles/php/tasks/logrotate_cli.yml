@@ -1,0 +1,8 @@
+---
+- name: Configure logrotate for PHP CLI
+  ansible.builtin.template:
+    src: logrotate_cli.conf.j2
+    dest: /etc/logrotate.d/php-cli
+    owner: root
+    group: root
+    mode: '0644'

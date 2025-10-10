@@ -190,7 +190,7 @@
   - ✅ Install PHP core and extensions from configurable package list
   - ✅ Support PHP-FPM installation when enabled
   - ✅ Support Composer installation when enabled
-  - Install packages idempotently
+  - ✅ Install packages idempotently
   - ✅ Ensure FPM service is started and enabled
 ### 16.2 PHP Configuration Management
 #### 16.2.1 CLI Configuration
@@ -262,18 +262,15 @@
 
 #### 16.6.1 Log Rotation
 - **CLI Log Rotation:**
-  - Configure logrotate for PHP CLI error logs
-  - Support custom log paths
-  - Create logrotate configuration from templates
+  - ✅ Configure logrotate for PHP CLI error logs
+  - ✅ Support custom log paths
+  - ✅ Create logrotate configuration from templates
 
 - **FPM Log Rotation:**
-  - Configure logrotate for PHP-FPM logs
-  - Support custom FPM log paths
-  - Create version-specific logrotate configuration
+  - ✅ Configure logrotate for PHP-FPM logs
+  - ✅ Support custom FPM log paths
+  - ✅ Create version-specific logrotate configuration
 
-
-
-### 16.10 Variables and Configuration
 ### 16.11 Testing Requirements
 - **Molecule Tests:**
   - Support create, converge, verify, and destroy lifecycle
@@ -281,17 +278,8 @@
 ### 16.12 Integration Requirements
 - **Web Server Integration:**
   - Integrate with web servers via environment variables
-  - Support conditional web server restarts
   - Configure FPM status page endpoint access
   - Add file existence checks for secure execution
-
-- **System Integration:**
-  - Gather system facts for version-specific decisions
-  - Manage system alternatives for version switching
-  - Integrate with system service manager (systemd)
-  - Configure system PATH for command-line tools
-
-
 
 - **Tag Support:**
   - Support role-wide tags (php_*)
@@ -328,3 +316,5 @@
 - **Role Integration:**
   - Update `apache/tasks/main.yml` to include `php_integration.yml` conditionally.
   - Support multiple PHP versions on same system if you don't set a default version (mejor agregar el arcgivo .conf por defecto)
+
+- testear cuando se haen los logs y cuando se necesita logrotate

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PHP {{ php_version }} FPM Status</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .status-link {
+            display: inline-block;
+            margin: 10px 5px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 3px;
+        }
+        .status-link:hover {
+            background-color: #45a049;
+        }
+        .info {
+            background-color: #e7f3fe;
+            border-left: 4px solid #2196F3;
+            padding: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PHP {{ php_version }} FPM Status Monitor</h1>
+
+        <div class="info">
+            <p><strong>PHP Version:</strong> {{ php_version }}</p>
+            <p><strong>Pool Name:</strong> {{ php_pool_settings.pool_name | default('www-' + php_version) }}</p>
+        </div>
+
+        <h2>Available Status Pages</h2>
+        <p>Click on the links below to view different status formats:</p>
+
+        <div>
+            <a href="{{ php_pool_settings.status_path | default('/status-' + php_version) }}" class="status-link">
+                Text Status
+            </a>
+            <a href="{{ php_pool_settings.status_path | default('/status-' + php_version) }}?json" class="status-link">
+                JSON Status
+            </a>
+            <a href="{{ php_pool_settings.status_path | default('/status-' + php_version) }}?html" class="status-link">
+                HTML Status
+            </a>
+            <a href="{{ php_pool_settings.status_path | default('/status-' + php_version) }}?xml" class="status-link">
+                XML Status
+            </a>
+            <a href="{{ php_pool_settings.status_path | default('/status-' + php_version) }}?full" class="status-link">
+                Full Status
+            </a>
+        </div>
+
+        <h2>Ping Endpoint</h2>
+        <p>
+            <a href="{{ php_pool_settings.ping_path | default('/ping-' + php_version) }}" class="status-link">
+                Ping PHP-FPM
+            </a>
+        </p>
+
+        <div class="info">
+            <h3>About FPM Status</h3>
+            <p>The status page shows information about the FPM pool including:</p>
+            <ul>
+                <li>Pool name and process manager type</li>
+                <li>Start time and uptime</li>
+                <li>Accepted connections</li>
+                <li>Queue status (current, maximum, length)</li>
+                <li>Process counts (idle, active, total)</li>
+                <li>Maximum processes reached</li>
+            </ul>
+            <p><strong>Note:</strong> Add <code>?full</code> to see detailed information about each process.</p>
+        </div>
+    </div>
+</body>
+</html>
