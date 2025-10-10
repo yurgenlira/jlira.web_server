@@ -1,7 +1,25 @@
+# SPDX-License-Identifier: MIT-0
 - name: Verify
   hosts: all
   gather_facts: false
+  vars_files:
+    - "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/../roles/php/defaults/main.yml" # Load role defaults
+    - vars.yml
   tasks:
-    - name: Include install tests
+    - name: Include install.yml tests
       ansible.builtin.include_tasks:
         file: tests/install.yml
+
+    - name: Include configure_cli.yml tests
+      ansible.builtin.include_tasks:
+        file: tests/configure_cli.yml
+
+    - name: Include configure_fpm.yml tests
+      ansible.builtin.include_tasks:
+        file: tests/configure_fpm.yml
+      when: php_fpm_enabled
+
+    - name: Include configure_status_page.yml tests
+      ansible.builtin.include_tasks:
+        file: tests/configure_status_page.yml
+      when: php_fpm_enabled and php_status_page_enabled

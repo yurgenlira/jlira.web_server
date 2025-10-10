@@ -1,0 +1,104 @@
+---
+- name: Gather facts
+  ansible.builtin.setup:
+    gather_subset:
+      - '!all'
+      - '!min'
+      - os_family
+      - distribution
+
+- name: Install prerequisites for installation
+  ansible.builtin.apt:
+    name:
+      - php{{ php_version }}-dev
+    state: present
+    update_cache: true
+
+# /etc/apt/trusted.gpg.d/ is the old dir so use /usr/share/keyrings
+- name: Add Microsoft GPG key
+  ansible.builtin.apt_key:
+    url: "{{ php_mssql_apt.key_url }}"
+    keyring: "{{ php_mssql_apt.key_file }}"
+    state: present
+
+- name: Add Microsoft APT repository
+  ansible.builtin.apt_repository:
+    repo: "{{ php_mssql_apt.repository }}"
+    state: present
+    filename: microsoft
+
+- name: Install Microsoft ODBC {{ php_mssql_package_version }}
+  ansible.builtin.apt:
+    name: "msodbcsql{{ php_mssql_package_version }}"
+    state: present
+    update_cache: true
+  environment:
+    ACCEPT_EULA: "Y"
+
+- name: Optionally install mssql-tools{{ php_mssql_package_version }}
+  ansible.builtin.apt:
+    name: "mssql-tools{{ php_mssql_package_version }}"
+    state: present
+    update_cache: true
+  environment:
+    ACCEPT_EULA: "Y"
+
+- name: Add mssql-tools to the system-wide PATH
+  ansible.builtin.lineinfile:
+    path: /etc/profile.d/mssql-tools.sh
+    mode: '0755'
+    line: 'export PATH="$PATH:/opt/mssql-tools{{ php_mssql_package_version }}/bin"'
+    create: true
+    state: present
+
+- name: Install development packages
+  ansible.builtin.apt:
+    name:
+      - unixodbc-dev
+      - php-pear
+      - php-dev
+    state: present
+
+- name: Get PHP extension directory
+  ansible.builtin.shell: "$(which php{{ php_version }}) -r \"echo ini_get('extension_dir');\""
+  register: php_extension_dir_output
+  changed_when: false
+  check_mode: false
+
+- name: Install PHP sqlsrv module
+  ansible.builtin.shell:
+    cmd: pecl config-set php_suffix {{ php_version }} && pecl install -f sqlsrv
+  args:
+    creates: "{{ php_extension_dir_output.stdout }}/sqlsrv.so"
+  register: php_compile_sqlsrv
+  # failed_when:
+  #   - php_compile_sqlsrv.rc != 0
+  #   - php_compile_sqlsrv.rc != -11
+
+- name: Install PHP pdo_sqlsrv module
+  ansible.builtin.shell:
+    cmd: pecl config-set php_suffix {{ php_version }} && pecl install -f pdo_sqlsrv
+  args:
+    creates: "{{ php_extension_dir_output.stdout }}/pdo_sqlsrv.so"
+  register: php_compile_pdo_sqlsrv
+  # failed_when:
+  #   - php_compile_pdo_sqlsrv.rc != 0
+  #   - php_compile_pdo_sqlsrv.rc != -11
+
+- name: Create sqlsrv.ini file
+  ansible.builtin.shell:
+    cmd: printf "; priority=20\nextension=sqlsrv.so\n" > /etc/php/{{ php_version }}/mods-available/sqlsrv.ini
+  args:
+    creates: /etc/php/{{ php_version }}/mods-available/sqlsrv.ini
+
+- name: Create pdo_sqlsrv.ini file
+  ansible.builtin.shell:
+    cmd: printf "; priority=30\nextension=pdo_sqlsrv.so\n" > /etc/php/{{ php_version }}/mods-available/pdo_sqlsrv.ini
+  args:
+    creates: /etc/php/{{ php_version }}/mods-available/pdo_sqlsrv.ini
+
+- name: Enable PHP sqlsrv and pdo_sqlsrv modules
+  ansible.builtin.command:
+    cmd: phpenmod -v {{ php_version }} sqlsrv pdo_sqlsrv
+  register: php_enable_sqlsrv
+  changed_when: php_enable_sqlsrv == 0

@@ -1,8 +1,28 @@
+# SPDX-License-Identifier: MIT-0
 ---
 - name: Converge
   hosts: all
-  gather_facts: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
   tasks:
-    - name: Apply role under test
+    # - name: Apply apache role
+    #   ansible.builtin.include_role:
+    #     name: apache
+
+    - name: Apply php role under test
       ansible.builtin.include_role:
         name: php
+      tags:
+        - install
+        - php_install
+        - configure_cli
+        - php_configure_cli
+        - set_default_cli_version
+        - php_set_default_cli_version
+        - configure_fpm
+        - php_configure_fpm
+        # - configure_status_page
+        # - php_configure_status_page
+        - php_install_mssql_extension
+        - install_mssql_extension

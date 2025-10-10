@@ -1,71 +1,45 @@
 # SPDX-License-Identifier: MIT-0
 ---
-- name: Install software-properties-common for PPA management
+- name: Install prerequisites for installation
   ansible.builtin.apt:
-    name: software-properties-common
+    name:
+      - curl
+      - gnupg
+      - dirmngr
     state: present
     update_cache: true
-  tags:
-    - php_install
-    - php_install_prerequisites
 
 - name: Add Ondrej PHP PPA repository
   ansible.builtin.apt_repository:
     repo: "{{ php_ppa_repository }}"
     state: present
     update_cache: true
-  tags:
-    - php_install
-    - php_add_repository
 
-- name: Install PHP {{ php_version }} packages
+- name: Install PHP CLI and packages for version {{ php_version }}
   ansible.builtin.apt:
-    name: "{{ php_packages }}"
+    name: "{{ ['php' ~ php_version] + php_packages }}"
     state: present
     update_cache: true
     cache_valid_time: 3600
-  tags:
-    - php_install
-    - php_install_packages
 
-- name: Install PHP {{ php_version }} FPM
+- name: Install PHP-FPM for version {{ php_version }}
   ansible.builtin.apt:
     name: "php{{ php_version }}-fpm"
     state: present
   when: php_fpm_enabled
-  tags:
-    - php_install
-    - php_install_fpm
 
-- name: Download Composer installer
-  ansible.builtin.get_url:
-    url: https://getcomposer.org/installer
-    dest: /tmp/composer-installer.php
-    mode: '0755'
-  when: php_composer_enabled
-  tags:
-    - php_install
-    - php_install_composer
+- name: Ensure PHP-FPM service is started and enabled
+  ansible.builtin.service:
+    name: "php{{ php_version }}-fpm"
+    state: started
+    enabled: true
 
-- name: Install Composer globally
-  ansible.builtin.command:
-    cmd: >-
-      php /tmp/composer-installer.php
-      --install-dir=/usr/local/bin
-      --filename=composer
-      --quiet
+- name: Download and install Composer globally
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer --quiet
+    chmod +x /usr/local/bin/composer
+  args:
     creates: /usr/local/bin/composer
+    executable: /bin/bash
   when: php_composer_enabled
-  changed_when: false
-  tags:
-    - php_install
-    - php_install_composer
-
-- name: Remove Composer installer
-  ansible.builtin.file:
-    path: /tmp/composer-installer.php
-    state: absent
-  when: php_composer_enabled
-  tags:
-    - php_install
-    - php_install_composer

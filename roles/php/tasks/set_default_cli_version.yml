@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT-0
 ---
-- name: Verify PHP {{ php_version }} binaries exist
+- name: Verify PHP binary exist
   ansible.builtin.stat:
     path: "/usr/bin/php{{ php_version }}"
   register: php_binary_check
@@ -12,11 +12,11 @@
   changed_when: false
   failed_when: false
 
-- name: Set all PHP {{ php_version }} CLI tools as default
+- name: Set all PHP CLI tools as default for version {{ php_version }}
   community.general.alternatives:
     name: "{{ item }}"
     path: "/usr/bin/{{ item }}{{ php_version }}"
-    priority: "{{ php_priority }}"
+    state: selected
   loop:
     - php
     - phar
@@ -27,6 +27,3 @@
     php_cli_set_as_default_version and
     (php_current_version.stdout is not defined or
      php_version not in php_current_version.stdout)
-  tags:
-    - php_set_cli_version
-    - php_version_management

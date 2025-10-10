@@ -1,0 +1,17 @@
+## {mark} ANSIBLE MANAGED FILE ##
+
+<VirtualHost *:80>
+    ServerName {{ apache_server_name }}
+    ServerAdmin webmaster@{{ apache_server_name }}
+    DocumentRoot /var/www/html
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+{# {% if apache_install_php %}
+    # PHP-FPM Configuration
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/var/run/php/php{{ apache_php_version }}-fpm.sock|fcgi://localhost"
+    </FilesMatch>
+{% endif %} #}
+</VirtualHost>

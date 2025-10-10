@@ -279,6 +279,9 @@ The project is structured as an Ansible collection, which is the standard way to
 6.  Create Tests (Mandatory):
     -   Create a scenario for each role (molecule scenario should match the role name).
     -   Design and implement Molecule tests for the new role or feature.
+    -   Test file organization: The test file name in `extensions/molecule/<role>/tests/` must match the task file name in `roles/<role>/tasks/`. For example:
+        -   Task file: `roles/apache/tasks/configure.yml` → Test file: `extensions/molecule/apache/tests/configure.yml`
+        -   Task file: `roles/apache/tasks/install.yml` → Test file: `extensions/molecule/apache/tests/install.yml`
     -   Define scenarios, platforms, verifiers, etc.
 7.  Local Validation:
     -   Molecule should be executed from the extensions directory.

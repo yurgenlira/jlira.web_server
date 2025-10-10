@@ -180,3 +180,151 @@
 - ✅ Proper ownership (root:root for config, root:www-data for .htpasswd)
 
 
+## 16. PHP Role Functional Requirements
+
+### 16.1 PHP Installation
+- **Repository Management:**
+  - ✅ Add third-party PHP repository for accessing specific PHP versions
+
+- **Package Installation:**
+  - ✅ Install PHP core and extensions from configurable package list
+  - ✅ Support PHP-FPM installation when enabled
+  - ✅ Support Composer installation when enabled
+  - Install packages idempotently
+  - ✅ Ensure FPM service is started and enabled
+### 16.2 PHP Configuration Management
+#### 16.2.1 CLI Configuration
+- **Configuration File Management:**
+  - ✅ Backup original php.ini before modifications
+  - ✅ Update PHP settings using regex-based replacements
+  - ✅ Support comprehensive configuration options:
+    - ✅ Execution limits (max_execution_time, max_input_time, max_input_vars)
+    - ✅ Memory management (memory_limit)
+    - ✅ Error handling (error_reporting, display_errors, error_log)
+    - ✅ Upload limits (post_max_size, upload_max_filesize, max_file_uploads)
+    - ✅ Behavior settings (short_open_tag, mail headers)
+  - ✅ Create custom log directories
+
+#### 16.2.2 FPM Configuration
+- **PHP-FPM Settings:**
+  - ✅ Backup original FPM php.ini before modifications
+  - ✅ Configure FPM-specific PHP settings independently from CLI
+  - ✅ Support same configuration options as CLI with different defaults
+  - ✅ Restart FPM service only when configuration changes
+
+- **FPM Pool Configuration:**
+  - ✅ Backup original pool configuration
+  - ✅ Configure FPM pool settings:
+    - ✅ Process manager type (static, dynamic, ondemand)
+    - ✅ Process limits (pm_max_children, pm_start_servers, pm_min_spare_servers, pm_max_spare_servers)
+  - ✅ Create pool configuration from templates
+
+### 16.3 PHP Version Management
+- **CLI Version Management:**
+  - ✅ Set default PHP CLI version using system alternatives
+  - ✅ Update php, phar, phar.phar, phpize, and php-config alternatives
+  - ✅ Create symlinks for default version tools
+
+- **FPM Version Management:**
+  - Configure PHP-FPM as default version when enabled
+
+
+- **Version Upgrade/Downgrade:**
+  - Remove old PHP versions when specified
+  - Stop and disable old PHP-FPM services
+  - Clean up old packages, configuration files, and logs
+  - Remove old extension files and directories
+  - Support clean migration between versions
+
+### 16.4 PHP Extensions
+#### 16.4.1 Microsoft SQL Server Extension
+- **MSSQL Driver Installation:**
+  - ✅ Add Microsoft repository and GPG key
+  - ✅ Install Microsoft ODBC driver with EULA acceptance
+  - ✅ Install mssql-tools with command-line utilities
+  - ✅ Add mssql-tools to system PATH
+
+- **PHP MSSQL Extension Compilation:**
+  - ✅ Install sqlsrv and pdo_sqlsrv extensions using PECL
+  - ✅ Create module configuration files with correct priority
+  - ✅ Enable extensions using phpenmod
+  - ✅ Skip compilation if extensions already exist
+
+### 16.5 Status Page Configuration
+- **FPM Status Page:**
+  - Configure proxy timeout settings for FPM connections
+  - Add file existence checks for PHP file execution
+  - Configure status page endpoint access
+  - Create version-specific status page HTML files
+  - Update status page URL references for version-specific endpoints
+
+### 16.6 Log Management
+
+#### 16.6.1 Log Rotation
+- **CLI Log Rotation:**
+  - Configure logrotate for PHP CLI error logs
+  - Support custom log paths
+  - Create logrotate configuration from templates
+
+- **FPM Log Rotation:**
+  - Configure logrotate for PHP-FPM logs
+  - Support custom FPM log paths
+  - Create version-specific logrotate configuration
+
+
+
+### 16.10 Variables and Configuration
+### 16.11 Testing Requirements
+- **Molecule Tests:**
+  - Support create, converge, verify, and destroy lifecycle
+
+### 16.12 Integration Requirements
+- **Web Server Integration:**
+  - Integrate with web servers via environment variables
+  - Support conditional web server restarts
+  - Configure FPM status page endpoint access
+  - Add file existence checks for secure execution
+
+- **System Integration:**
+  - Gather system facts for version-specific decisions
+  - Manage system alternatives for version switching
+  - Integrate with system service manager (systemd)
+  - Configure system PATH for command-line tools
+
+
+
+- **Tag Support:**
+  - Support role-wide tags (php_*)
+  - Support task-specific tags for granular execution
+  - Allow selective execution of specific functionality
+  - Support conditional task execution based on variables
+
+### 16.9 Idempotency Requirements
+- **Change Detection:**
+  - Check if files exist before creating backups
+  - Use 'creates' parameter for idempotent installations
+  - Register and check task results before triggering handlers
+  - Only restart services when configuration actually changes
+
+- **Service State Management:**
+  - Conditional service restarts/reloads based on registered changes
+
+
+### 16.12 playbooks
+- Create playbook for intstall multiple php versions (use role serveral times)
+
+- Create test for install_mssql_extension.yml
+
+## 10. Apache PHP-FPM Integration
+
+### 10.1 PHP-FPM Integration
+- **Apache Configuration:**
+  - Create a new task `php_integration.yml` in the `apache` role.
+  - Add logic to enable the `proxy_fcgi` Apache module.
+  - Add logic to execute `a2enconf php{{ apache_php_fpm_version }}-fpm`.
+- **Variables:**
+  - Add `apache_php_fpm_integration: false` to `apache` role defaults.
+  - Add `apache_php_fpm_version` to `apache` role defaults.
+- **Role Integration:**
+  - Update `apache/tasks/main.yml` to include `php_integration.yml` conditionally.
+  - Support multiple PHP versions on same system if you don't set a default version (mejor agregar el arcgivo .conf por defecto)

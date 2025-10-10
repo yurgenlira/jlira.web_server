@@ -5,34 +5,36 @@
 # Type: String
 php_ppa_repository: "ppa:ondrej/php"
 
-# The file where the PPA repository is stored.
-# This file is created when the PPA repository is added to the system.
-# Type: String
-php_ppa_file: ondrej-ubuntu-php-noble.sources
+php_regex_patterns:
+  bool: '^;?\s*__KEY__\s*=\s*(On|Off|true|false)'
+  int: '^;?\s*__KEY__\s*=\s*[0-9]+'
+  size: '^;?\s*__KEY__\s*=\s*[0-9]+[KMG]?'
+  string: '^;?\s*__KEY__\s*=\s*.*'
+  path: '^;?\s*__KEY__\s*=\s*[/a-zA-Z0-9_.-]+'
 
-# PHP version without the period, used for creating directory paths or filenames.
-# Derived from `php_version` by removing the dot.
-# Example: "8.4" becomes "84"
-# Type: String
-php_version_no_dot: "{{ php_version | replace('.', '') }}"
+# # PHP version without the period, used for creating directory paths or filenames.
+# # Derived from `php_version` by removing the dot.
+# # Example: "8.4" becomes "84"
+# # Type: String
+# php_version_no_dot: "{{ php_version | replace('.', '') }}"
 
-# Priority value for update-alternatives based on PHP version number.
-# Higher version numbers receive higher priority automatically.
-# Example: PHP 8.4 gets priority 84, PHP 8.3 gets priority 83
-# Type: String
-php_priority: "{{ php_version_no_dot }}"
+# # Priority value for update-alternatives based on PHP version number.
+# # Higher version numbers receive higher priority automatically.
+# # Example: PHP 8.4 gets priority 84, PHP 8.3 gets priority 83
+# # Type: String
+# php_priority: "{{ php_version_no_dot }}"
 
-# PHP-FPM service name based on the PHP version.
-# Example: "php8.4-fpm" for PHP 8.4
-# Type: String
-php_fpm_service_name: "php{{ php_version }}-fpm"
+# # PHP-FPM service name based on the PHP version.
+# # Example: "php8.4-fpm" for PHP 8.4
+# # Type: String
+# php_fpm_service_name: "php{{ php_version }}-fpm"
 
-# # The repository for Microsoft SQL Server PHP extensions.
-# # This is necessary to install the SQL Server extension for PHP.
-# # Type: Dictionary
-# php_mssql_apt:
-#   key_url: https://packages.microsoft.com/keys/microsoft.asc
-#   key_file: /usr/share/keyrings/microsoft.gpg
-#   repository: "deb [arch=amd64,armhf,arm64 signed-by=/usr/share/keyrings/microsoft.gpg] \
-#            https://packages.microsoft.com/ubuntu/{{ ansible_distribution_version }}/prod \
-#            {{ ansible_distribution_release }} main"
+# The repository for Microsoft SQL Server PHP extensions.
+# This is necessary to install the SQL Server extension for PHP.
+# Type: Dictionary
+php_mssql_apt:
+  key_url: https://packages.microsoft.com/keys/microsoft.asc
+  key_file: /usr/share/keyrings/microsoft.gpg
+  repository: "deb [arch=amd64,armhf,arm64 signed-by=/usr/share/keyrings/microsoft.gpg] \
+           https://packages.microsoft.com/ubuntu/{{ ansible_distribution_version }}/prod \
+           {{ ansible_distribution_release }} main"

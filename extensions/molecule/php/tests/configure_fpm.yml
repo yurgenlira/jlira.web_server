@@ -1,0 +1,242 @@
+---
+- name: Check if FPM php.ini backup exists
+  ansible.builtin.stat:
+    path: "/etc/php/{{ php_version }}/fpm/php.ini.original"
+  register: fpm_php_ini_backup_stat
+
+- name: Assert FPM php.ini backup exists
+  ansible.builtin.assert:
+    that:
+      - fpm_php_ini_backup_stat.stat.exists
+      - fpm_php_ini_backup_stat.stat.isreg
+    fail_msg: FPM php.ini backup does not exist
+    success_msg: FPM php.ini backup exists
+
+- name: Check if FPM pool backup exists
+  ansible.builtin.stat:
+    path: "/etc/php/{{ php_version }}/fpm/pool.d/www.conf.original"
+  register: fpm_pool_backup_stat
+
+- name: Assert FPM pool backup exists
+  ansible.builtin.assert:
+    that:
+      - fpm_pool_backup_stat.stat.exists
+      - fpm_pool_backup_stat.stat.isreg
+    fail_msg: FPM pool backup does not exist
+    success_msg: FPM pool backup exists
+
+- name: Get PHP FPM configuration via php-fpm -i
+  ansible.builtin.command: php-fpm{{ php_version }} -i
+  register: php_fpm_info
+  changed_when: false
+
+- name: Extract PHP-FPM configuration values from php -i output *
+  ansible.builtin.set_fact:
+    php_fpm_config_values:
+      memory_limit: "{{ php_fpm_info.stdout | regex_search('memory_limit => ([^ ]+) ', '\\1') | first }}"
+      error_reporting: "{{ php_fpm_info.stdout | regex_search('error_reporting => ([^ ]+) ', '\\1') | first }}"
+      max_execution_time: "{{ php_fpm_info.stdout | regex_search('max_execution_time => ([^ ]+) ', '\\1') | first }}"
+      error_log: "{{ php_fpm_info.stdout | regex_search('error_log => ([^ ]+) ', '\\1') | first }}"
+
+- name: Display extracted PHP FPM configuration values
+  ansible.builtin.debug:
+    var: php_fpm_config_values
+
+- name: Normalize expected values for comparison
+  ansible.builtin.set_fact:
+    expected_fpm_values:
+      memory_limit: "{{ php_fpm_settings.memory_limit.value }}"
+      error_reporting: "{{ php_fpm_settings.error_reporting.value }}"
+      max_execution_time: "{{ php_fpm_settings.max_execution_time.value }}"
+      error_log: "{{ php_fpm_settings.error_log.value }}"
+
+- name: Display expected configuration values
+  ansible.builtin.debug:
+    var: expected_fpm_values
+
+- name: Assert memory_limit is configured correctly in FPM
+  ansible.builtin.assert:
+    that:
+      - php_fpm_config_values.memory_limit == expected_fpm_values.memory_limit
+    fail_msg: >-
+      FPM memory_limit is '{{ php_fpm_config_values.memory_limit }}'
+      but expected '{{ expected_fpm_values.memory_limit }}'
+    success_msg: >-
+      FPM memory_limit is correctly set to
+      '{{ expected_fpm_values.memory_limit }}'
+
+- name: Get numeric value of expected error_reporting
+  ansible.builtin.command: php{{ php_version }} -r 'error_reporting({{ expected_fpm_values.error_reporting }}); echo error_reporting();'
+  register: expected_fpm_error_reporting_numeric
+  changed_when: false
+
+- name: Assert error_reporting is configured correctly in FPM
+  ansible.builtin.assert:
+    that:
+      - php_fpm_config_values.error_reporting == expected_fpm_error_reporting_numeric.stdout
+    fail_msg: >-
+      FPM error_reporting is '{{ php_fpm_config_values.error_reporting }}'
+      but expected '{{ expected_fpm_error_reporting_numeric.stdout }}'
+      ({{ expected_fpm_values.error_reporting }})
+    success_msg: >-
+      FPM error_reporting is correctly set to
+      '{{ expected_fpm_error_reporting_numeric.stdout }}'
+
+- name: Assert max_execution_time is configured correctly in FPM
+  ansible.builtin.assert:
+    that:
+      - php_fpm_config_values.max_execution_time | int == expected_fpm_values.max_execution_time | int
+    fail_msg: >-
+      FPM max_execution_time is '{{ php_fpm_config_values.max_execution_time }}'
+      but expected '{{ expected_fpm_values.max_execution_time }}'
+    success_msg: >-
+      FPM max_execution_time is correctly set to '{{ expected_fpm_values.max_execution_time }}'
+
+- name: Assert error_log is configured correctly
+  ansible.builtin.assert:
+    that:
+      - php_fpm_config_values.error_log == expected_fpm_values.error_log
+    fail_msg: "FPM error_log is '{{ php_fpm_config_values.error_log }}' but expected '{{ expected_fpm_values.error_log }}'"
+    success_msg: "FPM error_log is correctly set to '{{ expected_fpm_values.error_log }}'"
+
+- name: Read FPM pool configuration file
+  ansible.builtin.slurp:
+    path: "/etc/php/{{ php_version }}/fpm/pool.d/www.conf"
+  register: fpm_pool_config
+
+- name: Decode FPM pool configuration
+  ansible.builtin.set_fact:
+    fpm_pool_config_content: "{{ fpm_pool_config.content | b64decode }}"
+
+- name: Assert pool name is configured correctly
+  ansible.builtin.assert:
+    that:
+      - fpm_pool_config_content is search('\\[' + php_pool_settings.pool_name + '\\]')
+    fail_msg: >-
+      Pool name '[{{ php_pool_settings.pool_name }}]' not found in pool configuration
+    success_msg: Pool name '[{{ php_pool_settings.pool_name }}]' is correctly configured
+
+- name: Assert pm is configured correctly
+  ansible.builtin.assert:
+    that:
+      - fpm_pool_config_content is search('pm = ' + php_pool_settings.pm)
+    fail_msg: >-
+      pm = {{ php_pool_settings.pm }} not found in pool configuration
+    success_msg: pm is correctly set to '{{ php_pool_settings.pm }}'
+
+- name: Assert pm_max_children is configured correctly
+  ansible.builtin.assert:
+    that:
+      - fpm_pool_config_content is search('pm.max_children = ' + php_pool_settings.pm_max_children|string)
+    fail_msg: >-
+      pm.max_children = {{ php_pool_settings.pm_max_children }}
+      not found in pool configuration
+    success_msg: >-
+      pm.max_children is correctly set to
+      '{{ php_pool_settings.pm_max_children }}'
+
+- name: Assert pm_start_servers is configured correctly
+  ansible.builtin.assert:
+    that:
+      - >-
+        fpm_pool_config_content is
+        search('pm.start_servers = ' + php_pool_settings.pm_start_servers|string)
+    fail_msg: >-
+      pm.start_servers = {{ php_pool_settings.pm_start_servers }}
+      not found in pool configuration
+    success_msg: >-
+      pm.start_servers is correctly set to
+      '{{ php_pool_settings.pm_start_servers }}'
+
+- name: Assert pm_min_spare_servers is configured correctly
+  ansible.builtin.assert:
+    that:
+      - >-
+        fpm_pool_config_content is
+        search('pm.min_spare_servers = ' + php_pool_settings.pm_min_spare_servers|string)
+    fail_msg: >-
+      pm.min_spare_servers = {{ php_pool_settings.pm_min_spare_servers }}
+      not found in pool configuration
+    success_msg: >-
+      pm.min_spare_servers is correctly set to
+      '{{ php_pool_settings.pm_min_spare_servers }}'
+
+- name: Assert pm_max_spare_servers is configured correctly
+  ansible.builtin.assert:
+    that:
+      - >-
+        fpm_pool_config_content is
+        search('pm.max_spare_servers = ' + php_pool_settings.pm_max_spare_servers|string)
+    fail_msg: >-
+      pm.max_spare_servers = {{ php_pool_settings.pm_max_spare_servers }}
+      not found in pool configuration
+    success_msg: >-
+      pm.max_spare_servers is correctly set to
+      '{{ php_pool_settings.pm_max_spare_servers }}'
+
+- name: Assert status_path is configured correctly
+  ansible.builtin.assert:
+    that:
+      - >-
+        fpm_pool_config_content is
+        search('pm.status_path = ' + php_pool_settings.status_path)
+    fail_msg: >-
+      pm.status_path = {{ php_pool_settings.status_path }}
+      not found in pool configuration
+    success_msg: >-
+      pm.status_path is correctly set to '{{ php_pool_settings.status_path }}'
+  when: php_status_page_enabled
+
+- name: Assert ping_path is configured correctly
+  ansible.builtin.assert:
+    that:
+      - fpm_pool_config_content is search('pm.ping.path = ' + php_pool_settings.ping_path)
+    fail_msg: >-
+      pm.ping.path = {{ php_pool_settings.ping_path }}
+      not found in pool configuration
+    success_msg: pm.ping.path is correctly set to '{{ php_pool_settings.ping_path }}'
+  when: php_status_page_enabled
+
+- name: Assert ping_response is configured correctly
+  ansible.builtin.assert:
+    that:
+      - >-
+        fpm_pool_config_content is
+        search('pm.ping.response = ' + php_pool_settings.ping_response)
+    fail_msg: >-
+      pm.ping.response = {{ php_pool_settings.ping_response }}
+      not found in pool configuration
+    success_msg: >-
+      pm.ping.response is correctly set to '{{ php_pool_settings.ping_response }}'
+  when: php_status_page_enabled
+
+- name: Assert additional pool settings are configured correctly
+  ansible.builtin.assert:
+    that:
+      - fpm_pool_config_content is search(item.key|regex_escape + ' = ' + item.value|string)
+    fail_msg: >-
+      {{ item.key }} = {{ item.value }} not found in pool configuration
+    success_msg: >-
+      {{ item.key }} is correctly set to '{{ item.value }}'
+  loop: "{{ php_pool_additional_settings | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: php_pool_additional_settings is defined
+
+- name: Check PHP-FPM service status
+  ansible.builtin.service_facts:
+
+- name: Assert PHP-FPM service is running
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.services['php' + php_version + '-fpm.service'] is defined
+      - ansible_facts.services['php' + php_version + '-fpm.service'].state == 'running'
+    fail_msg: PHP-FPM service is not running
+    success_msg: PHP-FPM service is running
+
+- name: Assert PHP-FPM service is enabled
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.services['php' + php_version + '-fpm.service'].status == 'enabled'
+    fail_msg: PHP-FPM service is not enabled
+    success_msg: PHP-FPM service is enabled

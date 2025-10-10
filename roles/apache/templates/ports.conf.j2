@@ -1,0 +1,21 @@
+## {mark} ANSIBLE MANAGED FILE ##
+
+# HTTP ports
+{% for port in apache_http_ports %}
+Listen {{ port }}
+{% endfor %}
+
+{% if apache_ssl_enabled %}
+# HTTPS ports
+<IfModule ssl_module>
+{% for port in apache_https_ports %}
+  Listen {{ port }}
+{% endfor %}
+</IfModule>
+
+<IfModule mod_gnutls.c>
+{% for port in apache_https_ports %}
+  Listen {{ port }}
+{% endfor %}
+</IfModule>
+{% endif %}

@@ -1,34 +1,26 @@
+# SPDX-License-Identifier: MIT-0
 ---
 - name: Check PHP version
-  ansible.builtin.command: php --version
-  register: php_version
+  ansible.builtin.command: php{{ php_version }} --version
+  register: php_version_check
   changed_when: false
 
 - name: Assert PHP is installed
   ansible.builtin.assert:
-    that: "'{{ php_version }}' in php_version.stdout"
+    that: "php_version in php_version_check.stdout"
     fail_msg: "PHP {{ php_version }} is not installed"
 
 - name: Check PHP extensions
-  ansible.builtin.command: php -m
-  register: php_modules
+  ansible.builtin.command: php{{ php_version }} -m
+  register: php_modules_check
   changed_when: false
 
 - name: Assert core extensions are loaded
   ansible.builtin.assert:
     that:
-      - "'Core' in php_modules.stdout"
+      - "'bcmath' in php_modules_check.stdout"
+      - "'curl' in php_modules_check.stdout"
     fail_msg: "Core PHP extensions are not loaded"
-
-- name: Test basic PHP execution
-  ansible.builtin.command: php -r "echo 'PHP is working';"
-  register: php_test
-  changed_when: false
-
-- name: Assert PHP basic functionality
-  ansible.builtin.assert:
-    that: "'PHP is working' in php_test.stdout"
-    fail_msg: "Basic PHP execution failed"
 
 - name: Check if PHP-FPM is installed
   ansible.builtin.command: php-fpm{{ php_version }} --version
@@ -41,7 +33,7 @@
   ansible.builtin.assert:
     that:
       - phpfpm_version_check.rc == 0
-      - "'{{ php_version }}' in phpfpm_version_check.stdout"
+      - "php_version in phpfpm_version_check.stdout"
     fail_msg: "PHP-FPM {{ php_version }} is not installed"
   when: php_fpm_enabled
 

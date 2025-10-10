@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Check if backup of php.ini already exists
+  ansible.builtin.stat:
+    path: "/etc/php/{{ php_version }}/fpm/php.ini.original"
+  register: php_ini_backup_stat
+
+- name: Create one-time backup of original php.ini
+  ansible.builtin.copy:
+    src: "/etc/php/{{ php_version }}/fpm/php.ini"
+    dest: "/etc/php/{{ php_version }}/fpm/php.ini.original"
+    remote_src: true
+    mode: "0644"
+  when: not php_ini_backup_stat.stat.exists
+
+- name: Create PHP FPM error log directory if error_log is defined
+  ansible.builtin.file:
+    path: "{{ php_fpm_settings.error_log.value | dirname }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  when:
+    - php_fpm_settings.error_log is defined
+    - php_fpm_settings.error_log.type == 'path'
+    - php_fpm_settings.error_log.value is defined
+    - php_fpm_settings.error_log.value | dirname != ""
+
+- name: Build PHP FPM settings configuration list
+  ansible.builtin.set_fact:
+    php_fpm_settings_list: >-
+      {{ php_fpm_settings_list | default([]) + [setting_item] }}
+  loop: "{{ php_fpm_settings | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  vars:
+    setting_item:
+      regex: >-
+        {{ php_regex_patterns[item.value.type] | replace('__KEY__', item.key) }}
+      line: >-
+        {{ item.key }} =
+        {% if item.value.type == 'bool' %}
+        {{ 'On' if item.value.value else 'Off' }}
+        {% else %}
+        {{ item.value.value }}
+        {% endif %}
+
+- name: Display PHP FPM settings list
+  ansible.builtin.debug:
+    var: php_fpm_settings_list
+
+- name: Configure PHP FPM settings in php.ini
+  ansible.builtin.lineinfile:
+    path: "/etc/php/{{ php_version }}/fpm/php.ini"
+    regexp: "{{ item.regex }}"
+    line: "{{ item.line }}"
+  loop: "{{ php_fpm_settings_list }}"
+  loop_control:
+    label: "{{ item.line }}"
+  notify: Restart PHP-FPM service
+  register: php_fpm_ini_changed
+
+- name: Check if backup of FPM pool configuration already exists
+  ansible.builtin.stat:
+    path: "/etc/php/{{ php_version }}/fpm/pool.d/www.conf.original"
+  register: php_fpm_pool_backup_stat
+  when: php_pool_settings is defined
+
+- name: Create one-time backup of original FPM pool configuration
+  ansible.builtin.copy:
+    src: "/etc/php/{{ php_version }}/fpm/pool.d/www.conf"
+    dest: "/etc/php/{{ php_version }}/fpm/pool.d/www.conf.original"
+    remote_src: true
+    mode: "0644"
+  when:
+    - php_pool_settings is defined
+    - not php_fpm_pool_backup_stat.stat.exists
+
+- name: Configure PHP-FPM pool settings from template
+  ansible.builtin.template:
+    src: www.conf.j2
+    dest: "/etc/php/{{ php_version }}/fpm/pool.d/www.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  when: php_pool_settings is defined
+  notify: Restart PHP-FPM service

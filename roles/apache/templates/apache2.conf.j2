@@ -1,0 +1,15 @@
+# ServerName Configuration
+ServerName {{ apache_server_name }}
+
+{% if apache_main_settings | length > 0 %}
+# Main Apache Settings
+{% for setting in apache_main_settings %}
+{% if setting.name != 'ServerName' %}
+{% if setting.comment is defined %}
+{{ setting.comment | comment }}
+{% endif %}
+{{ setting.name }} {{ setting.value }}
+
+{% endif %}
+{% endfor %}
+{% endif %}
