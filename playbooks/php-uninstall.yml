@@ -1,0 +1,119 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Playbook for uninstalling PHP
+#
+# This playbook completely removes PHP from target servers including:
+# - PHP packages and extensions
+# - PHP-FPM service (if installed)
+# - Configuration files
+# - Logrotate configurations
+# - Alternatives system entries
+#
+# Usage:
+#   ansible-playbook -i inventory playbooks/php-uninstall.yml \
+#     -e "php_version_to_remove=8.4"
+#
+# Warning:
+#   - This will completely remove PHP from the system
+#   - Applications depending on PHP will stop working
+#   - Backup important data before running
+#   - Consider using php-upgrade.yml instead for version changes
+
+- name: Uninstall PHP
+  hosts: webservers
+  become: true
+  vars:
+    # PHP version to remove (required)
+    php_version_to_remove: "8.4"
+
+  tasks:
+    - name: Confirm PHP version to remove
+      ansible.builtin.pause:
+        prompt: |
+          WARNING: This will completely remove PHP {{ php_version_to_remove }} from the system.
+
+          This includes:
+          - All PHP {{ php_version_to_remove }} packages
+          - PHP-FPM service
+          - Configuration files
+          - Logrotate configurations
+
+          Press CTRL+C and then A to abort, or ENTER to continue
+      when: not ansible_check_mode
+
+    - name: Stop PHP-FPM service
+      ansible.builtin.systemd:
+        name: "php{{ php_version_to_remove }}-fpm"
+        state: stopped
+      failed_when: false
+
+    - name: Disable PHP-FPM service
+      ansible.builtin.systemd:
+        name: "php{{ php_version_to_remove }}-fpm"
+        enabled: false
+      failed_when: false
+
+    - name: Get list of installed PHP packages
+      ansible.builtin.shell:
+        cmd: set -o pipefail && dpkg -l | grep "php{{ php_version_to_remove }}" | awk '{print $2}'
+        executable: /bin/bash
+      register: php_packages_to_remove
+      changed_when: false
+      failed_when: false
+
+    - name: Remove PHP packages
+      ansible.builtin.apt:
+        name: "{{ php_packages_to_remove.stdout_lines }}"
+        state: absent
+        purge: true
+      when:
+        - php_packages_to_remove.stdout_lines is defined
+        - php_packages_to_remove.stdout_lines | length > 0
+
+    - name: Remove PHP configuration directory
+      ansible.builtin.file:
+        path: "/etc/php/{{ php_version_to_remove }}"
+        state: absent
+
+    - name: Remove PHP CLI logrotate configuration
+      ansible.builtin.file:
+        path: /etc/logrotate.d/php-cli
+        state: absent
+
+    - name: Remove PHP-FPM logrotate configuration
+      ansible.builtin.file:
+        path: "/etc/logrotate.d/php{{ php_version_to_remove }}-fpm"
+        state: absent
+
+    - name: Check PHP alternatives
+      ansible.builtin.command: update-alternatives --query php
+      register: php_alternatives_check
+      changed_when: false
+      failed_when: false
+
+    - name: Remove PHP alternatives
+      ansible.builtin.command: "update-alternatives --remove {{ item }} /usr/bin/{{ item }}{{ php_version_to_remove }}"
+      loop:
+        - php
+        - phar
+        - phar.phar
+        - phpize
+        - php-config
+      when:
+        - php_alternatives_check.rc == 0
+        - "'/usr/bin/' + item + php_version_to_remove in php_alternatives_check.stdout"
+      changed_when: true
+      failed_when: false
+
+    - name: Clean up apt cache
+      ansible.builtin.apt:
+        autoclean: true
+        autoremove: true
+
+    - name: Display uninstall summary
+      ansible.builtin.debug:
+        msg:
+          - "PHP {{ php_version_to_remove }} has been successfully uninstalled"
+          - "Removed packages: {{ php_packages_to_remove.stdout_lines | default([]) | join(', ') }}"
+          - "Configuration files have been purged"
+          - "System has been cleaned up"

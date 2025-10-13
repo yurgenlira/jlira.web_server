@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Check if old PHP packages are removed
+  ansible.builtin.shell:
+    cmd: set -o pipefail && dpkg -l | grep "php{{ php_old_version }}" | awk '{print $2}'
+    executable: /bin/bash
+  register: remaining_old_php_packages
+  changed_when: false
+  failed_when: false
+  when: php_old_version is defined and php_old_version | length > 0
+
+- name: Assert no old PHP packages remain installed
+  ansible.builtin.assert:
+    that:
+      - remaining_old_php_packages.stdout_lines | length == 0
+    fail_msg: >-
+      Old PHP {{ php_old_version }} packages are still installed:
+      {{ remaining_old_php_packages.stdout_lines }}
+    success_msg: "All PHP {{ php_old_version }} packages have been removed"
+  when: php_old_version is defined and php_old_version | length > 0
+
+- name: Check if old PHP configuration directory exists
+  ansible.builtin.stat:
+    path: "/etc/php/{{ php_old_version }}"
+  register: old_php_config_dir
+  when: php_old_version is defined and php_old_version | length > 0
+
+- name: Assert old PHP configuration directory is removed
+  ansible.builtin.assert:
+    that:
+      - not old_php_config_dir.stat.exists
+    fail_msg: "Old PHP {{ php_old_version }} configuration directory still exists at /etc/php/{{ php_old_version }}"
+    success_msg: "Old PHP {{ php_old_version }} configuration directory has been removed"
+  when: php_old_version is defined and php_old_version | length > 0
+
+- name: Check if old PHP-FPM logrotate configuration exists
+  ansible.builtin.stat:
+    path: "/etc/logrotate.d/php{{ php_old_version }}-fpm"
+  register: old_php_fpm_logrotate
+  when: php_old_version is defined and php_old_version | length > 0
+
+- name: Assert old PHP-FPM logrotate configuration is removed
+  ansible.builtin.assert:
+    that:
+      - not old_php_fpm_logrotate.stat.exists
+    fail_msg: "Old PHP-FPM logrotate configuration still exists at /etc/logrotate.d/php{{ php_old_version }}-fpm"
+    success_msg: "Old PHP-FPM logrotate configuration has been removed"
+  when: php_old_version is defined and php_old_version | length > 0
+
+- name: Check if old PHP-FPM service is running
+  ansible.builtin.systemd:
+    name: "php{{ php_old_version }}-fpm"
+  register: old_php_fpm_service_status
+  failed_when: false
+  when: php_old_version is defined and php_old_version | length > 0
+
+- name: Assert old PHP-FPM service is not active
+  ansible.builtin.assert:
+    that:
+      - old_php_fpm_service_status.status is not defined or old_php_fpm_service_status.status.ActiveState != 'active'
+    fail_msg: "Old PHP-FPM {{ php_old_version }} service is still running"
+    success_msg: "Old PHP-FPM {{ php_old_version }} service is not active"
+  when: php_old_version is defined and php_old_version | length > 0
+
+- name: Check PHP alternatives configuration
+  ansible.builtin.command: update-alternatives --query php
+  register: php_alternatives_current
+  changed_when: false
+  failed_when: false
+  when: php_old_version is defined and php_old_version | length > 0
+
+- name: Assert old PHP version is not in alternatives
+  ansible.builtin.assert:
+    that:
+      - "'/usr/bin/php' + php_old_version not in php_alternatives_current.stdout"
+    fail_msg: "Old PHP {{ php_old_version }} is still registered in alternatives system"
+    success_msg: "Old PHP {{ php_old_version }} has been removed from alternatives system"
+  when:
+    - php_old_version is defined and php_old_version | length > 0
+    - php_alternatives_current.rc == 0
+
+- name: Verify current PHP version is not the old version
+  ansible.builtin.command: php --version
+  register: current_php_version_check
+  changed_when: false
+  failed_when: false
+  when: php_old_version is defined and php_old_version | length > 0
+
+- name: Assert current PHP version is not the old version
+  ansible.builtin.assert:
+    that:
+      - current_php_version_check.rc == 0
+      - php_old_version not in current_php_version_check.stdout
+    fail_msg: "Current PHP version is still {{ php_old_version }}"
+    success_msg: "Current PHP version is {{ php_version }}, not {{ php_old_version }}"
+  when: php_old_version is defined and php_old_version | length > 0

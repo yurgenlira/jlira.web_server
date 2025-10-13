@@ -13,7 +13,7 @@
       register: microsoft_apt_repo
       failed_when: not microsoft_apt_repo.stat.exists
 
-    - name: Verify that msodbcsql{{ php_mssql_package_version }} is installed
+    - name: Verify that msodbcsql is installed in {{ php_mssql_package_version }}
       ansible.builtin.package:
         name: "msodbcsql{{ php_mssql_package_version }}"
         state: present
@@ -21,7 +21,7 @@
       register: msodbcsql_installed
       failed_when: msodbcsql_installed.changed
 
-    - name: Verify that mssql-tools{{ php_mssql_package_version }} is installed
+    - name: Verify that mssql-tools is installed in {{ php_mssql_package_version }}
       ansible.builtin.package:
         name: "mssql-tools{{ php_mssql_package_version }}"
         state: present

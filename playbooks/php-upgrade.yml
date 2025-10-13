@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Playbook for upgrading PHP versions
+#
+# This playbook performs a complete PHP version upgrade by:
+# 1. Removing the old PHP version (packages, configs, services)
+# 2. Installing the new PHP version
+# 3. Configuring the new version
+#
+# Usage:
+#   ansible-playbook -i inventory playbooks/php-upgrade.yml \
+#     -e "php_old_version=8.3" \
+#     -e "php_version=8.4"
+#
+# With PHP-FPM:
+#   ansible-playbook -i inventory playbooks/php-upgrade.yml \
+#     -e "php_old_version=8.3" \
+#     -e "php_version=8.4" \
+#     -e "php_fpm_enabled=true"
+#
+# Important:
+#   - Always specify php_old_version to trigger removal
+#   - Ensure php_old_version != php_version
+#   - Test in staging environment first
+#   - Backup databases and configurations before upgrading
+
+- name: Upgrade PHP version
+  hosts: webservers
+  become: true
+  roles:
+    - role: jlira.web_server.php
+      vars:
+        # New PHP version to install
+        php_version: "8.4"
+
+        # Old PHP version to remove (REQUIRED for upgrade)
+        php_old_version: "8.3"
+
+        # PHP packages to install
+        php_packages:
+          - "php{{ php_version }}-cli"
+          - "php{{ php_version }}-curl"
+          - "php{{ php_version }}-mbstring"
+          - "php{{ php_version }}-xml"
+          - "php{{ php_version }}-zip"
+          - "php{{ php_version }}-mysql"
+
+        # Set new version as default CLI
+        php_cli_set_as_default_version: true
+
+        # Enable PHP-FPM if needed
+        # php_fpm_enabled: true
+
+  post_tasks:
+    - name: Display upgrade summary
+      ansible.builtin.debug:
+        msg:
+          - "PHP upgrade completed successfully!"
+          - "Old version {{ php_old_version }} has been removed"
+          - "New version {{ php_version }} is now active"
+          - "Please verify your applications are working correctly"

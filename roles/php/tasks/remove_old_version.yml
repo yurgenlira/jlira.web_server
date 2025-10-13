@@ -1,0 +1,83 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Validate php_old_version is different from php_version
+  ansible.builtin.assert:
+    that:
+      - php_old_version is defined
+      - php_old_version | length > 0
+      - php_old_version != php_version
+    fail_msg: "php_old_version must be defined, non-empty, and different from php_version ({{ php_version }})"
+    success_msg: "Proceeding to remove PHP {{ php_old_version }}"
+
+- name: Check if old PHP-FPM service exists
+  ansible.builtin.systemd:
+    name: "php{{ php_old_version }}-fpm"
+  register: php_old_fpm_service
+  failed_when: false
+  check_mode: true
+
+- name: Stop old PHP-FPM service
+  ansible.builtin.systemd:
+    name: "php{{ php_old_version }}-fpm"
+    state: stopped
+  when: php_old_fpm_service.status is defined
+  failed_when: false
+
+- name: Disable old PHP-FPM service
+  ansible.builtin.systemd:
+    name: "php{{ php_old_version }}-fpm"
+    enabled: false
+  when: php_old_fpm_service.status is defined
+  failed_when: false
+
+- name: Get list of installed old PHP packages
+  ansible.builtin.shell:
+    cmd: set -o pipefail && dpkg -l | grep "php{{ php_old_version }}" | awk '{print $2}'
+    executable: /bin/bash
+  register: php_old_packages
+  changed_when: false
+  failed_when: false
+
+- name: Remove old PHP packages
+  ansible.builtin.apt:
+    name: "{{ php_old_packages.stdout_lines }}"
+    state: absent
+    purge: true
+  when:
+    - php_old_packages.stdout_lines is defined
+    - php_old_packages.stdout_lines | length > 0
+
+- name: Remove old PHP configuration directory
+  ansible.builtin.file:
+    path: "/etc/php/{{ php_old_version }}"
+    state: absent
+
+- name: Remove old PHP-FPM logrotate configuration
+  ansible.builtin.file:
+    path: "/etc/logrotate.d/php{{ php_old_version }}-fpm"
+    state: absent
+
+- name: Check if old PHP version is in alternatives
+  ansible.builtin.command: update-alternatives --query php
+  register: php_alternatives_query
+  changed_when: false
+  failed_when: false
+
+- name: Remove old PHP alternatives
+  ansible.builtin.command: "update-alternatives --remove {{ item }} /usr/bin/{{ item }}{{ php_old_version }}"
+  loop:
+    - php
+    - phar
+    - phar.phar
+    - phpize
+    - php-config
+  when:
+    - php_alternatives_query.rc == 0
+    - "'/usr/bin/' + item + php_old_version in php_alternatives_query.stdout"
+  changed_when: true
+  failed_when: false
+
+- name: Clean up apt cache
+  ansible.builtin.apt:
+    autoclean: true
+    autoremove: true

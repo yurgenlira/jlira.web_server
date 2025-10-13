@@ -66,7 +66,9 @@
       '{{ expected_fpm_values.memory_limit }}'
 
 - name: Get numeric value of expected error_reporting
-  ansible.builtin.command: php{{ php_version }} -r 'error_reporting({{ expected_fpm_values.error_reporting }}); echo error_reporting();'
+  ansible.builtin.command: >-
+    php{{ php_version }} -r
+    'error_reporting({{ expected_fpm_values.error_reporting }}); echo error_reporting();'
   register: expected_fpm_error_reporting_numeric
   changed_when: false
 
@@ -96,7 +98,9 @@
   ansible.builtin.assert:
     that:
       - php_fpm_config_values.error_log == expected_fpm_values.error_log
-    fail_msg: "FPM error_log is '{{ php_fpm_config_values.error_log }}' but expected '{{ expected_fpm_values.error_log }}'"
+    fail_msg: >-
+      FPM error_log is '{{ php_fpm_config_values.error_log }}'
+      but expected '{{ expected_fpm_values.error_log }}'
     success_msg: "FPM error_log is correctly set to '{{ expected_fpm_values.error_log }}'"
 
 - name: Read FPM pool configuration file

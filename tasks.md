@@ -1,3 +1,5 @@
+# Apache role
+
 ## ✅ 1. Install apache
 
 - ✅ **Installation:**
@@ -180,9 +182,25 @@
 - ✅ Proper ownership (root:root for config, root:www-data for .htpasswd)
 
 
-## 16. PHP Role Functional Requirements
+## 10. Apache PHP-FPM Integration
 
-### 16.1 PHP Installation
+### 10.1 PHP-FPM Integration
+- **Apache Configuration:**
+  - Create a new task `php_integration.yml` in the `apache` role.
+  - Add logic to enable the `proxy_fcgi` Apache module.
+  - Add logic to execute `a2enconf php{{ apache_php_fpm_version }}-fpm`.
+- **Variables:**
+  - Add `apache_php_fpm_integration: false` to `apache` role defaults.
+  - Add `apache_php_fpm_version` to `apache` role defaults.
+- **Role Integration:**
+  - Update `apache/tasks/main.yml` to include `php_integration.yml` conditionally.
+  - Support multiple PHP versions on same system if you don't set a default version (mejor agregar el arcgivo .conf por defecto)
+
+
+
+# PHP Role Functional Requirements
+
+## 1. PHP Installation
 - **Repository Management:**
   - ✅ Add third-party PHP repository for accessing specific PHP versions
 
@@ -192,8 +210,8 @@
   - ✅ Support Composer installation when enabled
   - ✅ Install packages idempotently
   - ✅ Ensure FPM service is started and enabled
-### 16.2 PHP Configuration Management
-#### 16.2.1 CLI Configuration
+## 2. PHP Configuration Management
+### 2.1 CLI Configuration
 - **Configuration File Management:**
   - ✅ Backup original php.ini before modifications
   - ✅ Update PHP settings using regex-based replacements
@@ -205,7 +223,7 @@
     - ✅ Behavior settings (short_open_tag, mail headers)
   - ✅ Create custom log directories
 
-#### 16.2.2 FPM Configuration
+### 2.2 FPM Configuration
 - **PHP-FPM Settings:**
   - ✅ Backup original FPM php.ini before modifications
   - ✅ Configure FPM-specific PHP settings independently from CLI
@@ -219,25 +237,13 @@
     - ✅ Process limits (pm_max_children, pm_start_servers, pm_min_spare_servers, pm_max_spare_servers)
   - ✅ Create pool configuration from templates
 
-### 16.3 PHP Version Management
+### 2.3 PHP Version Management
 - **CLI Version Management:**
   - ✅ Set default PHP CLI version using system alternatives
   - ✅ Update php, phar, phar.phar, phpize, and php-config alternatives
   - ✅ Create symlinks for default version tools
 
-- **FPM Version Management:**
-  - Configure PHP-FPM as default version when enabled
-
-
-- **Version Upgrade/Downgrade:**
-  - Remove old PHP versions when specified
-  - Stop and disable old PHP-FPM services
-  - Clean up old packages, configuration files, and logs
-  - Remove old extension files and directories
-  - Support clean migration between versions
-
-### 16.4 PHP Extensions
-#### 16.4.1 Microsoft SQL Server Extension
+### 2.4 Microsoft SQL Server Extension
 - **MSSQL Driver Installation:**
   - ✅ Add Microsoft repository and GPG key
   - ✅ Install Microsoft ODBC driver with EULA acceptance
@@ -250,17 +256,7 @@
   - ✅ Enable extensions using phpenmod
   - ✅ Skip compilation if extensions already exist
 
-### 16.5 Status Page Configuration
-- **FPM Status Page:**
-  - Configure proxy timeout settings for FPM connections
-  - Add file existence checks for PHP file execution
-  - Configure status page endpoint access
-  - Create version-specific status page HTML files
-  - Update status page URL references for version-specific endpoints
-
-### 16.6 Log Management
-
-#### 16.6.1 Log Rotation
+### 2.5 Log Rotation
 - **CLI Log Rotation:**
   - ✅ Configure logrotate for PHP CLI error logs
   - ✅ Support custom log paths
@@ -270,6 +266,35 @@
   - ✅ Configure logrotate for PHP-FPM logs
   - ✅ Support custom FPM log paths
   - ✅ Create version-specific logrotate configuration
+
+### 2.6 Uninstall php version
+- **Version Upgrade/Downgrade:**
+  - Remove old PHP versions when specified
+  - Stop and disable old PHP-FPM services
+  - Clean up old packages, configuration files, and logs
+  - Remove old extension files and directories
+  - Support clean migration between versions
+
+
+
+**Technical Debt:**
+- **FPM Version Management:**
+  - ⚠️ Configure PHP-FPM as default version when enabled
+  - ⚠️ Test when logs are created in custom paths and logrotate works for those paths (cli and fpm)
+
+
+
+
+### 16.5 Status Page Configuration
+- **FPM Status Page:**
+  - Configure proxy timeout settings for FPM connections
+  - Add file existence checks for PHP file execution
+  - Configure status page endpoint access
+  - Create version-specific status page HTML files
+  - Update status page URL references for version-specific endpoints
+
+
+
 
 ### 16.11 Testing Requirements
 - **Molecule Tests:**
@@ -301,20 +326,5 @@
 ### 16.12 playbooks
 - Create playbook for intstall multiple php versions (use role serveral times)
 
-- Create test for install_mssql_extension.yml
 
-## 10. Apache PHP-FPM Integration
 
-### 10.1 PHP-FPM Integration
-- **Apache Configuration:**
-  - Create a new task `php_integration.yml` in the `apache` role.
-  - Add logic to enable the `proxy_fcgi` Apache module.
-  - Add logic to execute `a2enconf php{{ apache_php_fpm_version }}-fpm`.
-- **Variables:**
-  - Add `apache_php_fpm_integration: false` to `apache` role defaults.
-  - Add `apache_php_fpm_version` to `apache` role defaults.
-- **Role Integration:**
-  - Update `apache/tasks/main.yml` to include `php_integration.yml` conditionally.
-  - Support multiple PHP versions on same system if you don't set a default version (mejor agregar el arcgivo .conf por defecto)
-
-- testear cuando se haen los logs y cuando se necesita logrotate

@@ -1,8 +1,9 @@
 ---
 - name: Configure logrotate for PHP FPM
-  ansible.builtin.template:
-    src: logrotate_fpm.conf.j2
-    dest: /etc/logrotate.d/php{{ php_version }}-fpm
+  ansible.builtin.blockinfile:
+    path: /etc/logrotate.d/php{{ php_version }}-fpm
+    block: "{{ lookup('template', 'logrotate_fpm.conf.j2') }}"
+    marker: "## {mark} ANSIBLE MANAGED BLOCK - php-fpm Custom log ##"
     owner: root
     group: root
     mode: '0644'

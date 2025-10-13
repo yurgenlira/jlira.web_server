@@ -1,18 +1,16 @@
 # SPDX-License-Identifier: MIT-0
 ---
-
-
-# - name: Include jlira.web_server.php.remove_old_version.yml
-#   ansible.builtin.include_tasks:
-#     file: remove_old_version.yml
-#     apply:
-#       tags:
-#         - remove_old_version
-#         - php_remove_old_version
-#   tags:
-#     - remove_old_version
-#     - php_remove_old_version
-#   when: php_old_version is defined and php_old_version | length > 0
+- name: Include jlira.web_server.php.remove_old_version.yml
+  ansible.builtin.include_tasks:
+    file: remove_old_version.yml
+    apply:
+      tags:
+        - remove_old_version
+        - php_remove_old_version
+  tags:
+    - remove_old_version
+    - php_remove_old_version
+  when: php_old_version is defined and php_old_version | length > 0
 
 - name: Include jlira.web_server.php.install.yml
   ansible.builtin.include_tasks:
@@ -24,6 +22,17 @@
   tags:
     - install
     - php_install
+
+- name: Include jlira.web_server.php.configure_cli.yml
+  ansible.builtin.include_tasks:
+    file: configure_cli.yml
+    apply:
+      tags:
+        - configure_cli
+        - php_configure_cli
+  tags:
+    - configure_cli
+    - php_configure_cli
 
 - name: Include jlira.web_server.php.set_default_cli_version.yml
   ansible.builtin.include_tasks:
@@ -49,7 +58,6 @@
     - php_install_mssql_extension
   when: php_mssql_extension_enabled
 
-
 # - name: Include jlira.web_server.php.set_fpm_version.yml
 #   ansible.builtin.include_tasks:
 #     file: set_fpm_version.yml
@@ -61,17 +69,6 @@
 #     - set_fpm_version
 #     - php_set_fpm_version
 #   when: php_fpm_enabled and php_fpm_set_as_default_version
-
-- name: Include jlira.web_server.php.configure_cli.yml
-  ansible.builtin.include_tasks:
-    file: configure_cli.yml
-    apply:
-      tags:
-        - configure_cli
-        - php_configure_cli
-  tags:
-    - configure_cli
-    - php_configure_cli
 
 - name: Include jlira.web_server.php.logrotate_cli.yml
   ansible.builtin.include_tasks:

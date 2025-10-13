@@ -1,5 +1,6 @@
 profile: production
 exclude_paths:
   - .github/workflows/
+  - extensions/molecule/php/vars.yml  # This is a vars file, not a playbook
 skip_list:
   - yaml[new-line-at-end-of-file]

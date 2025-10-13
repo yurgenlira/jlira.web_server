@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Playbook for installing PHP
+#
+# This playbook installs and configures PHP on target servers.
+# It can be used for fresh installations or adding PHP to servers
+# that don't have it yet.
+#
+# Usage:
+#   ansible-playbook -i inventory playbooks/php-install.yml
+#
+# With custom PHP version:
+#   ansible-playbook -i inventory playbooks/php-install.yml -e "php_version=8.3"
+#
+# With PHP-FPM enabled:
+#   ansible-playbook -i inventory playbooks/php-install.yml -e "php_fpm_enabled=true"
+
+- name: Install PHP
+  hosts: webservers
+  become: true
+  roles:
+    - role: jlira.web_server.php
+      vars:
+        # PHP version to install (default: 8.4)
+        php_version: "8.4"
+
+        # PHP packages to install
+        php_packages:
+          - "php{{ php_version }}-cli"
+          - "php{{ php_version }}-curl"
+          - "php{{ php_version }}-mbstring"
+          - "php{{ php_version }}-xml"
+          - "php{{ php_version }}-zip"
+
+        # Set as default CLI version
+        php_cli_set_as_default_version: true
+
+        # Enable PHP-FPM (uncomment if needed)
+        # php_fpm_enabled: true
+
+        # Enable Composer (uncomment if needed)
+        # php_composer_enabled: true

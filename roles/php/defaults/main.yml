@@ -85,23 +85,23 @@ php_cli_set_as_default_version: true
 # # Type: String (Options: apache, nginx)
 # php_web_server: "apache"
 
-# # Previous PHP version to remove during version upgrades or migrations.
-# # When defined, triggers complete cleanup of the old PHP installation including:
-# # - PHP packages and extensions
-# # - PHP-FPM service (stopped and disabled)
-# # - Configuration files
-# # - Log files and directories
-# # - Extension configuration files
-# #
-# # Safety measures:
-# # - Must be different from php_version (cannot remove the version being installed)
-# # - Removal only occurs when this variable is explicitly defined
-# # - Supports clean migration between major or minor PHP versions
-# #
-# # Example: When upgrading from PHP 8.3 to 8.4, set php_old_version: "8.3"
-# #
-# # Type: String
-# # php_old_version: ""
+# Previous PHP version to remove during version upgrades or migrations.
+# When defined, triggers complete cleanup of the old PHP installation including:
+# - PHP packages and extensions
+# - PHP-FPM service (stopped and disabled)
+# - Configuration files
+# - Logrotate configuration files
+# - Alternatives system entries
+#
+# Safety measures:
+# - Must be different from php_version (cannot remove the version being installed)
+# - Removal only occurs when this variable is explicitly defined and non-empty
+# - Supports clean migration between major or minor PHP versions
+#
+# Example: When upgrading from PHP 8.3 to 8.4, set php_old_version: "8.3"
+#
+# Type: String
+php_old_version: ""
 
 # Enable or disable the installation and configuration of Microsoft SQL Server drivers for PHP.
 # Type: Boolean
@@ -324,7 +324,7 @@ php_fpm_logrotate_enabled: true
 
 # Path to the PHP FPM log file for log rotation.
 # Type: String
-php_fpm_logrotate_path: "/var/log/php/php{{ php_version }}-fpm.log"
+php_fpm_logrotate_path: "{{ php_fpm_settings.error_log.value }}"
 
 # Options for logrotate.
 # Type: List of Strings

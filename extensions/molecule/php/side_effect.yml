@@ -1,28 +1,38 @@
 # SPDX-License-Identifier: MIT-0
 ---
-- name: Converge
+# This playbook tests the PHP upgrade scenario
+# It upgrades from PHP 8.2 (installed in converge.yml) to PHP 8.4
+# This validates the remove_old_version functionality
+
+- name: Side Effect - Test PHP Upgrade
   hosts: all
   gather_facts: false
   vars_files:
     - vars.yml
   vars:
-    # PHP version for initial installation
-    php_version: "8.2"
+    # Target PHP version for upgrade
+    php_version: "8.4"
+
+    # Old PHP version to remove (installed in converge.yml)
+    php_old_version: "8.2"
+
   tasks:
-    - name: Display initial installation information
+    - name: Display upgrade information
       ansible.builtin.debug:
         msg:
           - "=========================================="
-          - "Initial PHP Installation"
+          - "Testing PHP Upgrade Scenario"
           - "=========================================="
-          - "Installing PHP {{ php_version }}"
-          - "This is the base installation that will be upgraded in side_effect.yml"
+          - "Upgrading from PHP {{ php_old_version }} to {{ php_version }}"
+          - "This will test the remove_old_version functionality"
           - "=========================================="
 
-    - name: Apply php role under test
+    - name: Apply php role for upgrade
       ansible.builtin.include_role:
         name: php
       tags:
+        - remove_old_version
+        - php_remove_old_version
         - install
         - php_install
         - configure_cli
@@ -37,15 +47,14 @@
         - php_configure_fpm
         - logrotate_fpm
         - php_logrotate_fpm
-        # - configure_status_page
-        # - php_configure_status_page
 
-    - name: Display installation completion
+    - name: Display upgrade completion
       ansible.builtin.debug:
         msg:
           - "=========================================="
-          - "Initial Installation Completed"
+          - "PHP Upgrade Completed"
           - "=========================================="
-          - "PHP {{ php_version }} installed successfully"
-          - "Next: side_effect.yml will upgrade to PHP 8.4"
+          - "Old version {{ php_old_version }} should be removed"
+          - "New version {{ php_version }} should be active"
+          - "Proceeding to verification tests..."
           - "=========================================="

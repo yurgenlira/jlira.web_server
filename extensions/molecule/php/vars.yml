@@ -1,5 +1,24 @@
 ---
-php_version: "8.2"
+# yamllint disable-line rule:document-start
+# This is a vars file, not a playbook
+# ansible-lint: skip=syntax-check
+
+# ============================================================================
+# Molecule Test Variables for PHP Role
+# ============================================================================
+#
+# This vars file is used for the initial PHP installation in converge.yml
+# The side_effect.yml playbook tests the upgrade scenario from 8.2 to 8.4
+#
+# Test Flow:
+# 1. converge.yml  - Installs PHP 8.2 with all features
+# 2. side_effect.yml - Upgrades from PHP 8.2 to PHP 8.4 (tests remove_old_version)
+# 3. verify.yml    - Verifies PHP 8.4 is installed and 8.2 is removed
+# ============================================================================
+
+# Note: php_old_version is NOT set here - it's only used in side_effect.yml
+# to test the upgrade scenario
+
 php_fpm_enabled: true
 php_composer_enabled: true
 php_cli_set_as_default_version: true
@@ -60,4 +79,3 @@ php_pool_additional_settings:
   php_admin_value[error_log]: /var/log/php/pool-admin-error.log
   php_admin_flag[log_errors]: "on"
 php_mssql_extension_enabled: true
-php_mssql_package_version: 18
