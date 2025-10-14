@@ -22,16 +22,6 @@
 php_fpm_enabled: true
 php_composer_enabled: true
 php_cli_set_as_default_version: true
-# php_status_page_enabled: true
-# php_proxy_timeout: 60
-
-# Apache PHP-FPM status proxy configuration
-# apache_php_fpm_status_configs:
-#   - version: "{{ php_version }}"
-#     status_path: "{{ php_pool_settings.status_path }}"
-#     ping_path: "{{ php_pool_settings.ping_path }}"
-#     proxy_timeout: "{{ php_proxy_timeout }}"
-#     allowed_hosts: []
 php_packages:
   - "php{{ php_version }}-bcmath"
   - "php{{ php_version }}-curl"
