@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: MIT-0
+---
+# This scenario tests the php-uninstall.yml playbook
+# It validates that the playbook correctly removes PHP
+
+- name: Display uninstall test information
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Show scenario details
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Testing: playbooks/php-uninstall.yml"
+          - "=========================================="
+          - "Uninstalling PHP {{ php_version_to_remove }}"
+          - "Expected outcome: Complete removal of PHP and all components"
+          - "=========================================="
+
+- name: Import PHP uninstall playbook
+  ansible.builtin.import_playbook: ../../../playbooks/php-uninstall.yml
+
+- name: Display test completion
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Show completion message
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Uninstall Playbook Execution Completed"
+          - "=========================================="
+          - "Next: verify.yml will validate the removal"
+          - "=========================================="

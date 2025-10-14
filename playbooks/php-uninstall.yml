@@ -72,7 +72,9 @@
           Applications depending on PHP {{ php_old_version }} will STOP WORKING.
 
           Press CTRL+C and then A to abort, or ENTER to continue
-      when: not ansible_check_mode
+      when:
+        - not ansible_check_mode
+        - not (php_skip_confirm | default(false))
 
   roles:
     - role: jlira.web_server.php

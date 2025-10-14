@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Verify PHP installation via playbook
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Check PHP CLI version
+      ansible.builtin.command: php --version
+      register: php_version_output
+      changed_when: false
+
+    - name: Display PHP version
+      ansible.builtin.debug:
+        msg: "{{ php_version_output.stdout_lines[0] }}"
+
+    - name: Verify PHP is installed ({{ php_version }})
+      ansible.builtin.assert:
+        that:
+          - "'PHP {{ php_version }}' in php_version_output.stdout"
+        fail_msg: "PHP {{ php_version }} not installed correctly"
+        success_msg: "PHP {{ php_version }} is installed correctly"
+
+    - name: Check PHP-FPM service status
+      ansible.builtin.systemd:
+        name: "php{{ php_version }}-fpm"
+      register: php_fpm_service
+      when: php_fpm_enabled | default(true)
+
+    - name: Verify PHP-FPM is running
+      ansible.builtin.assert:
+        that:
+          - php_fpm_service.status.ActiveState == "active"
+          - php_fpm_service.status.LoadState == "loaded"
+        fail_msg: "PHP-FPM service is not running correctly"
+        success_msg: "PHP-FPM service is active and loaded"
+      when: php_fpm_enabled | default(true)
+
+    - name: Check if PHP is set as default
+      ansible.builtin.command: php --version
+      register: default_php_version
+      changed_when: false
+      when: php_cli_set_as_default_version | default(true)
+
+    - name: Verify PHP {{ php_version }} is the default
+      ansible.builtin.assert:
+        that:
+          - "'PHP {{ php_version }}' in default_php_version.stdout"
+        fail_msg: "PHP {{ php_version }} is not set as default"
+        success_msg: "PHP {{ php_version }} is set as default CLI version"
+      when: php_cli_set_as_default_version | default(true)
+
+    - name: Verify PHP packages are installed
+      ansible.builtin.command: dpkg -l php{{ php_version }}-cli php{{ php_version }}-fpm
+      register: php_packages
+      changed_when: false
+      failed_when: php_packages.rc != 0
+
+    - name: Display verification summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Verification Successful!"
+          - "=========================================="
+          - "✓ PHP {{ php_version }} installed"
+          - "✓ PHP-FPM service running"
+          - "✓ PHP set as default CLI version"
+          - "✓ All required packages installed"
+          - "=========================================="

@@ -34,42 +34,37 @@
 #     -e '{"php_packages": ["php8.4-cli", "php8.4-fpm", "php8.4-mysql", "php8.4-mbstring"]}'
 
 - name: Install and Configure PHP
-  hosts: webservers
+  hosts: php
   become: true
+
+  pre_tasks:
+    - name: Display PHP installation parameters
+      ansible.builtin.debug:
+        msg:
+          - "===================================================================="
+          - "                      PHP Installation Details                      "
+          - "===================================================================="
+          - ""
+          - "  Target Hosts:           {{ ansible_play_hosts_all | join(', ') }}"
+          - "  PHP Version:            {{ php_version | default('8.4') }}"
+          - "  PHP-FPM Enabled:        {{ php_fpm_enabled | default(true) }}"
+          - "  Composer Enabled:       {{ php_composer_enabled | default(false) }}"
+          - "  Set as Default CLI:     {{ php_cli_set_as_default_version | default(true) }}"
+          - ""
+          - "  This playbook will install and configure PHP with these settings."
+          - "  Review the parameters above before proceeding."
+          - ""
+          - "===================================================================="
+      tags: always
+
+    - name: Confirm PHP installation
+      ansible.builtin.pause:
+        prompt: "Press Enter to continue with PHP installation, or Ctrl+C and then 'a' to abort."
+      when: not (php_skip_confirm | default(false))
+      tags: always
 
   roles:
     - role: jlira.web_server.php
-      vars:
-        # PHP version to install (default: 8.4)
-        php_version: "{{ php_version | default('8.4') }}"
-
-        # PHP packages to install
-        # Customize this list based on your application requirements
-        php_packages:
-          - "php{{ php_version }}-cli"
-          - "php{{ php_version }}-fpm"
-          - "php{{ php_version }}-curl"
-          - "php{{ php_version }}-mbstring"
-          - "php{{ php_version }}-xml"
-          - "php{{ php_version }}-zip"
-          - "php{{ php_version }}-mysql"
-          - "php{{ php_version }}-gd"
-
-        # Set as default CLI version
-        php_cli_set_as_default_version: true
-
-        # Enable PHP-FPM (default: true)
-        php_fpm_enabled: true
-
-        # Enable Composer (default: false)
-        # Uncomment or set via -e to enable
-        # php_composer_enabled: true
-
-        # Enable CLI error logging
-        php_cli_logrotate_enabled: true
-
-        # Enable FPM error logging
-        php_fpm_logrotate_enabled: true
 
   post_tasks:
     - name: Verify PHP installation
@@ -81,11 +76,11 @@
       ansible.builtin.debug:
         msg:
           - "═══════════════════════════════════════════════════════════════════════"
-          - "PHP {{ php_version }} Installation Complete"
+          - "PHP {{ php_version | default('8.4') }} Installation Complete"
           - "═══════════════════════════════════════════════════════════════════════"
           - ""
           - "Installed:"
-          - "  • PHP Version: {{ php_version }}"
+          - "  • PHP Version: {{ php_version | default('8.4') }}"
           - "  • PHP-FPM: {{ 'Enabled' if php_fpm_enabled | default(true) else 'Disabled' }}"
           - "  • Composer: {{ 'Enabled' if php_composer_enabled | default(false) else 'Disabled' }}"
           - "  • Set as default CLI: {{ 'Yes' if php_cli_set_as_default_version | default(true) else 'No' }}"
@@ -95,11 +90,3 @@
             {{ php_version_check.stdout_lines[0]
             if php_version_check.stdout_lines | length > 0
             else 'Version check failed' }}
-          - ""
-          - "Next steps:"
-          - "  1. Configure your web server (Apache/Nginx) to use PHP-FPM"
-          - "  2. Test PHP with: php -r 'phpinfo();' | head"
-          - "  3. Verify FPM is running: systemctl status php{{ php_version }}-fpm"
-          - "  4. Customize php.ini settings if needed"
-          - ""
-          - "═══════════════════════════════════════════════════════════════════════"

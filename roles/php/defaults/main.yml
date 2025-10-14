@@ -4,8 +4,8 @@
 # PHP Version Configuration
 # ============================================================================
 
-# PHP version to install and configure.
-# Specifies the major and minor version (e.g., 8.3, 8.4).
+# Specifies the PHP version to install and configure.
+# It defines the major and minor version (e.g., "8.3", "8.4").
 # Type: String
 php_version: "8.4"
 
@@ -13,9 +13,8 @@ php_version: "8.4"
 # Package Installation
 # ============================================================================
 
-# List of PHP packages to install from the Ondrej PHP PPA repository.
-# This includes the main PHP package, CLI, and any extensions you need.
-# Uncomment or add extensions based on your application requirements.
+# Defines the list of PHP packages to install from the Ondrej PHP PPA repository.
+# This should include the main PHP package, CLI, and any required extensions.
 # Type: List of Strings
 php_packages:
   - "php{{ php_version }}-cli"
@@ -36,8 +35,7 @@ php_packages:
 # Composer Configuration
 # ============================================================================
 
-# Enable Composer installation.
-# Composer is the dependency manager for PHP.
+# Determines whether to install Composer, the dependency manager for PHP.
 # Type: Boolean
 php_composer_enabled: false
 
@@ -45,55 +43,23 @@ php_composer_enabled: false
 # Version Management
 # ============================================================================
 
-# Determines if the newly installed PHP version should be set as the default CLI version.
-# When enabled, the PHP version specified in `php_version` will become the system default
-# for command-line PHP execution (updates /usr/bin/php symlink).
-#
-# This is useful when:
-# - Installing PHP for the first time
-# - Upgrading to a newer PHP version
-# - Managing multiple PHP versions and wanting to switch the default
-#
-# Note: This uses the Debian alternatives system to manage version priority.
-# Higher versions automatically receive higher priority.
+# Determines if the newly installed PHP version should be set as the default for the CLI.
+# If true, the version in `php_version` becomes the system-wide default for `php`.
+# This is managed using the Debian alternatives system.
 #
 # Type: Boolean
 php_cli_set_as_default_version: true
 
-# Previous PHP version to remove during version upgrades or migrations.
-# When defined, triggers complete cleanup of the old PHP installation including:
-# - PHP packages and extensions
-# - PHP-FPM service (stopped and disabled)
-# - Configuration files
-# - Logrotate configuration files
-# - Alternatives system entries
+# A dictionary of settings for the `php.ini` configuration file for the PHP CLI.
+# These settings customize PHP's behavior for command-line execution.
+# Each setting is a dictionary with `value` and `type` keys.
 #
-# Safety measures:
-# - Must be different from php_version (cannot remove the version being installed)
-# - Removal only occurs when this variable is explicitly defined and non-empty
-# - Supports clean migration between major or minor PHP versions
+# - `value`: The value for the PHP directive.
+# - `type`: The data type for regex matching (bool, int, size, string, path).
 #
-# Example: When upgrading from PHP 8.3 to 8.4, set php_old_version: "8.3"
+# Note: `max_execution_time` is hardcoded to 0 for the CLI and is not configurable here.
 #
-# Type: String
-php_old_version: ""
-
-# Enable or disable the installation and configuration of Microsoft SQL Server drivers for PHP.
-# Type: Boolean
-php_mssql_extension_enabled: false
-
-# Version of the Microsoft SQL Server driver for PHP to be installed.
-# This is used when `php_mssql_extension_enabled` is set to true.
-# Type: Integer
-php_mssql_package_version: 18
-
-# Settings for the `php.ini` configuration file for PHP-CLI.
-# These settings customize PHP's behavior such as memory limits, error reporting, and file upload sizes.
-# Each setting includes:
-# - value: The value to set for this PHP configuration directive
-# - type: The data type used for regex pattern matching (bool, int, size, string, path)
 # Type: Dictionary
-# NOTE: max_execution_time is hardcoded to 0 for the CLI SAPI so it is not configurable here.
 php_cli_settings:
   short_open_tag:                         # Allow the use of short PHP tags.
     value: false
@@ -141,20 +107,42 @@ php_cli_settings:
     value: false
     type: bool
 
+# Determines whether to install and configure Microsoft SQL Server drivers for PHP.
+# Type: Boolean
+php_mssql_extension_enabled: false
+
+# Specifies the version of the Microsoft SQL Server driver for PHP to install.
+# This is only used if `php_mssql_extension_enabled` is true.
+# Type: Integer
+php_mssql_package_version: 18
+
+# Specifies the previous PHP version to remove during an upgrade or migration.
+# When defined, this triggers a complete cleanup of the old PHP installation,
+# including packages, services, and configuration files.
+#
+# This must be different from `php_version`.
+#
+# Example: To upgrade from PHP 8.3 to 8.4, set `php_old_version: "8.3"`.
+#
+# Type: String
+php_old_version: ""
+
 # ============================================================================
 # PHP-FPM Configuration
 # ============================================================================
 
-# Enable PHP-FPM installation and configuration.
-# PHP-FPM is required for serving PHP applications via web servers.
+# Determines whether to install and configure PHP-FPM.
+# PHP-FPM is required for serving PHP applications with a web server.
 # Type: Boolean
 php_fpm_enabled: false
 
-# Settings for the `php.ini` configuration file for PHP-FPM.
-# These settings customize PHP's behavior such as memory limits, error reporting, and file upload sizes.
-# Each setting includes:
-# - value: The value to set for this PHP configuration directive
-# - type: The data type used for regex pattern matching (bool, int, size, string, path)
+# A dictionary of settings for the `php.ini` configuration file for PHP-FPM.
+# These settings customize PHP's behavior for web requests.
+# Each setting is a dictionary with `value` and `type` keys.
+#
+# - `value`: The value for the PHP directive.
+# - `type`: The data type for regex matching (bool, int, size, string, path).
+#
 # Type: Dictionary
 php_fpm_settings:
   short_open_tag:                         # Allow the use of short PHP tags.
@@ -206,52 +194,16 @@ php_fpm_settings:
     value: false
     type: bool
 
-# Configuration settings for PHP-FPM pools.
-# This defines how PHP-FPM should manage its child processes.
-# Each setting includes:
-# - pool_name: The name of the pool (optional, defaults to www-{version})
-# - pm: Process manager type (static, dynamic, ondemand)
-# - pm_max_children: Maximum number of child processes
-# - pm_start_servers: Number of child processes created on startup (dynamic only)
-# - pm_min_spare_servers: Minimum number of spare idle processes (dynamic only)
-# - pm_max_spare_servers: Maximum number of spare idle processes (dynamic only)
-# - status_path: URI path for the FPM status page (optional)
-# - ping_path: URI path for the FPM ping endpoint (optional)
-# - ping_response: Response text for ping requests (optional)
+# A dictionary of additional custom settings for the PHP-FPM pool.
+# This allows for advanced configuration of the FPM pool.
+#
+# Example:
+# php_pool_additional_settings:
+#   slowlog: /var/log/php/php{{ php_version }}-fpm-slow.log
+#   request_slowlog_timeout: 5s
+#
 # Type: Dictionary
-php_pool_settings:
-  pool_name: www
-  pm: dynamic
-  pm_max_children: 5
-  pm_start_servers: 2
-  pm_min_spare_servers: 1
-  pm_max_spare_servers: 3
-  status_path: /status
-  ping_path: /ping
-  ping_response: pong
-
-# Enable PHP-FPM status page configuration.
-# When enabled, the status page will be configured in the pool and accessible via web server.
-# Type: Boolean
-php_status_page_enabled: false
-
-# Additional PHP-FPM pool configuration settings.
-# This dictionary allows you to add any custom pool configuration directives dynamically.
-# The key is the directive name and the value is the directive value.
-# Common examples include:
-# - slowlog: Path to the slow request log file
-# - request_slowlog_timeout: Timeout for logging slow requests (e.g., "5s")
-# - request_terminate_timeout: Timeout for terminating requests (e.g., "30s")
-# - php_admin_value[error_log]: Override error_log for this pool
-# - php_admin_value[memory_limit]: Override memory_limit for this pool
-# - php_admin_flag[display_errors]: Override display_errors for this pool
-# - catch_workers_output: Capture worker stdout/stderr (yes/no)
-# - rlimit_files: Open file descriptor limit
-# - rlimit_core: Core size limit
-# - chdir: Change directory on startup
-# - security.limit_extensions: Limit allowed file extensions
-# Type: Dictionary
-php_pool_additional_settings:
+php_pool_additional_settings: {}
 #   slowlog: /var/log/php/php{{ php_version }}-fpm-slow.log
 #   request_slowlog_timeout: 5s
 #   request_terminate_timeout: 30s
@@ -260,19 +212,36 @@ php_pool_additional_settings:
 #   php_admin_flag[display_errors]: off
 #   catch_workers_output: yes
 
+# A dictionary of configuration settings for the PHP-FPM pool.
+# This defines how PHP-FPM manages its child processes.
+#
+# Type: Dictionary
+php_pool_settings:
+  pool_name: www            # The name of the pool (optional, defaults to www-{version})
+  pm: dynamic               # Process manager (static, dynamic, or ondemand)
+  pm_max_children: 5        # Maximum number of child processes
+  pm_start_servers: 2       # Number of child processes created on startup (dynamic only)
+  pm_min_spare_servers: 1   # Minimum number of spare idle processes (dynamic only)
+  pm_max_spare_servers: 3   # Maximum number of spare idle processes (dynamic only)
+  status_path: /status      # URI path for the FPM status page (optional)
+  ping_path: /ping          # URI path for the FPM ping endpoint (optional)
+  ping_response: pong       # Response text for ping requests (optional)
+
+# Determines whether to enable the PHP-FPM status page.
+# If true, the status page will be configured and accessible via the web server.
+# Type: Boolean
+php_status_page_enabled: false
+
 # ============================================================================
 # Logrotate Configuration
 # ============================================================================
 
-# Enable logrotate for PHP CLI.
+# Determines whether to enable log rotation for the PHP CLI error log.
 # Type: Boolean
 php_cli_logrotate_enabled: false
 
-# Path to the PHP CLI log file for log rotation.
-# Type: String
-php_cli_logrotate_path: "{{ php_cli_settings.error_log.value }}"
-
-# Options for logrotate.
+# A list of options for logrotate for the PHP CLI log file.
+#
 # Type: List of Strings
 php_cli_logrotate_options:
   - su root root
@@ -283,15 +252,16 @@ php_cli_logrotate_options:
   - compress
   - delaycompress
 
-# Enable logrotate for PHP FPM.
+# The path to the PHP CLI log file for log rotation.
+# Type: String
+php_cli_logrotate_path: "{{ php_cli_settings.error_log.value }}"
+
+# Determines whether to enable log rotation for the PHP-FPM error log.
 # Type: Boolean
 php_fpm_logrotate_enabled: false
 
-# Path to the PHP FPM log file for log rotation.
-# Type: String
-php_fpm_logrotate_path: "{{ php_fpm_settings.error_log.value }}"
-
-# Options for logrotate.
+# A list of options for logrotate for the PHP-FPM log file.
+#
 # Type: List of Strings
 php_fpm_logrotate_options:
   - su root root
@@ -301,3 +271,7 @@ php_fpm_logrotate_options:
   - notifempty
   - compress
   - delaycompress
+
+# The path to the PHP-FPM log file for log rotation.
+# Type: String
+php_fpm_logrotate_path: "{{ php_fpm_settings.error_log.value }}"
