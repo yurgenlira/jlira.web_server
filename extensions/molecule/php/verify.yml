@@ -49,8 +49,3 @@
       ansible.builtin.include_tasks:
         file: tests/logrotate_fpm.yml
       when: php_fpm_enabled and php_fpm_logrotate_enabled
-
-    # - name: Include configure_status_page.yml tests
-    #   ansible.builtin.include_tasks:
-    #     file: tests/configure_status_page.yml
-    #   when: php_fpm_enabled and php_status_page_enabled
