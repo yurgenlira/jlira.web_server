@@ -35,7 +35,7 @@
 
 - name: Check if old PHP-FPM logrotate configuration exists
   ansible.builtin.stat:
-    path: "/etc/logrotate.d/php{{ php_old_version }}-fpm"
+    path: "/etc/logrotate.d/php{{ php_old_version }}-fpm-pool"
   register: old_php_fpm_logrotate
   when: php_old_version is defined and php_old_version | length > 0
 
@@ -43,7 +43,7 @@
   ansible.builtin.assert:
     that:
       - not old_php_fpm_logrotate.stat.exists
-    fail_msg: "Old PHP-FPM logrotate configuration still exists at /etc/logrotate.d/php{{ php_old_version }}-fpm"
+    fail_msg: "Old PHP-FPM logrotate configuration still exists at /etc/logrotate.d/php{{ php_old_version }}-fpm-pool"
     success_msg: "Old PHP-FPM logrotate configuration has been removed"
   when: php_old_version is defined and php_old_version | length > 0
 

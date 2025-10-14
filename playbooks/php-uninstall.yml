@@ -82,7 +82,7 @@
 
     - name: Remove PHP-FPM logrotate configuration
       ansible.builtin.file:
-        path: "/etc/logrotate.d/php{{ php_version_to_remove }}-fpm"
+        path: "/etc/logrotate.d/php{{ php_version_to_remove }}-fpm-pool"
         state: absent
 
     - name: Check PHP alternatives

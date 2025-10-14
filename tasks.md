@@ -267,15 +267,21 @@
   - ✅ Support custom FPM log paths
   - ✅ Create version-specific logrotate configuration
 
-### 2.6 Uninstall php version
+### ✅ 2.6 Uninstall php version
 - **Version Upgrade/Downgrade:**
-  - Remove old PHP versions when specified
-  - Stop and disable old PHP-FPM services
-  - Clean up old packages, configuration files, and logs
-  - Remove old extension files and directories
-  - Support clean migration between versions
+  - ✅ Remove old PHP versions when specified
+  - ✅ Stop and disable old PHP-FPM services
+  - ✅ Clean up old packages, configuration files, and logs
+  - ✅ Remove old extension files and directories
+  - ✅ Support clean migration between versions
 
-
+## 3. Status Page Configuration
+- **FPM Status Page:**
+  - Configure proxy timeout settings for FPM connections
+  - Add file existence checks for PHP file execution
+  - Configure status page endpoint access
+  - Create version-specific status page HTML files
+  - Update status page URL references for version-specific endpoints
 
 **Technical Debt:**
 - **FPM Version Management:**
@@ -285,22 +291,16 @@
 
 
 
-### 16.5 Status Page Configuration
-- **FPM Status Page:**
-  - Configure proxy timeout settings for FPM connections
-  - Add file existence checks for PHP file execution
-  - Configure status page endpoint access
-  - Create version-specific status page HTML files
-  - Update status page URL references for version-specific endpoints
 
 
 
+# General Functional Requirements
 
-### 16.11 Testing Requirements
+## 1. Testing Requirements
 - **Molecule Tests:**
   - Support create, converge, verify, and destroy lifecycle
 
-### 16.12 Integration Requirements
+## 2. Integration Requirements
 - **Web Server Integration:**
   - Integrate with web servers via environment variables
   - Configure FPM status page endpoint access
@@ -312,19 +312,15 @@
   - Allow selective execution of specific functionality
   - Support conditional task execution based on variables
 
-### 16.9 Idempotency Requirements
+## 3. Idempotency Requirements
 - **Change Detection:**
   - Check if files exist before creating backups
   - Use 'creates' parameter for idempotent installations
   - Register and check task results before triggering handlers
-  - Only restart services when configuration actually changes
+  - Only restart/reload services when configuration actually changes
 
-- **Service State Management:**
-  - Conditional service restarts/reloads based on registered changes
-
-
-### 16.12 playbooks
-- Create playbook for intstall multiple php versions (use role serveral times)
+### 4. playbooks
+- Create playbook for install multiple php versions (use role serveral times)
 
 
 

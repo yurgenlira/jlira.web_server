@@ -59,7 +59,7 @@
 
 - name: Remove old PHP-FPM logrotate configuration
   ansible.builtin.file:
-    path: "/etc/logrotate.d/php{{ php_old_version }}-fpm"
+    path: "/etc/logrotate.d/php{{ php_old_version }}-fpm-pool"
     state: absent
 
 - name: Check if old PHP version is in alternatives
@@ -86,3 +86,8 @@
   ansible.builtin.apt:
     autoclean: true
     autoremove: true
+
+- name: Clean up old PHP mssql extension files
+  ansible.builtin.file:
+    path: "/var/lib/php/modules/{{ php_old_version }}"
+    state: absent
