@@ -60,31 +60,6 @@ php_composer_enabled: false
 # Type: Boolean
 php_cli_set_as_default_version: true
 
-# # Determines if the newly installed PHP-FPM version should be configured as the default
-# # for web server integration. When enabled, sets the PHP_VERSION environment variable
-# # in the web server configuration.
-# #
-# # This is useful when:
-# # - Using PHP-FPM with a web server (Apache/Nginx)
-# # - Running multiple PHP-FPM versions and needing to specify which one to use
-# # - Ensuring the web server knows which PHP version to proxy requests to
-# #
-# # Requires:
-# # - php_fpm_enabled: true
-# # - php_web_server: must be set to 'apache' or 'nginx'
-# #
-# # Type: Boolean
-# php_fpm_set_as_default_version: false
-
-# # Specifies the web server being used with PHP-FPM for environment variable configuration.
-# # Currently supported values: 'apache', 'nginx'
-# #
-# # When set to 'apache': Updates /etc/apache2/envvars with PHP_VERSION
-# # When set to 'nginx': Updates /etc/default/php{version}-fpm with PHP_VERSION
-# #
-# # Type: String (Options: apache, nginx)
-# php_web_server: "apache"
-
 # Previous PHP version to remove during version upgrades or migrations.
 # When defined, triggers complete cleanup of the old PHP installation including:
 # - PHP packages and extensions
@@ -284,17 +259,6 @@ php_pool_additional_settings:
 #   php_admin_value[memory_limit]: 256M
 #   php_admin_flag[display_errors]: off
 #   catch_workers_output: yes
-
-# # Timeout value for proxying requests to PHP-FPM.
-# # Type: Integer
-# php_proxy_timeout: 60
-
-# # List of hosts allowed to access the PHP-FPM status page.
-# # Each entry includes an IP address and a comment describing its purpose.
-# # Type: List of Dictionaries
-# php_status_page_allowed_hosts: []
-# #   - ip: 10.0.0.1
-# #     comment: allow access to host
 
 # ============================================================================
 # Logrotate Configuration

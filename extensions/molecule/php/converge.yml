@@ -37,8 +37,6 @@
         - php_configure_fpm
         - logrotate_fpm
         - php_logrotate_fpm
-        # - configure_status_page
-        # - php_configure_status_page
 
     - name: Display installation completion
       ansible.builtin.debug:

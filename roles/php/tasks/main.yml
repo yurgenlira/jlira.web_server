@@ -67,18 +67,6 @@
     - php_install_mssql_extension
   when: php_mssql_extension_enabled
 
-# - name: Include jlira.web_server.php.set_fpm_version.yml
-#   ansible.builtin.include_tasks:
-#     file: set_fpm_version.yml
-#     apply:
-#       tags:
-#         - set_fpm_version
-#         - php_set_fpm_version
-#   tags:
-#     - set_fpm_version
-#     - php_set_fpm_version
-#   when: php_fpm_enabled and php_fpm_set_as_default_version
-
 - name: Include jlira.web_server.php.logrotate_cli.yml
   ansible.builtin.include_tasks:
     file: logrotate_cli.yml
@@ -114,15 +102,3 @@
     - logrotate_fpm
     - php_logrotate_fpm
   when: php_fpm_enabled and php_fpm_logrotate_enabled
-
-# - name: Include jlira.web_server.php.configure_status_page.yml
-#   ansible.builtin.include_tasks:
-#     file: configure_status_page.yml
-#     apply:
-#       tags:
-#         - configure_status_page
-#         - php_configure_status_page
-#   tags:
-#     - configure_status_page
-#     - php_configure_status_page
-#   when: php_fpm_enabled and php_status_page_enabled

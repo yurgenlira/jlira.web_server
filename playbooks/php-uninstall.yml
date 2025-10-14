@@ -8,112 +8,97 @@
 # - Configuration files
 # - Logrotate configurations
 # - Alternatives system entries
+# - Extension files and directories
 #
 # Usage:
 #   ansible-playbook -i inventory playbooks/php-uninstall.yml \
 #     -e "php_version_to_remove=8.4"
+#
+# With specific version removal:
+#   ansible-playbook -i inventory playbooks/php-uninstall.yml \
+#     -e "php_old_version=8.3" \
+#     -e "php_version=8.4"
 #
 # Warning:
 #   - This will completely remove PHP from the system
 #   - Applications depending on PHP will stop working
 #   - Backup important data before running
 #   - Consider using php-upgrade.yml instead for version changes
+#
+# How it works:
+#   - Uses the php role with only the uninstall tag
+#   - The role requires php_old_version to trigger uninstall
+#   - php_version is used as the "current" version to prevent conflicts
 
 - name: Uninstall PHP
   hosts: webservers
   become: true
-  vars:
-    # PHP version to remove (required)
-    php_version_to_remove: "8.4"
 
-  tasks:
+  pre_tasks:
+    - name: Set uninstall variables
+      ansible.builtin.set_fact:
+        php_old_version: "{{ php_version_to_remove | default('8.3') }}"
+        php_version: "{{ php_current_version | default('8.4') }}"
+
+    - name: Validate versions are different
+      ansible.builtin.assert:
+        that:
+          - php_old_version is defined
+          - php_version is defined
+          - php_old_version != php_version
+        fail_msg: >-
+          php_old_version ({{ php_old_version | default('undefined') }}) must be defined
+          and different from php_version ({{ php_version | default('undefined') }})
+        success_msg: "Will proceed to remove PHP {{ php_old_version }}"
+
     - name: Confirm PHP version to remove
       ansible.builtin.pause:
         prompt: |
-          WARNING: This will completely remove PHP {{ php_version_to_remove }} from the system.
+
+          ╔═══════════════════════════════════════════════════════════════════════╗
+          ║                            WARNING                                    ║
+          ╚═══════════════════════════════════════════════════════════════════════╝
+
+          This will completely remove PHP {{ php_old_version }} from the system.
 
           This includes:
-          - All PHP {{ php_version_to_remove }} packages
-          - PHP-FPM service
-          - Configuration files
-          - Logrotate configurations
+          ✗ All PHP {{ php_old_version }} packages and extensions
+          ✗ PHP-FPM service (if running)
+          ✗ Configuration files (/etc/php/{{ php_old_version }})
+          ✗ Logrotate configurations
+          ✗ Alternatives system entries
+          ✗ Extension files and directories
+
+          Applications depending on PHP {{ php_old_version }} will STOP WORKING.
 
           Press CTRL+C and then A to abort, or ENTER to continue
       when: not ansible_check_mode
 
-    - name: Stop PHP-FPM service
-      ansible.builtin.systemd:
-        name: "php{{ php_version_to_remove }}-fpm"
-        state: stopped
-      failed_when: false
+  roles:
+    - role: jlira.web_server.php
+      tags:
+        - uninstall
+        - php_uninstall
 
-    - name: Disable PHP-FPM service
-      ansible.builtin.systemd:
-        name: "php{{ php_version_to_remove }}-fpm"
-        enabled: false
-      failed_when: false
-
-    - name: Get list of installed PHP packages
-      ansible.builtin.shell:
-        cmd: set -o pipefail && dpkg -l | grep "php{{ php_version_to_remove }}" | awk '{print $2}'
-        executable: /bin/bash
-      register: php_packages_to_remove
-      changed_when: false
-      failed_when: false
-
-    - name: Remove PHP packages
-      ansible.builtin.apt:
-        name: "{{ php_packages_to_remove.stdout_lines }}"
-        state: absent
-        purge: true
-      when:
-        - php_packages_to_remove.stdout_lines is defined
-        - php_packages_to_remove.stdout_lines | length > 0
-
-    - name: Remove PHP configuration directory
-      ansible.builtin.file:
-        path: "/etc/php/{{ php_version_to_remove }}"
-        state: absent
-
-    - name: Remove PHP CLI logrotate configuration
-      ansible.builtin.file:
-        path: /etc/logrotate.d/php-cli
-        state: absent
-
-    - name: Remove PHP-FPM logrotate configuration
-      ansible.builtin.file:
-        path: "/etc/logrotate.d/php{{ php_version_to_remove }}-fpm-pool"
-        state: absent
-
-    - name: Check PHP alternatives
-      ansible.builtin.command: update-alternatives --query php
-      register: php_alternatives_check
-      changed_when: false
-      failed_when: false
-
-    - name: Remove PHP alternatives
-      ansible.builtin.command: "update-alternatives --remove {{ item }} /usr/bin/{{ item }}{{ php_version_to_remove }}"
-      loop:
-        - php
-        - phar
-        - phar.phar
-        - phpize
-        - php-config
-      when:
-        - php_alternatives_check.rc == 0
-        - "'/usr/bin/' + item + php_version_to_remove in php_alternatives_check.stdout"
-      changed_when: true
-      failed_when: false
-
-    - name: Clean up apt cache
-      ansible.builtin.apt:
-        autoclean: true
-        autoremove: true
-
+  post_tasks:
     - name: Display uninstall summary
       ansible.builtin.debug:
         msg:
-          - "PHP {{ php_version_to_remove }} has been successfully uninstalled"
-          - "Removed packages: {{ php_packages_to_remove.stdout_lines | default([]) | join(', ') }}"
-          - "Configuration files have been purged"
-          - "System has been cleaned up"
+          - "═══════════════════════════════════════════════════════════════════════"
+          - "PHP {{ php_old_version }} Uninstallation Complete"
+          - "═══════════════════════════════════════════════════════════════════════"
+          - ""
+          - "Removed:"
+          - "  • All PHP {{ php_old_version }} packages"
+          - "  • Configuration directory: /etc/php/{{ php_old_version }}"
+          - "  • PHP-FPM service"
+          - "  • Logrotate configurations"
+          - "  • Alternatives system entries"
+          - "  • Extension files"
+          - ""
+          - "Next steps:"
+          - "  1. Verify no applications are broken"
+          - "  2. Check for any remaining PHP processes"
+          - "  3. Consider cleaning up application-specific configs"
+          - ""
+          - "═══════════════════════════════════════════════════════════════════════"
