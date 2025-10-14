@@ -52,6 +52,11 @@
     path: "/etc/php/{{ php_old_version }}"
     state: absent
 
+- name: Remove old PHP CLI logrotate configuration
+  ansible.builtin.file:
+    path: "/etc/logrotate.d/php{{ php_old_version }}-cli"
+    state: absent
+
 - name: Remove old PHP-FPM logrotate configuration
   ansible.builtin.file:
     path: "/etc/logrotate.d/php{{ php_old_version }}-fpm"

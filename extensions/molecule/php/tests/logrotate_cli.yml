@@ -2,7 +2,7 @@
 ---
 - name: Check if logrotate configuration file exists
   ansible.builtin.stat:
-    path: /etc/logrotate.d/php-cli
+    path: /etc/logrotate.d/php{{ php_version }}-cli
   register: logrotate_cli_file
   when: php_cli_logrotate_enabled
 
@@ -11,7 +11,7 @@
     that:
       - logrotate_cli_file.stat.exists
       - logrotate_cli_file.stat.isreg
-    fail_msg: "Logrotate configuration file /etc/logrotate.d/php-cli does not exist"
+    fail_msg: "Logrotate configuration file /etc/logrotate.d/php{{ php_version }}-cli does not exist"
   when: php_cli_logrotate_enabled
 
 - name: Assert logrotate configuration file has correct permissions
@@ -25,7 +25,7 @@
 
 - name: Read logrotate configuration file
   ansible.builtin.slurp:
-    path: /etc/logrotate.d/php-cli
+    path: /etc/logrotate.d/php{{ php_version }}-cli
   register: logrotate_cli_content
   when: php_cli_logrotate_enabled
 
@@ -54,7 +54,7 @@
   when: php_cli_logrotate_enabled
 
 - name: Verify logrotate configuration syntax
-  ansible.builtin.command: logrotate -d /etc/logrotate.d/php-cli
+  ansible.builtin.command: logrotate -d /etc/logrotate.d/php{{ php_version }}-cli
   register: logrotate_syntax_check
   changed_when: false
   failed_when: logrotate_syntax_check.rc != 0

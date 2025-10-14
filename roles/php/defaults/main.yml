@@ -302,7 +302,7 @@ php_pool_additional_settings:
 
 # Enable logrotate for PHP CLI.
 # Type: Boolean
-php_cli_logrotate_enabled: true
+php_cli_logrotate_enabled: false
 
 # Path to the PHP CLI log file for log rotation.
 # Type: String
@@ -320,7 +320,7 @@ php_cli_logrotate_options:
 
 # Enable logrotate for PHP FPM.
 # Type: Boolean
-php_fpm_logrotate_enabled: true
+php_fpm_logrotate_enabled: false
 
 # Path to the PHP FPM log file for log rotation.
 # Type: String

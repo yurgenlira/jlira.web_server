@@ -1,15 +1,24 @@
 # SPDX-License-Identifier: MIT-0
 ---
-- name: Include jlira.web_server.php.remove_old_version.yml
+- name: Include jlira.web_server.php.validate.yml
   ansible.builtin.include_tasks:
-    file: remove_old_version.yml
+    file: validate.yml
     apply:
       tags:
-        - remove_old_version
-        - php_remove_old_version
+        - always
   tags:
-    - remove_old_version
-    - php_remove_old_version
+    - always
+
+- name: Include jlira.web_server.php.uninstall.yml
+  ansible.builtin.include_tasks:
+    file: uninstall.yml
+    apply:
+      tags:
+        - uninstall
+        - php_uninstall
+  tags:
+    - uninstall
+    - php_uninstall
   when: php_old_version is defined and php_old_version | length > 0
 
 - name: Include jlira.web_server.php.install.yml
@@ -117,14 +126,3 @@
 #     - configure_status_page
 #     - php_configure_status_page
 #   when: php_fpm_enabled and php_status_page_enabled
-
-# # # - name: Include jlira.web_server.php.error_reporting.yml
-# # #   ansible.builtin.include_tasks:
-# # #     file: error_reporting.yml
-# # #     apply:
-# # #       tags:
-# # #         - error_reporting
-# # #         - php_error_reporting
-# # #   tags:
-# # #     - error_reporting
-# # #     - php_error_reporting

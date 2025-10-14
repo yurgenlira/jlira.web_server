@@ -127,7 +127,7 @@ ansible-playbook -i inventory playbooks/php-install.yml --tags install
 ansible-playbook -i inventory playbooks/php-install.yml --tags php_configure_fpm
 
 # Remove old version only
-ansible-playbook -i inventory playbooks/php-upgrade.yml --tags php_remove_old_version
+ansible-playbook -i inventory playbooks/php-upgrade.yml --tags php_uninstall
 ```
 
 ### Verbose Output

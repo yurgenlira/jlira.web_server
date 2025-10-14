@@ -1,0 +1,621 @@
+# SPDX-License-Identifier: MIT-0
+---
+# =============================================================================
+# Variable Validation Tasks for PHP Role
+# =============================================================================
+# This file contains all validation logic for the PHP role variables.
+# It performs comprehensive checks to ensure all inputs are valid before
+# any system modifications occur.
+#
+# Validation Strategy:
+# - FAIL HARD: For critical misconfigurations that would break functionality
+# - WARN: For suboptimal but functional configurations (not implemented here)
+#
+# Execution Order:
+# 1. Required variable existence checks
+# 2. Type and format validations
+# 3. Logical consistency checks
+# 4. Dependency validations
+# =============================================================================
+
+# =============================================================================
+# 1. Required Variable Existence Checks
+# =============================================================================
+
+- name: Validate that php_version is defined
+  ansible.builtin.assert:
+    that:
+      - php_version is defined
+      - php_version | length > 0
+    fail_msg: "php_version must be defined and non-empty"
+    success_msg: "php_version is defined: {{ php_version }}"
+    quiet: true
+
+- name: Validate that php_packages is defined and is a list
+  ansible.builtin.assert:
+    that:
+      - php_packages is defined
+      - php_packages is iterable
+      - php_packages is not string
+      - php_packages is not mapping
+      - php_packages | length > 0
+    fail_msg: "php_packages must be defined as a non-empty list"
+    success_msg: "php_packages is defined with {{ php_packages | length }} package(s)"
+    quiet: true
+
+# =============================================================================
+# 2. PHP Version Format Validation
+# =============================================================================
+
+- name: Validate php_version format (must be X.Y)
+  ansible.builtin.assert:
+    that:
+      - php_version is match('^[0-9]+\.[0-9]+$')
+    fail_msg: >-
+      php_version must be in format 'X.Y' (e.g., '8.3', '8.4').
+      Current value: '{{ php_version }}'
+    success_msg: "php_version format is valid: {{ php_version }}"
+    quiet: true
+
+# =============================================================================
+# 3. PHP CLI Settings Validation
+# =============================================================================
+
+- name: Validate php_cli_settings is defined and is a dictionary
+  ansible.builtin.assert:
+    that:
+      - php_cli_settings is defined
+      - php_cli_settings is mapping
+    fail_msg: "php_cli_settings must be defined as a dictionary"
+    success_msg: "php_cli_settings is defined and is a dictionary"
+    quiet: true
+
+# --- Boolean Settings ---
+- name: Validate php_cli_settings boolean values
+  ansible.builtin.assert:
+    that:
+      - item.value.type == 'bool'
+      - item.value.value is boolean
+    fail_msg: >-
+      php_cli_settings.{{ item.key }}.value must be a boolean (true/false).
+      Current value: '{{ item.value.value }}' (type: {{ item.value.value | type_debug }})
+    success_msg: "php_cli_settings.{{ item.key }} is a valid boolean"
+    quiet: true
+  loop: "{{ php_cli_settings | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when:
+    - item.value.type is defined
+    - item.value.type == 'bool'
+
+# --- Integer Settings ---
+- name: Validate php_cli_settings integer values
+  ansible.builtin.assert:
+    that:
+      - item.value.type == 'int'
+      - item.value.value is number
+      - item.value.value | int == item.value.value
+      - item.value.value | int >= 0
+    fail_msg: >-
+      php_cli_settings.{{ item.key }}.value must be a non-negative integer.
+      Current value: '{{ item.value.value }}' (type: {{ item.value.value | type_debug }})
+    success_msg: "php_cli_settings.{{ item.key }} is a valid integer: {{ item.value.value }}"
+    quiet: true
+  loop: "{{ php_cli_settings | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when:
+    - item.value.type is defined
+    - item.value.type == 'int'
+
+# --- Size Settings (memory_limit, post_max_size, upload_max_filesize) ---
+- name: Validate php_cli_settings size values format
+  ansible.builtin.assert:
+    that:
+      - item.value.type == 'size'
+      - >-
+        item.value.value is match('^-1$') or
+        item.value.value is match('^[0-9]+[KMG]?$')
+    fail_msg: >-
+      php_cli_settings.{{ item.key }}.value must be a valid size format.
+      Valid formats: '-1' (unlimited), '128M', '2G', '512K', '1024' (bytes).
+      Current value: '{{ item.value.value }}'
+    success_msg: "php_cli_settings.{{ item.key }} has valid size format: {{ item.value.value }}"
+    quiet: true
+  loop: "{{ php_cli_settings | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when:
+    - item.value.type is defined
+    - item.value.type == 'size'
+
+# --- Path Settings (error_log) ---
+- name: Validate php_cli_settings absolute file path format
+  ansible.builtin.assert:
+    that:
+      - item.value.type == 'path'
+      - item.value.value is string
+      - item.value.value | length > 0
+      # Must be a valid absolute path (starts with /)
+      - item.value.value is match('^/')
+      # Must not contain path traversal sequences
+      - "'..' not in item.value.value"
+      # Must not contain null bytes (injection prevention)
+      - "'\\x00' not in item.value.value"
+      # Must not end with / (must be a file, not a directory)
+      - item.value.value is not match('/$')
+      # Valid characters: alphanumeric, dot, hyphen, underscore, forward slash
+      - item.value.value is match('^/[a-zA-Z0-9._/-]+$')
+      # Must have at least one directory level and a filename
+      - item.value.value is match('^/[^/]+/.+')
+      # Filename must not be empty and should contain valid characters
+      - item.value.value | basename | length > 0
+    fail_msg: >-
+      php_cli_settings.{{ item.key }}.value must be a valid absolute file path.
+      Requirements:
+        - Must start with '/' (absolute path)
+        - Must not contain '..' (prevents path traversal attacks)
+        - Must not end with '/' (must be a file, not a directory)
+        - Must contain only alphanumeric characters, dots, hyphens, underscores, and slashes
+        - Must have at least one directory and a filename (e.g., /var/log/php.log)
+        - Must not be empty or contain null bytes
+      Current value: '{{ item.value.value }}'
+      Example valid paths: /var/log/php/error.log, /tmp/php_error.log
+    success_msg: "php_cli_settings.{{ item.key }} has valid absolute file path format: {{ item.value.value }}"
+    quiet: true
+  loop: "{{ php_cli_settings | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when:
+    - item.value.type is defined
+    - item.value.type == 'path'
+
+# --- String Settings (error_reporting) ---
+- name: Validate php_cli_settings string values
+  ansible.builtin.assert:
+    that:
+      - item.value.type == 'string'
+      - item.value.value is string
+      - item.value.value | length > 0
+    fail_msg: >-
+      php_cli_settings.{{ item.key }}.value must be a non-empty string.
+      Current value: '{{ item.value.value }}' (type: {{ item.value.value | type_debug }})
+    success_msg: "php_cli_settings.{{ item.key }} is a valid string"
+    quiet: true
+  loop: "{{ php_cli_settings | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when:
+    - item.value.type is defined
+    - item.value.type == 'string'
+
+# =============================================================================
+# 5. PHP FPM Settings Validation (if FPM is enabled)
+# =============================================================================
+
+- name: Validate php_fpm_enabled is boolean
+  ansible.builtin.assert:
+    that:
+      - php_fpm_enabled is defined
+      - php_fpm_enabled is boolean
+    fail_msg: "php_fpm_enabled must be a boolean (true/false)"
+    success_msg: "php_fpm_enabled is valid: {{ php_fpm_enabled }}"
+    quiet: true
+
+- name: Validate php_fpm_settings (if FPM is enabled)
+  when: php_fpm_enabled | bool
+  block:
+    - name: Validate php_fpm_settings is defined and is a dictionary
+      ansible.builtin.assert:
+        that:
+          - php_fpm_settings is defined
+          - php_fpm_settings is mapping
+        fail_msg: "php_fpm_settings must be defined as a dictionary when php_fpm_enabled is true"
+        success_msg: "php_fpm_settings is defined and is a dictionary"
+        quiet: true
+
+    # --- Boolean Settings ---
+    - name: Validate php_fpm_settings boolean values
+      ansible.builtin.assert:
+        that:
+          - item.value.type == 'bool'
+          - item.value.value is boolean
+        fail_msg: >-
+          php_fpm_settings.{{ item.key }}.value must be a boolean (true/false).
+          Current value: '{{ item.value.value }}' (type: {{ item.value.value | type_debug }})
+        success_msg: "php_fpm_settings.{{ item.key }} is a valid boolean"
+        quiet: true
+      loop: "{{ php_fpm_settings | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when:
+        - item.value.type is defined
+        - item.value.type == 'bool'
+
+    # --- Integer Settings ---
+    - name: Validate php_fpm_settings integer values
+      ansible.builtin.assert:
+        that:
+          - item.value.type == 'int'
+          - item.value.value is number
+          - item.value.value | int == item.value.value
+          - item.value.value | int >= 0
+        fail_msg: >-
+          php_fpm_settings.{{ item.key }}.value must be a non-negative integer.
+          Current value: '{{ item.value.value }}' (type: {{ item.value.value | type_debug }})
+        success_msg: "php_fpm_settings.{{ item.key }} is a valid integer: {{ item.value.value }}"
+        quiet: true
+      loop: "{{ php_fpm_settings | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when:
+        - item.value.type is defined
+        - item.value.type == 'int'
+
+    # --- Size Settings ---
+    - name: Validate php_fpm_settings size values format
+      ansible.builtin.assert:
+        that:
+          - item.value.type == 'size'
+          - >-
+            item.value.value is match('^-1$') or
+            item.value.value is match('^[0-9]+[KMG]?$')
+        fail_msg: >-
+          php_fpm_settings.{{ item.key }}.value must be a valid size format.
+          Valid formats: '-1' (unlimited), '128M', '2G', '512K', '1024' (bytes).
+          Current value: '{{ item.value.value }}'
+        success_msg: "php_fpm_settings.{{ item.key }} has valid size format: {{ item.value.value }}"
+        quiet: true
+      loop: "{{ php_fpm_settings | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when:
+        - item.value.type is defined
+        - item.value.type == 'size'
+
+    # --- Path Settings ---
+    - name: Validate php_fpm_settings absolute file path format
+      ansible.builtin.assert:
+        that:
+          - item.value.type == 'path'
+          - item.value.value is string
+          - item.value.value | length > 0
+          # Must be a valid absolute path (starts with /)
+          - item.value.value is match('^/')
+          # Must not contain path traversal sequences
+          - "'..' not in item.value.value"
+          # Must not contain null bytes (injection prevention)
+          - "'\\x00' not in item.value.value"
+          # Must not end with / (must be a file, not a directory)
+          - item.value.value is not match('/$')
+          # Valid characters: alphanumeric, dot, hyphen, underscore, forward slash
+          - item.value.value is match('^/[a-zA-Z0-9._/-]+$')
+          # Must have at least one directory level and a filename
+          - item.value.value is match('^/[^/]+/.+')
+          # Filename must not be empty and should contain valid characters
+          - item.value.value | basename | length > 0
+        fail_msg: >-
+          php_fpm_settings.{{ item.key }}.value must be a valid absolute file path.
+          Requirements:
+            - Must start with '/' (absolute path)
+            - Must not contain '..' (prevents path traversal attacks)
+            - Must not end with '/' (must be a file, not a directory)
+            - Must contain only alphanumeric characters, dots, hyphens, underscores, and slashes
+            - Must have at least one directory and a filename (e.g., /var/log/php-fpm.log)
+            - Must not be empty or contain null bytes
+          Current value: '{{ item.value.value }}'
+          Example valid paths: /var/log/php-fpm/error.log, /tmp/php-fpm_error.log
+        success_msg: "php_fpm_settings.{{ item.key }} has valid absolute file path format: {{ item.value.value }}"
+        quiet: true
+      loop: "{{ php_fpm_settings | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when:
+        - item.value.type is defined
+        - item.value.type == 'path'
+
+    # --- String Settings ---
+    - name: Validate php_fpm_settings string values
+      ansible.builtin.assert:
+        that:
+          - item.value.type == 'string'
+          - item.value.value is string
+          - item.value.value | length > 0
+        fail_msg: >-
+          php_fpm_settings.{{ item.key }}.value must be a non-empty string.
+          Current value: '{{ item.value.value }}' (type: {{ item.value.value | type_debug }})
+        success_msg: "php_fpm_settings.{{ item.key }} is a valid string"
+        quiet: true
+      loop: "{{ php_fpm_settings | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when:
+        - item.value.type is defined
+        - item.value.type == 'string'
+
+# =============================================================================
+# 6. PHP Pool Settings Validation (if FPM is enabled)
+# =============================================================================
+
+- name: Validate php_pool_settings (if FPM is enabled)
+  when: php_fpm_enabled | bool
+  block:
+    - name: Validate php_pool_settings is defined and is a dictionary
+      ansible.builtin.assert:
+        that:
+          - php_pool_settings is defined
+          - php_pool_settings is mapping
+        fail_msg: "php_pool_settings must be defined as a dictionary when php_fpm_enabled is true"
+        success_msg: "php_pool_settings is defined and is a dictionary"
+        quiet: true
+
+    - name: Validate php_pool_settings.pool_name
+      ansible.builtin.assert:
+        that:
+          - php_pool_settings.pool_name is defined
+          - php_pool_settings.pool_name is string
+          - php_pool_settings.pool_name | length > 0
+          # Pool name must be alphanumeric with optional underscores/hyphens
+          - php_pool_settings.pool_name is match('^[a-zA-Z0-9_-]+$')
+        fail_msg: >-
+          php_pool_settings.pool_name must be a non-empty alphanumeric string
+          (underscores and hyphens allowed).
+          Current value: '{{ php_pool_settings.pool_name | default("undefined") }}'
+        success_msg: "php_pool_settings.pool_name is valid: {{ php_pool_settings.pool_name }}"
+        quiet: true
+
+    - name: Validate php_pool_settings.pm (process manager)
+      ansible.builtin.assert:
+        that:
+          - php_pool_settings.pm is defined
+          - php_pool_settings.pm in ['static', 'dynamic', 'ondemand']
+        fail_msg: >-
+          php_pool_settings.pm must be one of: 'static', 'dynamic', 'ondemand'.
+          Current value: '{{ php_pool_settings.pm | default("undefined") }}'
+        success_msg: "php_pool_settings.pm is valid: {{ php_pool_settings.pm }}"
+        quiet: true
+
+    - name: Validate php_pool_settings.pm_max_children
+      ansible.builtin.assert:
+        that:
+          - php_pool_settings.pm_max_children is defined
+          - php_pool_settings.pm_max_children is number
+          - php_pool_settings.pm_max_children | int > 0
+        fail_msg: >-
+          php_pool_settings.pm_max_children must be a positive integer.
+          Current value: '{{ php_pool_settings.pm_max_children | default("undefined") }}'
+        success_msg: "php_pool_settings.pm_max_children is valid: {{ php_pool_settings.pm_max_children }}"
+        quiet: true
+
+    # Dynamic PM specific validations
+    - name: Validate dynamic process manager settings
+      when: php_pool_settings.pm == 'dynamic'
+      block:
+        - name: Validate php_pool_settings.pm_start_servers
+          ansible.builtin.assert:
+            that:
+              - php_pool_settings.pm_start_servers is defined
+              - php_pool_settings.pm_start_servers is number
+              - php_pool_settings.pm_start_servers | int > 0
+              - php_pool_settings.pm_start_servers | int <= php_pool_settings.pm_max_children | int
+            fail_msg: >-
+              php_pool_settings.pm_start_servers must be a positive integer
+              and <= pm_max_children ({{ php_pool_settings.pm_max_children }}).
+              Current value: '{{ php_pool_settings.pm_start_servers | default("undefined") }}'
+            success_msg: "php_pool_settings.pm_start_servers is valid: {{ php_pool_settings.pm_start_servers }}"
+            quiet: true
+
+        - name: Validate php_pool_settings.pm_min_spare_servers
+          ansible.builtin.assert:
+            that:
+              - php_pool_settings.pm_min_spare_servers is defined
+              - php_pool_settings.pm_min_spare_servers is number
+              - php_pool_settings.pm_min_spare_servers | int > 0
+              - php_pool_settings.pm_min_spare_servers | int <= php_pool_settings.pm_max_children | int
+            fail_msg: >-
+              php_pool_settings.pm_min_spare_servers must be a positive integer
+              and <= pm_max_children ({{ php_pool_settings.pm_max_children }}).
+              Current value: '{{ php_pool_settings.pm_min_spare_servers | default("undefined") }}'
+            success_msg: "php_pool_settings.pm_min_spare_servers is valid: {{ php_pool_settings.pm_min_spare_servers }}"
+            quiet: true
+
+        - name: Validate php_pool_settings.pm_max_spare_servers
+          ansible.builtin.assert:
+            that:
+              - php_pool_settings.pm_max_spare_servers is defined
+              - php_pool_settings.pm_max_spare_servers is number
+              - php_pool_settings.pm_max_spare_servers | int > 0
+              - php_pool_settings.pm_max_spare_servers | int <= php_pool_settings.pm_max_children | int
+              - php_pool_settings.pm_max_spare_servers | int >= php_pool_settings.pm_min_spare_servers | int
+            fail_msg: >-
+              php_pool_settings.pm_max_spare_servers must be a positive integer,
+              <= pm_max_children ({{ php_pool_settings.pm_max_children }}),
+              and >= pm_min_spare_servers ({{ php_pool_settings.pm_min_spare_servers }}).
+              Current value: '{{ php_pool_settings.pm_max_spare_servers | default("undefined") }}'
+            success_msg: "php_pool_settings.pm_max_spare_servers is valid: {{ php_pool_settings.pm_max_spare_servers }}"
+            quiet: true
+
+        - name: Validate dynamic PM logical consistency
+          ansible.builtin.assert:
+            that:
+              - php_pool_settings.pm_start_servers | int >= php_pool_settings.pm_min_spare_servers | int
+              - php_pool_settings.pm_start_servers | int <= php_pool_settings.pm_max_spare_servers | int
+            fail_msg: >-
+              Dynamic PM consistency check failed.
+              pm_start_servers must be >= pm_min_spare_servers and <= pm_max_spare_servers.
+              Current values:
+                pm_start_servers: {{ php_pool_settings.pm_start_servers }}
+                pm_min_spare_servers: {{ php_pool_settings.pm_min_spare_servers }}
+                pm_max_spare_servers: {{ php_pool_settings.pm_max_spare_servers }}
+            success_msg: "Dynamic PM settings are logically consistent"
+            quiet: true
+
+    # Status page path validation (if defined)
+    - name: Validate php_pool_settings.status_path (if defined)
+      ansible.builtin.assert:
+        that:
+          - php_pool_settings.status_path is string
+          - php_pool_settings.status_path | length > 0
+          - php_pool_settings.status_path is match('^/')
+          - php_pool_settings.status_path is match('^/[a-zA-Z0-9/_-]+$')
+        fail_msg: >-
+          php_pool_settings.status_path must be a valid URI path starting with '/'.
+          Current value: '{{ php_pool_settings.status_path }}'
+        success_msg: "php_pool_settings.status_path is valid: {{ php_pool_settings.status_path }}"
+        quiet: true
+      when:
+        - php_pool_settings.status_path is defined
+        - php_pool_settings.status_path | length > 0
+
+    # Ping path validation (if defined)
+    - name: Validate php_pool_settings.ping_path (if defined)
+      ansible.builtin.assert:
+        that:
+          - php_pool_settings.ping_path is string
+          - php_pool_settings.ping_path | length > 0
+          - php_pool_settings.ping_path is match('^/')
+          - php_pool_settings.ping_path is match('^/[a-zA-Z0-9/_-]+$')
+        fail_msg: >-
+          php_pool_settings.ping_path must be a valid URI path starting with '/'.
+          Current value: '{{ php_pool_settings.ping_path }}'
+        success_msg: "php_pool_settings.ping_path is valid: {{ php_pool_settings.ping_path }}"
+        quiet: true
+      when:
+        - php_pool_settings.ping_path is defined
+        - php_pool_settings.ping_path | length > 0
+
+# =============================================================================
+# 7. Logrotate Settings Validation
+# =============================================================================
+
+- name: Validate php_cli_logrotate_enabled is boolean
+  ansible.builtin.assert:
+    that:
+      - php_cli_logrotate_enabled is defined
+      - php_cli_logrotate_enabled is boolean
+    fail_msg: "php_cli_logrotate_enabled must be a boolean (true/false)"
+    success_msg: "php_cli_logrotate_enabled is valid: {{ php_cli_logrotate_enabled }}"
+    quiet: true
+
+- name: Validate php_cli_logrotate_path (if logrotate is enabled)
+  ansible.builtin.assert:
+    that:
+      - php_cli_logrotate_path is defined
+      - php_cli_logrotate_path is string
+      - php_cli_logrotate_path | length > 0
+      - php_cli_logrotate_path is match('^/')
+    fail_msg: >-
+      php_cli_logrotate_path must be a valid absolute file path.
+      Current value: '{{ php_cli_logrotate_path | default("undefined") }}'
+    success_msg: "php_cli_logrotate_path is valid: {{ php_cli_logrotate_path }}"
+    quiet: true
+  when: php_cli_logrotate_enabled | bool
+
+- name: Validate php_cli_logrotate_options (if logrotate is enabled)
+  ansible.builtin.assert:
+    that:
+      - php_cli_logrotate_options is defined
+      - php_cli_logrotate_options is iterable
+      - php_cli_logrotate_options is not string
+      - php_cli_logrotate_options is not mapping
+      - php_cli_logrotate_options | length > 0
+    fail_msg: "php_cli_logrotate_options must be a non-empty list"
+    success_msg: "php_cli_logrotate_options is valid with {{ php_cli_logrotate_options | length }} option(s)"
+    quiet: true
+  when: php_cli_logrotate_enabled | bool
+
+- name: Validate php_fpm_logrotate_enabled is boolean
+  ansible.builtin.assert:
+    that:
+      - php_fpm_logrotate_enabled is defined
+      - php_fpm_logrotate_enabled is boolean
+    fail_msg: "php_fpm_logrotate_enabled must be a boolean (true/false)"
+    success_msg: "php_fpm_logrotate_enabled is valid: {{ php_fpm_logrotate_enabled }}"
+    quiet: true
+
+- name: Validate php_fpm_logrotate_path (if logrotate is enabled)
+  ansible.builtin.assert:
+    that:
+      - php_fpm_logrotate_path is defined
+      - php_fpm_logrotate_path is string
+      - php_fpm_logrotate_path | length > 0
+      - php_fpm_logrotate_path is match('^/')
+    fail_msg: >-
+      php_fpm_logrotate_path must be a valid absolute file path.
+      Current value: '{{ php_fpm_logrotate_path | default("undefined") }}'
+    success_msg: "php_fpm_logrotate_path is valid: {{ php_fpm_logrotate_path }}"
+    quiet: true
+  when: php_fpm_logrotate_enabled | bool
+
+- name: Validate php_fpm_logrotate_options (if logrotate is enabled)
+  ansible.builtin.assert:
+    that:
+      - php_fpm_logrotate_options is defined
+      - php_fpm_logrotate_options is iterable
+      - php_fpm_logrotate_options is not string
+      - php_fpm_logrotate_options is not mapping
+      - php_fpm_logrotate_options | length > 0
+    fail_msg: "php_fpm_logrotate_options must be a non-empty list"
+    success_msg: "php_fpm_logrotate_options is valid with {{ php_fpm_logrotate_options | length }} option(s)"
+    quiet: true
+  when: php_fpm_logrotate_enabled | bool
+
+# =============================================================================
+# 8. Composer Settings Validation
+# =============================================================================
+
+- name: Validate php_composer_enabled is boolean
+  ansible.builtin.assert:
+    that:
+      - php_composer_enabled is defined
+      - php_composer_enabled is boolean
+    fail_msg: "php_composer_enabled must be a boolean (true/false)"
+    success_msg: "php_composer_enabled is valid: {{ php_composer_enabled }}"
+    quiet: true
+
+# =============================================================================
+# 9. MSSQL Extension Settings Validation
+# =============================================================================
+
+- name: Validate php_mssql_extension_enabled is boolean
+  ansible.builtin.assert:
+    that:
+      - php_mssql_extension_enabled is defined
+      - php_mssql_extension_enabled is boolean
+    fail_msg: "php_mssql_extension_enabled must be a boolean (true/false)"
+    success_msg: "php_mssql_extension_enabled is valid: {{ php_mssql_extension_enabled }}"
+    quiet: true
+
+- name: Validate php_mssql_package_version (if MSSQL is enabled)
+  ansible.builtin.assert:
+    that:
+      - php_mssql_package_version is defined
+      - php_mssql_package_version is number
+      - php_mssql_package_version | int > 0
+    fail_msg: >-
+      php_mssql_package_version must be a positive integer.
+      Current value: '{{ php_mssql_package_version | default("undefined") }}'
+    success_msg: "php_mssql_package_version is valid: {{ php_mssql_package_version }}"
+    quiet: true
+  when: php_mssql_extension_enabled | bool
+
+# =============================================================================
+# 10. Validation Summary
+# =============================================================================
+
+- name: Display validation summary
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "PHP Role Variable Validation Summary"
+      - "==================================================================="
+      - "PHP Version: {{ php_version }}"
+      - "PHP Packages: {{ php_packages | length }} package(s)"
+      - "PHP-FPM Enabled: {{ php_fpm_enabled }}"
+      - "Composer Enabled: {{ php_composer_enabled }}"
+      - "CLI Logrotate Enabled: {{ php_cli_logrotate_enabled }}"
+      - "FPM Logrotate Enabled: {{ php_fpm_logrotate_enabled }}"
+      - "MSSQL Extension Enabled: {{ php_mssql_extension_enabled }}"
+      - "==================================================================="
+      - "All variable validations passed successfully!"
+      - "==================================================================="

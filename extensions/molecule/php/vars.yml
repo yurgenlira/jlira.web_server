@@ -12,7 +12,7 @@
 #
 # Test Flow:
 # 1. converge.yml  - Installs PHP 8.2 with all features
-# 2. side_effect.yml - Upgrades from PHP 8.2 to PHP 8.4 (tests remove_old_version)
+# 2. side_effect.yml - Upgrades from PHP 8.2 to PHP 8.4 (tests uninstall)
 # 3. verify.yml    - Verifies PHP 8.4 is installed and 8.2 is removed
 # ============================================================================
 
@@ -46,7 +46,7 @@ php_cli_settings:
     value: E_ALL & ~E_NOTICE & ~E_STRICT & ~E_DEPRECATED
     type: string
   error_log:
-    value: error.log
+    value: /var/log/php/error.log
     type: path
   post_max_size:
     value: 256M
@@ -79,3 +79,5 @@ php_pool_additional_settings:
   php_admin_value[error_log]: /var/log/php/pool-admin-error.log
   php_admin_flag[log_errors]: "on"
 php_mssql_extension_enabled: true
+php_fpm_logrotate_enabled: true
+php_cli_logrotate_enabled: true

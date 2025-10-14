@@ -2,7 +2,7 @@
 ---
 # This playbook tests the PHP upgrade scenario
 # It upgrades from PHP 8.2 (installed in converge.yml) to PHP 8.4
-# This validates the remove_old_version functionality
+# This validates the uninstall functionality
 
 - name: Side Effect - Test PHP Upgrade
   hosts: all
@@ -24,15 +24,15 @@
           - "Testing PHP Upgrade Scenario"
           - "=========================================="
           - "Upgrading from PHP {{ php_old_version }} to {{ php_version }}"
-          - "This will test the remove_old_version functionality"
+          - "This will test the uninstall functionality"
           - "=========================================="
 
     - name: Apply php role for upgrade
       ansible.builtin.include_role:
         name: php
       tags:
-        - remove_old_version
-        - php_remove_old_version
+        - uninstall
+        - php_uninstall
         - install
         - php_install
         - configure_cli

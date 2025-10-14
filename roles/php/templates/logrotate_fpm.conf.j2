@@ -1,4 +1,5 @@
 {{ php_fpm_logrotate_path }} {
+    su root root
     {{ php_fpm_logrotate_options | join("
     ") }}
 }

@@ -2,7 +2,7 @@
 ---
 - name: Check if logrotate FPM configuration file exists
   ansible.builtin.stat:
-    path: "/etc/logrotate.d/php{{ php_version }}-fpm"
+    path: "/etc/logrotate.d/php{{ php_version }}-fpm-pool"
   register: logrotate_fpm_file
   when: php_fpm_enabled and php_fpm_logrotate_enabled
 
@@ -11,7 +11,7 @@
     that:
       - logrotate_fpm_file.stat.exists
       - logrotate_fpm_file.stat.isreg
-    fail_msg: "Logrotate FPM configuration file /etc/logrotate.d/php{{ php_version }}-fpm does not exist"
+    fail_msg: "Logrotate FPM configuration file /etc/logrotate.d/php{{ php_version }}-fpm-pool does not exist"
   when: php_fpm_enabled and php_fpm_logrotate_enabled
 
 - name: Assert logrotate FPM configuration file has correct permissions
@@ -25,7 +25,7 @@
 
 - name: Read logrotate FPM configuration file
   ansible.builtin.slurp:
-    path: "/etc/logrotate.d/php{{ php_version }}-fpm"
+    path: "/etc/logrotate.d/php{{ php_version }}-fpm-pool"
   register: logrotate_fpm_content
   when: php_fpm_enabled and php_fpm_logrotate_enabled
 
@@ -54,7 +54,7 @@
   when: php_fpm_enabled and php_fpm_logrotate_enabled
 
 - name: Verify logrotate FPM configuration syntax
-  ansible.builtin.command: logrotate -d /etc/logrotate.d/php{{ php_version }}-fpm
+  ansible.builtin.command: logrotate -d /etc/logrotate.d/php{{ php_version }}-fpm-pool
   register: logrotate_fpm_syntax_check
   changed_when: false
   failed_when: logrotate_fpm_syntax_check.rc != 0

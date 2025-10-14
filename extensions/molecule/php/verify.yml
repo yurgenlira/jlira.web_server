@@ -13,9 +13,9 @@
     php_version: "8.4"
     php_old_version: "8.2"
   tasks:
-    - name: Include remove_old_version.yml tests
+    - name: Include uninstall.yml tests
       ansible.builtin.include_tasks:
-        file: tests/remove_old_version.yml
+        file: tests/uninstall.yml
       when: php_old_version is defined and php_old_version | length > 0
 
     - name: Include install.yml tests

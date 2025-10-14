@@ -18,7 +18,7 @@ The scenario uses Molecule's test sequence to validate different aspects of the 
 - Validates that the role is truly idempotent
 
 ### 3. **side_effect.yml** - Upgrade Scenario
-- **Tests the `remove_old_version` functionality**
+- **Tests the `uninstall` functionality**
 - Upgrades from PHP 8.2 (installed in converge.yml) to PHP 8.4
 - Validates that:
   - Old PHP 8.2 packages are removed
@@ -30,7 +30,7 @@ The scenario uses Molecule's test sequence to validate different aspects of the 
 ### 4. **verify.yml** - Comprehensive Verification
 Tests are organized by task file:
 
-#### **remove_old_version.yml tests**
+#### **uninstall.yml tests**
 - ✅ No old PHP 8.2 packages remain
 - ✅ Old configuration directory removed
 - ✅ Old logrotate configs removed

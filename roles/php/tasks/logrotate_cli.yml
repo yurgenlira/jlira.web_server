@@ -6,3 +6,9 @@
     owner: root
     group: root
     mode: '0644'
+
+- name: Verify PHP CLI logrotate configuration syntax
+  ansible.builtin.command: logrotate -d /etc/logrotate.d/php{{ php_version }}-cli
+  register: php_cli_logrotate_syntax_check
+  changed_when: false
+  failed_when: php_cli_logrotate_syntax_check.rc != 0
