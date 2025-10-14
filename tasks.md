@@ -281,7 +281,7 @@
 - **FPM Version Management:**
   - ⚠️ Configure PHP-FPM as default version when enabled
   - ⚠️ Test when logs are created in custom paths and logrotate works for those paths (cli and fpm)
-
+  - ⚠️ Test in check mode and diff mode
 
 
 
