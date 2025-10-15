@@ -37,7 +37,7 @@
 #   - Check extension availability for new version
 
 - name: Upgrade PHP Version
-  hosts: webservers
+  hosts: php
   become: true
 
   pre_tasks:
@@ -104,35 +104,7 @@
         - not (php_skip_confirm | default(false))
 
   roles:
-    - role: jlira.web_server.php
-      vars:
-        # New PHP version to install
-        php_version: "{{ php_version }}"
-
-        # Old PHP version to remove (triggers uninstall)
-        php_old_version: "{{ php_old_version }}"
-
-        # PHP packages to install for new version
-        # Customize based on your application requirements
-        php_packages:
-          - "php{{ php_version }}-cli"
-          - "php{{ php_version }}-fpm"
-          - "php{{ php_version }}-curl"
-          - "php{{ php_version }}-mbstring"
-          - "php{{ php_version }}-xml"
-          - "php{{ php_version }}-zip"
-          - "php{{ php_version }}-mysql"
-          - "php{{ php_version }}-gd"
-
-        # Set new version as default CLI
-        php_cli_set_as_default_version: true
-
-        # Enable PHP-FPM (set via -e if needed)
-        php_fpm_enabled: "{{ php_fpm_enabled | default(true) }}"
-
-        # Enable logrotate
-        php_cli_logrotate_enabled: true
-        php_fpm_logrotate_enabled: true
+    - role: php
 
   post_tasks:
     - name: Verify PHP upgrade

@@ -4,7 +4,7 @@
 # It validates that the playbook correctly upgrades PHP from one version to another
 
 - name: Display upgrade test information
-  hosts: all
+  hosts: php
   gather_facts: false
   tasks:
     - name: Show scenario details

@@ -2,53 +2,21 @@
 ---
 # Prepare installs the old PHP version
 # This sets up the starting state for the upgrade test
-
 - name: Prepare environment with old PHP version
-  hosts: all
+  hosts: php
   gather_facts: true
   tasks:
-    - name: Display preparation information
-      ansible.builtin.debug:
-        msg:
-          - "=========================================="
-          - "Preparing Upgrade Test Environment"
-          - "=========================================="
-          - "Installing PHP {{ php_old_version }} (old version)"
-          - "This will be upgraded to PHP {{ php_version }} in converge"
-          - "=========================================="
-
-    - name: Update apt cache
-      ansible.builtin.apt:
+    - name: Ensure required testing utilities (logrotate) are installed
+      ansible.builtin.package:
+        name: logrotate
+        state: present
         update_cache: true
         cache_valid_time: 3600
-      changed_when: false
 
-    - name: Install old PHP version
-      ansible.builtin.include_role:
-        name: php
-      vars:
-        php_version: "{{ php_old_version }}"
-        php_packages:
-          - "php{{ php_old_version }}-cli"
-          - "php{{ php_old_version }}-fpm"
-          - "php{{ php_old_version }}-curl"
-          - "php{{ php_old_version }}-mbstring"
-          - "php{{ php_old_version }}-xml"
-          - "php{{ php_old_version }}-zip"
-          - "php{{ php_old_version }}-mysql"
-          - "php{{ php_old_version }}-gd"
-
-    - name: Verify old version is installed
-      ansible.builtin.command: php --version
-      register: old_version_check
-      changed_when: false
-
-    - name: Display installed version
-      ansible.builtin.debug:
-        msg:
-          - "=========================================="
-          - "Preparation Complete"
-          - "=========================================="
-          - "Installed: {{ old_version_check.stdout_lines[0] }}"
-          - "Ready for upgrade to PHP {{ php_version }}"
-          - "=========================================="
+- name: Install old PHP version
+  import_playbook: ../../../playbooks/php-install.yml
+  vars:
+    php_version: "8.3"
+    # php_version_old is used as the target version for the install playbook,
+    # so we clear it here to avoid conflicts with the upgrade playbook's variables.
+    php_old_version: ""
