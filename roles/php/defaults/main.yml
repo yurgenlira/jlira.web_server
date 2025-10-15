@@ -158,7 +158,7 @@ php_fpm_settings:
     value: 1000
     type: int
   memory_limit:                           # Maximum amount of memory a script may consume.
-    value: "-1"
+    value: 128M
     type: string
   error_reporting:                        # Error reporting level.
     value: E_ALL & ~E_DEPRECATED
