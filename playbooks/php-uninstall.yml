@@ -31,15 +31,10 @@
 #   - php_version is used as the "current" version to prevent conflicts
 
 - name: Uninstall PHP
-  hosts: webservers
+  hosts: php
   become: true
 
   pre_tasks:
-    - name: Set uninstall variables
-      ansible.builtin.set_fact:
-        php_old_version: "{{ php_version_to_remove | default('8.3') }}"
-        php_version: "{{ php_current_version | default('8.4') }}"
-
     - name: Validate versions are different
       ansible.builtin.assert:
         that:
@@ -76,8 +71,16 @@
         - not ansible_check_mode
         - not (php_skip_confirm | default(false))
 
-  roles:
-    - role: jlira.web_server.php
+  # roles:
+  #   - role: php
+  #     tags:
+  #       - uninstall
+  #       - php_uninstall
+
+  tasks:
+    - name: Run php role
+      ansible.builtin.include_role:
+        name: php
       tags:
         - uninstall
         - php_uninstall

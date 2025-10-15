@@ -17,20 +17,20 @@
           - "This will be uninstalled in converge"
           - "=========================================="
 
-    - name: Update apt cache
-      ansible.builtin.apt:
+    - name: Ensure required testing utilities (logrotate) are installed
+      ansible.builtin.package:
+        name: logrotate
+        state: present
         update_cache: true
         cache_valid_time: 3600
-      changed_when: false
 
     - name: Install PHP version to be removed
       ansible.builtin.include_role:
         name: php
       vars:
         php_version: "{{ php_version_to_remove }}"
+        php_fpm_enabled: true
         php_packages:
-          - "php{{ php_version_to_remove }}-cli"
-          - "php{{ php_version_to_remove }}-fpm"
           - "php{{ php_version_to_remove }}-curl"
           - "php{{ php_version_to_remove }}-mbstring"
           - "php{{ php_version_to_remove }}-xml"

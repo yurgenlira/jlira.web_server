@@ -64,7 +64,7 @@
       tags: always
 
   roles:
-    - role: jlira.web_server.php
+    - role: php
 
   post_tasks:
     - name: Verify PHP installation

@@ -19,6 +19,8 @@
 
 - name: Import PHP uninstall playbook
   ansible.builtin.import_playbook: ../../../playbooks/php-uninstall.yml
+  vars:
+    php_old_version: "{{ php_version_to_remove }}"
 
 - name: Display test completion
   hosts: all
