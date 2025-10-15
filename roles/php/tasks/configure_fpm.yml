@@ -38,12 +38,8 @@
       regex: >-
         {{ php_regex_patterns[item.value.type] | replace('__KEY__', item.key) }}
       line: >-
-        {{ item.key }} =
-        {% if item.value.type == 'bool' %}
-        {{ 'On' if item.value.value else 'Off' }}
-        {% else %}
-        {{ item.value.value }}
-        {% endif %}
+        {{ item.key }} = {% if item.value.type == 'bool' %}{{ 'On' if item.value.value else 'Off' }}{% else -%}
+        {{ item.value.value }}{%- endif %}
 
 - name: Display PHP FPM settings list
   ansible.builtin.debug:

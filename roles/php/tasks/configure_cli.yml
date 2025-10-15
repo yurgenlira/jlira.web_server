@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT-0
 ---
-- name: Check if backup of php.ini already exists
+- name: Check if backup of php.ini.original already exists
   ansible.builtin.stat:
     path: "/etc/php/{{ php_version }}/cli/php.ini.original"
   register: php_ini_backup_stat
@@ -38,12 +38,8 @@
       regex: >-
         {{ php_regex_patterns[item.value.type] | replace('__KEY__', item.key) }}
       line: >-
-        {{ item.key }} =
-        {% if item.value.type == 'bool' %}
-        {{ 'On' if item.value.value else 'Off' }}
-        {% else %}
-        {{ item.value.value }}
-        {% endif %}
+        {{ item.key }} = {% if item.value.type == 'bool' %}{{ 'On' if item.value.value else 'Off' }}{%- else -%}
+        {{ item.value.value }}{%- endif -%}
 
 - name: Display PHP CLI settings list
   ansible.builtin.debug:
