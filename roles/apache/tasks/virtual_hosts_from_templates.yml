@@ -1,53 +1,181 @@
 # SPDX-License-Identifier: MIT-0
 ---
-- name: Create virtual host configuration files from templates
+- name: Create apache virtualhost from template folders
+  ansible.builtin.file:
+    path: "{{ apache_vhost_templates_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Create HTTP virtual host templates
+  ansible.builtin.template:
+    src: vhost_template.j2
+    dest: "{{ apache_vhost_templates_dir }}/{{ item.name }}.template.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ apache_vhost_templates }}"
+  when:
+    - apache_vhost_templates | length > 0
+    - item.http is defined
+  notify: Reload apache
+
+- name: Create HTTPS virtual host templates
+  ansible.builtin.template:
+    src: vhost-ssl_template.j2
+    dest: "{{ apache_vhost_templates_dir }}/{{ item.name }}-ssl.template.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ apache_vhost_templates }}"
+  when:
+    - apache_vhost_templates | length > 0
+    - item.https is defined
+  notify: Reload apache
+
+- name: Create HTTP virtual host configuration files from template
   ansible.builtin.template:
     src: vhost_from_template.conf.j2
     dest: "/etc/apache2/sites-available/{{ item.name }}.conf"
     owner: root
     group: root
     mode: "0644"
-  loop: "{{ apache_vhosts_from_templates }}"
+  loop: "{{ apache_vhosts_from_template }}"
   when:
-    - apache_vhosts_from_templates | length > 0
-    - item.state | default('present') == 'present'
-  vars:
-    vhost_template: "{{ apache_vhost_templates | selectattr('name', 'equalto', item.template) | first }}"
-    template_vars: "{{ item.vars | default({}) }}"
+    - apache_vhosts_from_template | length > 0
   notify: Reload apache
 
-- name: Enable virtual hosts from templates
+- name: Create HTTPS virtual host configuration files from template
+  ansible.builtin.template:
+    src: vhost-ssl_from_template.conf.j2
+    dest: "/etc/apache2/sites-available/{{ item.name }}-ssl.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ apache_vhosts_from_template }}"
+  when:
+    - apache_vhosts_from_template | length > 0
+  notify: Reload apache
+
+- name: Create directories for template-based virtual hosts
+  ansible.builtin.shell: |
+    set -o pipefail
+    source /etc/apache2/envvars
+    {% for envvar in apache_envvars | default([]) %}
+    export {{ envvar.name }}="{{ envvar.value }}"
+    {% endfor %}
+    {% for var in item.vars | default([]) %}
+    export {{ var.name }}="{{ var.value | replace('${', '$') | replace('}', '') }}"
+    {% endfor %}
+
+    # Function to extract and create directories from a config file
+    process_config() {
+      local config_file="$1"
+
+      if [ ! -f "$config_file" ]; then
+        return
+      fi
+
+      # Find template file if config contains Include directive
+      template_file=$(grep -E '^\s*Include' "$config_file" | \
+                      awk '{print $2}' | head -1)
+
+      if [ -n "$template_file" ] && [ -f "$template_file" ]; then
+        # Read from the template file
+        config_to_process="$template_file"
+      else
+        # Read from the config file itself
+        config_to_process="$config_file"
+      fi
+
+      # Extract and create DocumentRoot directories
+      grep -E '^\s*DocumentRoot' "$config_to_process" | \
+        awk '{print $2}' | while read -r docroot; do
+        expanded_path=$(echo "$docroot" | envsubst)
+        mkdir -p "$expanded_path"
+        echo "$expanded_path"
+      done || true
+
+      # Extract and create ErrorLog directories
+      grep -E '^\s*ErrorLog' "$config_to_process" | \
+        awk '{print $2}' | while read -r logpath; do
+        expanded_path=$(echo "$logpath" | envsubst)
+        logdir=$(dirname "$expanded_path")
+        mkdir -p "$logdir"
+        echo "$logdir"
+      done || true
+
+      # Extract and create CustomLog directories
+      grep -E '^\s*CustomLog' "$config_to_process" | \
+        awk '{print $2}' | while read -r logpath; do
+        expanded_path=$(echo "$logpath" | envsubst)
+        logdir=$(dirname "$expanded_path")
+        mkdir -p "$logdir"
+        echo "$logdir"
+      done || true
+    }
+
+    # Process both HTTP and HTTPS configs
+    process_config "/etc/apache2/sites-available/{{ item.name }}.conf"
+    process_config "/etc/apache2/sites-available/{{ item.name }}-ssl.conf"
+  args:
+    executable: /bin/bash
+  loop: "{{ apache_vhosts_from_template }}"
+  when:
+    - apache_vhosts_from_template | length > 0
+  changed_when: false
+
+- name: Enable HTTP virtual hosts from template
   ansible.builtin.command:
     cmd: "a2ensite {{ item.name }}"
-  register: apache_enable_template_vhost_result
-  changed_when: "'Enabling site' in apache_enable_template_vhost_result.stdout"
-  loop: "{{ apache_vhosts_from_templates }}"
+  args:
+    creates: /etc/apache2/sites-enabled/{{ item.name }}.conf
+  register: apache_enable_template_http_vhost_result
+  changed_when: "'Enabling site' in apache_enable_template_http_vhost_result.stdout"
+  loop: "{{ apache_vhosts_from_template }}"
   when:
-    - apache_vhosts_from_templates | length > 0
-    - item.state | default('present') == 'present'
-    - item.enabled | default(true)
+    - apache_vhosts_from_template | length > 0
+    - item.http_enabled | default(true)
   notify: Reload apache
 
-- name: Disable virtual hosts from templates
+- name: Disable HTTP virtual hosts from template
   ansible.builtin.command:
     cmd: "a2dissite {{ item.name }}"
-  register: apache_disable_template_vhost_result
+  args:
+    removes: /etc/apache2/sites-enabled/{{ item.name }}.conf
+  register: apache_disable_template_http_vhost_result
   changed_when:
     - "'Site' in apache_disable_template_vhost_result.stdout"
     - "'disabled' in apache_disable_template_vhost_result.stdout"
-  loop: "{{ apache_vhosts_from_templates }}"
+  loop: "{{ apache_vhosts_from_template }}"
   when:
-    - apache_vhosts_from_templates | length > 0
-    - item.state | default('present') == 'present'
-    - not (item.enabled | default(true))
+    - apache_vhosts_from_template | length > 0
+    - not (item.http_enabled | default(true))
   notify: Reload apache
 
-- name: Remove virtual host configuration files from templates
-  ansible.builtin.file:
-    path: "/etc/apache2/sites-available/{{ item.name }}.conf"
-    state: absent
-  loop: "{{ apache_vhosts_from_templates }}"
+- name: Enable HTTPS virtual hosts from template
+  ansible.builtin.command:
+    cmd: "a2ensite {{ item.name }}-ssl"
+  args:
+    creates: /etc/apache2/sites-enabled/{{ item.name }}-ssl.conf
+  register: apache_enable_template_https_vhost_result
+  changed_when: "'Enabling site' in apache_enable_template_https_vhost_result.stdout"
+  loop: "{{ apache_vhosts_from_template }}"
   when:
-    - apache_vhosts_from_templates | length > 0
-    - item.state | default('present') == 'absent'
+    - apache_vhosts_from_template | length > 0
+    - item.https_enabled | default(true)
+  notify: Reload apache
+
+- name: Disable HTTPS virtual hosts from template
+  ansible.builtin.command:
+    cmd: "a2dissite {{ item.name }}-ssl"
+  args:
+    removes: /etc/apache2/sites-enabled/{{ item.name }}-ssl.conf
+  register: apache_disable_template_https_vhost_result
+  changed_when:
+    - "'Site' in apache_disable_template_https_vhost_result.stdout"
+    - "'disabled' in apache_disable_template_https_vhost_result.stdout"
+  loop: "{{ apache_vhosts_from_template }}"
+  when:
+    - apache_vhosts_from_template | length > 0
+    - not (item.https_enabled | default(true))
   notify: Reload apache

@@ -37,11 +37,10 @@
   ansible.builtin.assert:
     that:
       - "'ANSIBLE MANAGED FILE' in (apache_custom_config_content.content | b64decode)"
-      - "'Test custom configuration' in (apache_custom_config_content.content | b64decode)"
     fail_msg: "Custom config file does not contain expected content or managed marker"
 
 - name: Verify custom config file has correct content
   ansible.builtin.assert:
     that:
-      - "'ServerSignature Off' in (apache_custom_config_content.content | b64decode)"
+      - "'Header always set X-Frame-Options' in (apache_custom_config_content.content | b64decode)"
     fail_msg: "Custom config file does not contain expected configuration directives"

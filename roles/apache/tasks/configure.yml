@@ -30,37 +30,6 @@
     mode: "0644"
   notify: Reload apache
 
-- name: Check if UFW is installed
-  ansible.builtin.command:
-    cmd: which ufw
-  register: apache_ufw_check
-  changed_when: false
-  failed_when: false
-
-- name: Configure firewall for Apache when UFW is present
-  when: apache_ufw_check.rc == 0
-  block:
-    - name: Allow HTTP ports in firewall
-      community.general.ufw:
-        rule: allow
-        port: "{{ item }}"
-        proto: tcp
-      loop: "{{ apache_http_ports }}"
-      notify: Reload apache
-
-    - name: Allow HTTPS ports in firewall
-      community.general.ufw:
-        rule: allow
-        port: "{{ item }}"
-        proto: tcp
-      loop: "{{ apache_https_ports }}"
-      when: apache_ssl_enabled
-      notify: Reload apache
-
-    - name: Enable UFW firewall
-      community.general.ufw:
-        state: enabled
-
 - name: Enable SSL module
   ansible.builtin.command:
     cmd: a2enmod ssl
@@ -95,7 +64,7 @@
 
 - name: Configure default SSL virtual host
   ansible.builtin.template:
-    src: default-ssl.conf.j2
+    src: 000-default-ssl.conf.j2
     dest: /etc/apache2/sites-available/000-default-ssl.conf
     owner: root
     group: root
@@ -106,18 +75,12 @@
 - name: Enable default SSL site
   ansible.builtin.command:
     cmd: a2ensite 000-default-ssl
+  args:
+    creates: /etc/apache2/sites-enabled/000-default-ssl.conf
   register: apache_enable_ssl_result
   changed_when: "'Enabling site' in apache_enable_ssl_result.stdout"
   when: apache_ssl_enabled
   notify: Reload apache
-
-- name: Create default index page
-  ansible.builtin.template:
-    src: index.html.j2
-    dest: /var/www/html/index.html
-    owner: www-data
-    group: www-data
-    mode: "0644"
 
 - name: Configure Apache security settings
   ansible.builtin.lineinfile:
@@ -135,5 +98,5 @@
     creates: /etc/apache2/conf-enabled/security.conf
   notify: Reload apache
 
-- name: Flush handlers
-  ansible.builtin.meta: flush_handlers
+# - name: Flush handlers
+#   ansible.builtin.meta: flush_handlers

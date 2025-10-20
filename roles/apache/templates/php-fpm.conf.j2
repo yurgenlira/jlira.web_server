@@ -1,0 +1,41 @@
+## ANSIBLE MANAGED FILE ##
+# SPDX-License-Identifier: MIT-0
+#
+# Apache configuration for PHP {{ apache_php_fpm_version }} FPM integration
+# This configuration enables Apache to proxy PHP requests to PHP-FPM
+
+# Redirect to local php-fpm if mod_php is not available
+<IfModule !mod_php{{ apache_php_fpm_version.split('.')[0] }}.c>
+  <IfModule proxy_fcgi_module>
+    # Enable http authorization headers
+    <IfModule setenvif_module>
+      SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1
+    </IfModule>
+
+    # Set proxy timeout for PHP-FPM connections
+    # This defines how long Apache will wait for a response from PHP-FPM
+    ProxyTimeout {{ apache_php_fpm_proxy_timeout }}
+
+    # Using (?:pattern) instead of (pattern) is a small optimization that
+    # avoid capturing the matching pattern (as $1) which isn't used here
+    <FilesMatch ".+\.ph(?:ar|p|tml)$">
+      # Only process files that actually exist on the filesystem
+      # This prevents unnecessary proxy requests for non-existent files
+      <If "-f %{REQUEST_FILENAME}">
+        SetHandler "proxy:unix:/run/php/php{{ apache_php_fpm_version }}-fpm.sock|fcgi://localhost"
+      </If>
+    </FilesMatch>
+
+    # Deny access to raw php sources by default
+    # This prevents viewing .phps files which may contain source code
+    <FilesMatch ".+\.phps$">
+      Require all denied
+    </FilesMatch>
+
+    # Deny access to files without filename (e.g. '.php')
+    # This prevents access to hidden PHP files
+    <FilesMatch "^\.ph(?:ar|p|ps|tml)$">
+      Require all denied
+    </FilesMatch>
+  </IfModule>
+</IfModule>

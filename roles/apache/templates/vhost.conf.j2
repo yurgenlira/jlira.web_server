@@ -1,74 +1,29 @@
-## {mark} ANSIBLE MANAGED FILE ##
-# Virtual Host: {{ item.name }}
-
+## ANSIBLE MANAGED FILE ##
+# HTTP Virtual Host: {{ item.name }}
 {% if item.http is defined %}
-# HTTP Virtual Host
-<VirtualHost {{ item.http.listen | default('*:80') }}>
+<VirtualHost {% for listen in item.http.listen %}{{ listen }}{% if not loop.last %} {% endif %}{% endfor %}>
+{% if item.server_name is defined %}
     ServerName {{ item.server_name }}
+{% endif %}
 {% if item.server_alias is defined and item.server_alias | length > 0 %}
     ServerAlias {{ item.server_alias | join(' ') }}
 {% endif %}
 {% if item.server_admin is defined %}
     ServerAdmin {{ item.server_admin }}
 {% endif %}
-
+{% if item.document_root is defined %}
     DocumentRoot {{ item.document_root }}
+{% endif %}
 
-    <Directory {{ item.document_root }}>
-        Options {{ item.directory_options | default('Indexes FollowSymLinks') }}
-        AllowOverride {{ item.directory_allow_override | default('None') }}
-        Require {{ item.directory_require | default('all granted') }}
-    </Directory>
-
-    ErrorLog {{ item.http.error_log | default('${APACHE_LOG_DIR}/' + item.name + '-error.log') }}
-    CustomLog {{ item.http.access_log | default('${APACHE_LOG_DIR}/' + item.name + '-access.log combined') }}
+{% if item.http.error_log is defined %}
+    ErrorLog {{ item.http.error_log }}
+{% endif %}
+{% if item.http.access_log is defined %}
+    CustomLog {{ item.http.access_log }}
+{% endif %}
 
 {% if item.http.custom_directives is defined %}
     {{ item.http.custom_directives | indent(4) }}
-{% elif item.custom_directives is defined %}
-    {{ item.custom_directives | indent(4) }}
-{% endif %}
-</VirtualHost>
-{% endif %}
-
-{% if item.https is defined %}
-# HTTPS Virtual Host
-<VirtualHost {{ item.https.listen | default('*:443') }}>
-    ServerName {{ item.server_name }}
-{% if item.server_alias is defined and item.server_alias | length > 0 %}
-    ServerAlias {{ item.server_alias | join(' ') }}
-{% endif %}
-{% if item.server_admin is defined %}
-    ServerAdmin {{ item.server_admin }}
-{% endif %}
-
-    DocumentRoot {{ item.document_root }}
-
-    <Directory {{ item.document_root }}>
-        Options {{ item.directory_options | default('Indexes FollowSymLinks') }}
-        AllowOverride {{ item.directory_allow_override | default('None') }}
-        Require {{ item.directory_require | default('all granted') }}
-    </Directory>
-
-    # SSL Configuration
-    SSLEngine on
-{% if item.https.certificate_file is defined %}
-    SSLCertificateFile {{ item.https.certificate_file }}
-{% endif %}
-{% if item.https.certificate_key_file is defined %}
-    SSLCertificateKeyFile {{ item.https.certificate_key_file }}
-{% endif %}
-{% if item.https.certificate_chain_file is defined %}
-    SSLCertificateChainFile {{ item.https.certificate_chain_file }}
-{% endif %}
-
-    ErrorLog {{ item.https.error_log | default('${APACHE_LOG_DIR}/' + item.name + '-ssl-error.log') }}
-    CustomLog {{ item.https.access_log | default('${APACHE_LOG_DIR}/' + item.name + '-ssl-access.log combined') }}
-
-{% if item.https.custom_directives is defined %}
-    {{ item.https.custom_directives | indent(4) }}
-{% elif item.custom_directives is defined %}
-    {{ item.custom_directives | indent(4) }}
 {% endif %}
 </VirtualHost>
 {% endif %}

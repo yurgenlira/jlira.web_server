@@ -6,4 +6,4 @@
 define {{ var.name }} {{ var.value }}
 {% endfor %}
 
-Include {{ apache_vhost_templates_dir }}/{{ item.template }}.template.conf
+Include {{ apache_vhost_templates_dir }}/{{ item.template }}-ssl.template.conf

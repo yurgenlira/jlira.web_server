@@ -11,6 +11,37 @@
     - install
     - apache_install
 
+- name: Include php role
+  ansible.builtin.include_role:
+    name: php
+  when: apache_php_fpm_integration
+  vars:
+    php_version: "{{ apache_php_fpm_version }}"
+    php_fpm_enabled: true
+  tags:
+    - php_integration
+    - apache_php_integration
+    - php_uninstall
+    - php_install
+    - php_configure_cli
+    - php_set_default_cli_version
+    - php_install_mssql_extension
+    - php_logrotate_cli
+    - php_configure_fpm
+    - php_logrotate_fpm
+
+- name: Include jlira.web_server.apache.php_integration.yml
+  ansible.builtin.include_tasks:
+    file: php_integration.yml
+    apply:
+      tags:
+        - php_integration
+        - apache_php_integration
+  when: apache_php_fpm_integration
+  tags:
+    - php_integration
+    - apache_php_integration
+
 - name: Include jlira.web_server.apache.configure.yml
   ansible.builtin.include_tasks:
     file: configure.yml
@@ -52,43 +83,47 @@
     apply:
       tags:
         - virtual_hosts
+        - apache_virtual_hosts
+        - virtual_hosts_from_templates
         - apache_virtual_hosts_from_templates
-  when: apache_vhosts_from_templates | length > 0
+  when: (apache_vhost_templates | length > 0) or (apache_vhosts_from_templates | length > 0)
   tags:
     - virtual_hosts
+    - apache_virtual_hosts
+    - virtual_hosts_from_templates
     - apache_virtual_hosts_from_templates
 
-- name: Include jlira.web_server.apache.status_page.yml
-  ansible.builtin.include_tasks:
-    file: status_page.yml
-    apply:
-      tags:
-        - status_page
-        - apache_status_page
-  tags:
-    - status_page
-    - apache_status_page
+# - name: Include jlira.web_server.apache.status_page.yml
+#   ansible.builtin.include_tasks:
+#     file: status_page.yml
+#     apply:
+#       tags:
+#         - status_page
+#         - apache_status_page
+#   tags:
+#     - status_page
+#     - apache_status_page
 
-- name: Include jlira.web_server.apache.php_fpm_status_proxy.yml
-  ansible.builtin.include_tasks:
-    file: php_fpm_status_proxy.yml
-    apply:
-      tags:
-        - php_fpm_status_proxy
-        - apache_php_fpm_status_proxy
-  when: apache_php_fpm_status_configs is defined and apache_php_fpm_status_configs | length > 0
-  tags:
-    - php_fpm_status_proxy
-    - apache_php_fpm_status_proxy
+# - name: Include jlira.web_server.apache.php_fpm_status_proxy.yml
+#   ansible.builtin.include_tasks:
+#     file: php_fpm_status_proxy.yml
+#     apply:
+#       tags:
+#         - php_fpm_status_proxy
+#         - apache_php_fpm_status_proxy
+#   when: apache_php_fpm_status_configs is defined and apache_php_fpm_status_configs | length > 0
+#   tags:
+#     - php_fpm_status_proxy
+#     - apache_php_fpm_status_proxy
 
-- name: Include jlira.web_server.apache.authentication.yml
-  ansible.builtin.include_tasks:
-    file: authentication.yml
-    apply:
-      tags:
-        - authentication
-        - apache_authentication
-  when: apache_htpasswd_files | length > 0
-  tags:
-    - authentication
-    - apache_authentication
+# - name: Include jlira.web_server.apache.authentication.yml
+#   ansible.builtin.include_tasks:
+#     file: authentication.yml
+#     apply:
+#       tags:
+#         - authentication
+#         - apache_authentication
+#   when: apache_htpasswd_files | length > 0
+#   tags:
+#     - authentication
+#     - apache_authentication

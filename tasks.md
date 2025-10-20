@@ -14,11 +14,6 @@
   - ✅ Support selective execution via tags
   - ✅ Allow granular control of PHP features
 
-**Technical Debt:**
-- ⚠️ PHP role `configure_cli.yml` requires `php_cli_ini_regex_settings` variable to be defined in defaults
-- ⚠️ PHP integration tests temporarily disabled in Apache molecule tests
-- ⚠️ Need to complete PHP role implementation before re-enabling integration tests
-
 ## 3. Configuration Requirements
 
 ### ✅ 3.1 Main Apache Configuration
@@ -42,13 +37,6 @@
   - ✅ Configure multiple HTTP ports (default: 80)
   - ✅ Configure multiple HTTPS ports (default: 443, when SSL enabled)
   - ✅ Manage port configuration
-
-- ✅ **Firewall Configuration:**
-  - ✅ Detect firewall presence
-  - ✅ Configure HTTP port access
-  - ✅ Configure HTTPS port access (when SSL enabled)
-  - ✅ Configure custom port access
-  - ✅ Manage firewall state
 
 - ✅ **Module Management:**
   - ✅ Enable additional modules
@@ -158,45 +146,41 @@
 - ✅ Create files conditionally when needed
 - ✅ Support idempotent command execution
 
-## 9. Dependency Requirements
+## 9. Security Requirements
 
-### 14.1 Ansible Collections
-- ansible.builtin (core modules)
-- community.general (ufw, htpasswd modules)
-
-### 14.2 System Requirements
-- Systemd for service management
-- UFW firewall (optional, auto-detected)
-- APT package manager (Debian/Ubuntu systems)
-
-### 14.3 Role Dependencies
-- PHP role (when `apache_install_php` is true)
-
-## 15. Security Requirements
-
-### 15.1 Secure Defaults
+### 9.1 Secure Defaults
 - ✅ ServerTokens set to Prod (minimal information disclosure)
 - ✅ ServerSignature set to Off (hide server signature)
 - ✅ TraceEnable set to Off (prevent HTTP TRACE attacks)
 - ✅ Proper file permissions (0644 for config, 0640 for .htpasswd)
 - ✅ Proper ownership (root:root for config, root:www-data for .htpasswd)
 
+## ✅ 10. Apache PHP-FPM Integration
 
-## 10. Apache PHP-FPM Integration
+### ✅ 10.1 PHP-FPM Integration
+- ✅ **Role Integration:**
+  - ✅ Create a new task `php_integration.yml` in the `apache` role.
+  - ✅ Support multiple PHP versions on same system, so configure /etc/apache2/conf-available/php{{ php_version }}-fpm.conf (configure ProxyTimeout, add <If "-f %{REQUEST_FILENAME}"> inside <FilesMatch ".+\.ph(ar|p|tml)$">)
+  - ✅ Add logic to configure wheter set php version as php-fpm default version or not. If default version, create symlink in conf-enabled.
+  - ✅ Update `apache/tasks/main.yml` to include `php_integration.yml` conditionally.
+  - ✅ Enable proxy_fcgi Apache module
+  - ✅ Include PHP role automatically when apache_php_fpm_integration is enabled
+  - ✅ Create comprehensive Molecule tests for PHP-FPM integration
 
-### 10.1 PHP-FPM Integration
-- **Apache Configuration:**
-  - Create a new task `php_integration.yml` in the `apache` role.
-  - Add logic to enable the `proxy_fcgi` Apache module.
-  - Add logic to execute `a2enconf php{{ apache_php_fpm_version }}-fpm`.
-- **Variables:**
-  - Add `apache_php_fpm_integration: false` to `apache` role defaults.
-  - Add `apache_php_fpm_version` to `apache` role defaults.
-- **Role Integration:**
-  - Update `apache/tasks/main.yml` to include `php_integration.yml` conditionally.
-  - Support multiple PHP versions on same system if you don't set a default version (mejor agregar el arcgivo .conf por defecto)
+## ✅ 11. Status Page Configuration
+- ✅ **FPM Status Page:**
+  - ✅ Configure proxy timeout settings for FPM connections
+  - ✅ Add file existence checks for PHP file execution
+  - ✅ Configure status page endpoint access
+  - ✅ Create version-specific status and ping endpoints
+  - ✅ Support IP-based access control for status endpoints
 
 
+**Technical Debt:**
+- ✅ ~~PHP integration tests temporarily disabled in Apache molecule tests~~ - RESOLVED: Tests enabled in converge.yml
+- ✅ ~~Need to complete PHP role implementation before re-enabling integration tests~~ - RESOLVED: PHP role complete
+- **FPM Version Management:**
+  - ✅ ~~Configure PHP-FPM as default version when enabled~~ - RESOLVED: Implemented apache_php_fpm_set_default variable
 
 # PHP Role Functional Requirements
 
@@ -275,18 +259,9 @@
   - ✅ Remove old extension files and directories
   - ✅ Support clean migration between versions
 
-## 3. Status Page Configuration
-- **FPM Status Page:**
-  - Configure proxy timeout settings for FPM connections
-  - Add file existence checks for PHP file execution
-  - Configure status page endpoint access
-  - Create version-specific status page HTML files
-  - Update status page URL references for version-specific endpoints
+
 
 **Technical Debt:**
-- **FPM Version Management:**
-  - ⚠️ Configure PHP-FPM as default version when enabled
-  - ⚠️ Test when logs are created in custom paths and logrotate works for those paths (cli and fpm)
   - ⚠️ Test in check mode and diff mode
 
 
@@ -296,9 +271,9 @@
 
 # General Functional Requirements
 
-## 1. Testing Requirements
+## ✅ 1. Testing Requirements
 - **Molecule Tests:**
-  - Support create, converge, verify, and destroy lifecycle
+  - ✅ Support create, converge, verify, and destroy lifecycle
 
 ## 2. Integration Requirements
 - **Web Server Integration:**
@@ -324,3 +299,6 @@
 
 
 
+solo testear variables que se van a usar al iniciar php role
+vcerificar que role php no instale apache
+allow override APACHE_LOG_DIR=/var/log/apache2$SUFFIX (if se sobrteescribe crear folder)

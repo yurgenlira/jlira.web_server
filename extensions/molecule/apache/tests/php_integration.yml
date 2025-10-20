@@ -1,23 +1,76 @@
+# SPDX-License-Identifier: MIT-0
 ---
-- name: Check if PHP is installed
-  ansible.builtin.command: php --version
-  register: php_version_check
+- name: Verify proxy_fcgi module is enabled
+  ansible.builtin.command: apache2ctl -M
+  register: apache_modules
   changed_when: false
+  failed_when: "'proxy_fcgi_module' not in apache_modules.stdout"
 
-- name: Verify PHP is installed
-  ansible.builtin.assert:
-    that:
-      - php_version_check.rc == 0
-      - "'PHP' in php_version_check.stdout"
-    fail_msg: "PHP is not installed or not accessible"
-
-- name: Check PHP CLI configuration
+- name: Verify PHP-FPM configuration file exists in conf-available
   ansible.builtin.stat:
-    path: /etc/php/8.4/cli/php.ini
-  register: php_cli_ini_check
+    path: "/etc/apache2/conf-available/php{{ apache_php_fpm_version }}-fpm.conf"
+  register: php_conf_available
+  failed_when: not php_conf_available.stat.exists
 
-- name: Verify PHP CLI configuration exists
+- name: Verify PHP-FPM configuration is enabled when set_default is true
+  ansible.builtin.stat:
+    path: "/etc/apache2/conf-enabled/php{{ apache_php_fpm_version }}-fpm.conf"
+  register: php_conf_enabled
+  failed_when:
+    - not php_conf_enabled.stat.exists
+    - not php_conf_enabled.stat.islnk
+  when: apache_php_fpm_set_default
+
+- name: Verify PHP-FPM configuration contains ProxyTimeout
+  ansible.builtin.command:
+    cmd: >-
+      grep 'ProxyTimeout {{ apache_php_fpm_proxy_timeout }}'
+      /etc/apache2/conf-available/php{{ apache_php_fpm_version }}-fpm.conf
+  changed_when: false
+  register: proxy_timeout_check
+  failed_when: proxy_timeout_check.rc != 0
+
+- name: Verify PHP-FPM configuration contains file existence check
+  ansible.builtin.command:
+    cmd: >-
+      grep '<If "-f %{REQUEST_FILENAME}">'
+      /etc/apache2/conf-available/php{{ apache_php_fpm_version }}-fpm.conf
+  changed_when: false
+  register: file_check
+  failed_when: file_check.rc != 0
+
+- name: Verify PHP-FPM service is running
+  ansible.builtin.service_facts:
+
+- name: Assert PHP-FPM service is active
   ansible.builtin.assert:
     that:
-      - php_cli_ini_check.stat.exists
-    fail_msg: "PHP CLI configuration file does not exist"
+      - ansible_facts.services['php' ~ apache_php_fpm_version ~ '-fpm.service'].state == 'running'
+      - ansible_facts.services['php' ~ apache_php_fpm_version ~ '-fpm.service'].status == 'enabled'
+    fail_msg: "PHP-FPM service is not running or not enabled"
+  when: apache_php_fpm_integration
+
+- name: Create test PHP file
+  ansible.builtin.copy:
+    dest: /var/www/html/test.php
+    content: |
+      <?php
+      echo "PHP Version: " . phpversion();
+      ?>
+    mode: '0644'
+    owner: www-data
+    group: www-data
+
+- name: Test PHP processing through Apache
+  ansible.builtin.uri:
+    url: "http://localhost/test.php"
+    return_content: true
+  register: php_test
+  failed_when: >-
+    'PHP Version' not in php_test.content or
+    apache_php_fpm_version not in php_test.content
+
+- name: Remove test PHP file
+  ansible.builtin.file:
+    path: /var/www/html/test.php
+    state: absent

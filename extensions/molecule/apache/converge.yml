@@ -1,52 +1,27 @@
 ---
 - name: Converge
-  hosts: all
+  hosts: web_server
   gather_facts: true
-  vars:
-    apache_install_php: false
-    apache_status_page_enabled: true
-    apache_htpasswd_files:
-      - path: /etc/apache2/.htpasswd
-        users:
-          - name: admin
-            password: adminpass123
-          - name: testuser
-            password: testpass456
-      - path: /etc/apache2/.htpasswd-api
-        users:
-          - name: api_user
-            password: apisecret789
-    apache_custom_configs:
-      - name: Test custom configuration
-        path: /data/apache-conf/custom-headers.conf
-        content: |
-          # Test custom configuration
-          ServerSignature Off
-    apache_virtual_hosts:
-      - name: testsite.local
-        server_name: testsite.local
-        server_alias:
-          - www.testsite.local
-        server_admin: admin@testsite.local
-        document_root: /var/www/testsite.local
-        http:
-          enabled: true
-        custom_directives: |
-          DirectoryIndex index.html
-      - name: securesite.local
-        server_name: securesite.local
-        server_admin: admin@securesite.local
-        document_root: /var/www/securesite.local
-        http:
-          enabled: true
-          custom_directives: |
-            # Redirect to HTTPS
-            Redirect permanent / https://securesite.local/
-        https:
-          enabled: true
-          certificate_file: /etc/ssl/certs/ssl-cert-snakeoil.pem
-          certificate_key_file: /etc/ssl/private/ssl-cert-snakeoil.key
   tasks:
-    - name: Apply role under test
+    - name: Apply apache role under test
       ansible.builtin.include_role:
         name: apache
+      tags:
+        - install
+        - apache_install
+        - php_integration
+        - apache_php_integration
+        - configure
+        - apache_configure
+        - custom_configs
+        - apache_custom_configs
+        - virtual_hosts
+        - apache_virtual_hosts
+        - virtual_hosts_from_templates
+        - apache_virtual_hosts_from_templates
+        - status_page
+        - apache_status_page
+        - php_fpm_status_proxy
+        - apache_php_fpm_status_proxy
+        - authentication
+        - apache_authentication

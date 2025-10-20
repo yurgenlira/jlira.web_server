@@ -11,7 +11,7 @@ The collection must provide the following capabilities through its roles:
 *   **Port Configuration:** Allows configuration of multiple HTTP and HTTPS ports (default: 80 for HTTP, 443 for HTTPS when SSL is enabled).
 *   **Virtual Host Management:** Provides a flexible way to define and manage virtual hosts, supporting both static configuration files and templates for dynamic VHost creation. It also manages custom configuration files.
 *   **PHP Integration:** Orchestrates the installation and configuration of PHP, ensuring that Apache is correctly set up to work with PHP-FPM.
-*   **Security:** Manages security-related aspects, such as enabling SSL/TLS, setting security headers, configuring basic authentication (`.htpasswd`), and managing UFW firewall rules for web traffic (automatically configures all HTTP and HTTPS ports).
+*   **Security:** Manages security-related aspects, such as enabling SSL/TLS, setting security headers, configuring basic authentication (`.htpasswd`)
 *   **Maintenance:** Handles the creation of custom log directories and validates configuration changes before reloading the Apache service to prevent downtime.
 *   **Monitoring:** Sets up a server status page with controlled access.
 

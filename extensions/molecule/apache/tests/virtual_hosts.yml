@@ -1,23 +1,71 @@
 ---
-# Test HTTP Virtual Host (testsite.local)
-- name: Check if HTTP virtual host document root exists
+# Test virtual host (secure.example.local)
+- name: Check if virtual host document root exists
   ansible.builtin.stat:
-    path: /var/www/testsite.local
-  register: apache_http_vhost_docroot_check
+    path: /var/www/secure.example.local
+  register: apache_vhost_docroot_check
 
-- name: Verify HTTP virtual host document root exists
+- name: Verify virtual host document root exists
   ansible.builtin.assert:
     that:
-      - apache_http_vhost_docroot_check.stat.exists
-      - apache_http_vhost_docroot_check.stat.isdir
-      - apache_http_vhost_docroot_check.stat.mode == "0755"
-      - apache_http_vhost_docroot_check.stat.pw_name == "www-data"
-      - apache_http_vhost_docroot_check.stat.gr_name == "www-data"
-    fail_msg: "HTTP virtual host document root does not exist or has incorrect permissions"
+      - apache_vhost_docroot_check.stat.exists
+      - apache_vhost_docroot_check.stat.isdir
+      - apache_vhost_docroot_check.stat.mode == "0755"
+    fail_msg: "Virtual host document root does not exist or has incorrect permissions"
 
+# Test that log directories were created with expanded variables
+- name: Check if HTTP error log directory exists (expanded from ${APACHE_LOG_DIR})
+  ansible.builtin.stat:
+    path: /var/log/apache2
+  register: apache_http_error_log_dir_check
+
+- name: Verify HTTP error log directory exists
+  ansible.builtin.assert:
+    that:
+      - apache_http_error_log_dir_check.stat.exists
+      - apache_http_error_log_dir_check.stat.isdir
+    fail_msg: "HTTP error log directory does not exist"
+
+- name: Check if HTTP access log directory exists (expanded from ${APACHE_LOG_DIR})
+  ansible.builtin.stat:
+    path: /var/log/apache2
+  register: apache_http_access_log_dir_check
+
+- name: Verify HTTP access log directory exists
+  ansible.builtin.assert:
+    that:
+      - apache_http_access_log_dir_check.stat.exists
+      - apache_http_access_log_dir_check.stat.isdir
+    fail_msg: "HTTP access log directory does not exist"
+
+- name: Check if HTTPS error log directory exists (expanded from ${APACHE_LOG_DIR})
+  ansible.builtin.stat:
+    path: /var/log/apache2
+  register: apache_https_error_log_dir_check
+
+- name: Verify HTTPS error log directory exists
+  ansible.builtin.assert:
+    that:
+      - apache_https_error_log_dir_check.stat.exists
+      - apache_https_error_log_dir_check.stat.isdir
+    fail_msg: "HTTPS error log directory does not exist"
+
+- name: Check if HTTPS access log directory exists (expanded from ${APACHE_LOG_DIR})
+  ansible.builtin.stat:
+    path: /var/log/apache2
+  register: apache_https_access_log_dir_check
+
+- name: Verify HTTPS access log directory exists
+  ansible.builtin.assert:
+    that:
+      - apache_https_access_log_dir_check.stat.exists
+      - apache_https_access_log_dir_check.stat.isdir
+    fail_msg: "HTTPS access log directory does not exist"
+
+# Test HTTP Virtual Host Configuration
 - name: Check if HTTP virtual host configuration file exists
   ansible.builtin.stat:
-    path: /etc/apache2/sites-available/testsite.local.conf
+    path: /etc/apache2/sites-available/secure.example.local.conf
   register: apache_http_vhost_config_check
 
 - name: Verify HTTP virtual host configuration file exists
@@ -31,24 +79,60 @@
 
 - name: Read HTTP virtual host configuration file content
   ansible.builtin.slurp:
-    path: /etc/apache2/sites-available/testsite.local.conf
+    path: /etc/apache2/sites-available/secure.example.local.conf
   register: apache_http_vhost_config_content
 
 - name: Verify HTTP virtual host has correct server name
   ansible.builtin.assert:
     that:
-      - "'ServerName testsite.local' in (apache_http_vhost_config_content.content | b64decode)"
+      - "'ServerName secure.example.local' in (apache_http_vhost_config_content.content | b64decode)"
     fail_msg: "HTTP virtual host configuration does not contain correct ServerName"
+
+- name: Verify HTTP virtual host has correct server aliases
+  ansible.builtin.assert:
+    that:
+      - >-
+        'ServerAlias www.secure.example.local www3.secure.example.local'
+        in (apache_http_vhost_config_content.content | b64decode)
+    fail_msg: "HTTP virtual host configuration does not contain correct ServerAlias"
 
 - name: Verify HTTP virtual host has correct document root
   ansible.builtin.assert:
     that:
-      - "'DocumentRoot /var/www/testsite.local' in (apache_http_vhost_config_content.content | b64decode)"
+      - "'DocumentRoot /var/www/secure.example.local' in (apache_http_vhost_config_content.content | b64decode)"
     fail_msg: "HTTP virtual host configuration does not contain correct DocumentRoot"
+
+- name: Verify HTTP virtual host has correct listen directives
+  ansible.builtin.assert:
+    that:
+      - "'<VirtualHost *:80 *:8080>' in (apache_http_vhost_config_content.content | b64decode)"
+    fail_msg: "HTTP virtual host configuration does not contain correct listen directives"
+
+- name: Verify HTTP virtual host has redirect to HTTPS
+  ansible.builtin.assert:
+    that:
+      - "'Redirect permanent / https://secure.example.local/' in (apache_http_vhost_config_content.content | b64decode)"
+    fail_msg: "HTTP virtual host does not contain redirect to HTTPS"
+
+- name: Verify HTTP virtual host has custom error log
+  ansible.builtin.assert:
+    that:
+      - >-
+        'ErrorLog ${APACHE_LOG_DIR}/secure.example.local-error.log'
+        in (apache_http_vhost_config_content.content | b64decode)
+    fail_msg: "HTTP virtual host does not contain custom error log"
+
+- name: Verify HTTP virtual host has custom access log
+  ansible.builtin.assert:
+    that:
+      - >-
+        'CustomLog ${APACHE_LOG_DIR}/secure.example.local-access.log combined'
+        in (apache_http_vhost_config_content.content | b64decode)
+    fail_msg: "HTTP virtual host does not contain custom access log"
 
 - name: Check if HTTP virtual host is enabled
   ansible.builtin.stat:
-    path: /etc/apache2/sites-enabled/testsite.local.conf
+    path: /etc/apache2/sites-enabled/secure.example.local.conf
   register: apache_http_vhost_enabled_check
 
 - name: Verify HTTP virtual host is enabled
@@ -58,25 +142,10 @@
       - apache_http_vhost_enabled_check.stat.islnk
     fail_msg: "HTTP virtual host is not enabled"
 
-# Test HTTPS Virtual Host (securesite.local)
-- name: Check if HTTPS virtual host document root exists
-  ansible.builtin.stat:
-    path: /var/www/securesite.local
-  register: apache_https_vhost_docroot_check
-
-- name: Verify HTTPS virtual host document root exists
-  ansible.builtin.assert:
-    that:
-      - apache_https_vhost_docroot_check.stat.exists
-      - apache_https_vhost_docroot_check.stat.isdir
-      - apache_https_vhost_docroot_check.stat.mode == "0755"
-      - apache_https_vhost_docroot_check.stat.pw_name == "www-data"
-      - apache_https_vhost_docroot_check.stat.gr_name == "www-data"
-    fail_msg: "HTTPS virtual host document root does not exist or has incorrect permissions"
-
+# Test HTTPS Virtual Host Configuration
 - name: Check if HTTPS virtual host configuration file exists
   ansible.builtin.stat:
-    path: /etc/apache2/sites-available/securesite.local.conf
+    path: /etc/apache2/sites-available/secure.example.local-ssl.conf
   register: apache_https_vhost_config_check
 
 - name: Verify HTTPS virtual host configuration file exists
@@ -90,22 +159,26 @@
 
 - name: Read HTTPS virtual host configuration file content
   ansible.builtin.slurp:
-    path: /etc/apache2/sites-available/securesite.local.conf
+    path: /etc/apache2/sites-available/secure.example.local-ssl.conf
   register: apache_https_vhost_config_content
 
-- name: Verify HTTPS virtual host has HTTP section with redirect
+- name: Verify HTTPS virtual host has correct listen directives
   ansible.builtin.assert:
     that:
-      - "'# HTTP Virtual Host' in (apache_https_vhost_config_content.content | b64decode)"
-      - "'Redirect permanent / https://securesite.local/' in (apache_https_vhost_config_content.content | b64decode)"
-    fail_msg: "HTTPS virtual host does not contain HTTP redirect configuration"
+      - "'<VirtualHost *:443 *:8443>' in (apache_https_vhost_config_content.content | b64decode)"
+    fail_msg: "HTTPS virtual host configuration does not contain correct listen directives"
 
-- name: Verify HTTPS virtual host has HTTPS section
+- name: Verify HTTPS virtual host has correct server name
   ansible.builtin.assert:
     that:
-      - "'# HTTPS Virtual Host' in (apache_https_vhost_config_content.content | b64decode)"
+      - "'ServerName secure.example.local' in (apache_https_vhost_config_content.content | b64decode)"
+    fail_msg: "HTTPS virtual host configuration does not contain correct ServerName"
+
+- name: Verify HTTPS virtual host has SSL engine enabled
+  ansible.builtin.assert:
+    that:
       - "'SSLEngine on' in (apache_https_vhost_config_content.content | b64decode)"
-    fail_msg: "HTTPS virtual host does not contain HTTPS configuration"
+    fail_msg: "HTTPS virtual host does not have SSL engine enabled"
 
 - name: Verify HTTPS virtual host has SSL certificate configuration
   ansible.builtin.assert:
@@ -118,9 +191,35 @@
         in (apache_https_vhost_config_content.content | b64decode)
     fail_msg: "HTTPS virtual host does not contain SSL certificate configuration"
 
+- name: Verify HTTPS virtual host has custom error log
+  ansible.builtin.assert:
+    that:
+      - >-
+        'ErrorLog ${APACHE_LOG_DIR}/secure.example.local-ssl-error.log'
+        in (apache_https_vhost_config_content.content | b64decode)
+    fail_msg: "HTTPS virtual host does not contain custom error log"
+
+- name: Verify HTTPS virtual host has custom access log
+  ansible.builtin.assert:
+    that:
+      - >-
+        'CustomLog ${APACHE_LOG_DIR}/secure.example.local-ssl-access.log combined'
+        in (apache_https_vhost_config_content.content | b64decode)
+    fail_msg: "HTTPS virtual host does not contain custom access log"
+
+- name: Verify HTTPS virtual host has custom directives
+  ansible.builtin.assert:
+    that:
+      - "'DirectoryIndex index.html index.php' in (apache_https_vhost_config_content.content | b64decode)"
+      - "'<Directory /var/www/secure.example.local>' in (apache_https_vhost_config_content.content | b64decode)"
+      - "'Options -Indexes +FollowSymLinks' in (apache_https_vhost_config_content.content | b64decode)"
+      - "'AllowOverride All' in (apache_https_vhost_config_content.content | b64decode)"
+      - "'Require all granted' in (apache_https_vhost_config_content.content | b64decode)"
+    fail_msg: "HTTPS virtual host does not contain expected custom directives"
+
 - name: Check if HTTPS virtual host is enabled
   ansible.builtin.stat:
-    path: /etc/apache2/sites-enabled/securesite.local.conf
+    path: /etc/apache2/sites-enabled/secure.example.local-ssl.conf
   register: apache_https_vhost_enabled_check
 
 - name: Verify HTTPS virtual host is enabled
@@ -129,3 +228,152 @@
       - apache_https_vhost_enabled_check.stat.exists
       - apache_https_vhost_enabled_check.stat.islnk
     fail_msg: "HTTPS virtual host is not enabled"
+
+# Functional Tests
+- name: Create test index file for virtual host
+  ansible.builtin.copy:
+    content: |
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <title>Secure Example Local</title>
+      </head>
+      <body>
+          <h1>Welcome to secure.example.local</h1>
+          <p>This is a test page for the Apache virtual host.</p>
+      </body>
+      </html>
+    dest: /var/www/secure.example.local/index.html
+    owner: www-data
+    group: www-data
+    mode: "0644"
+
+- name: Test HTTP virtual host responds on port 80
+  ansible.builtin.uri:
+    url: http://127.0.0.1:80/
+    method: GET
+    headers:
+      Host: secure.example.local
+    follow_redirects: none
+    status_code: 301
+    validate_certs: false
+  register: apache_http_port_80_response
+
+- name: Verify HTTP port 80 redirects to HTTPS
+  ansible.builtin.assert:
+    that:
+      - apache_http_port_80_response.status == 301
+      - "'https://secure.example.local/' in apache_http_port_80_response.location"
+    fail_msg: "HTTP virtual host on port 80 does not redirect to HTTPS"
+
+- name: Test HTTP virtual host responds on port 8080
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8080/
+    method: GET
+    headers:
+      Host: secure.example.local
+    follow_redirects: none
+    status_code: 301
+    validate_certs: false
+  register: apache_http_port_8080_response
+
+- name: Verify HTTP port 8080 redirects to HTTPS
+  ansible.builtin.assert:
+    that:
+      - apache_http_port_8080_response.status == 301
+      - "'https://secure.example.local/' in apache_http_port_8080_response.location"
+    fail_msg: "HTTP virtual host on port 8080 does not redirect to HTTPS"
+
+- name: Test HTTPS virtual host responds on port 443
+  ansible.builtin.uri:
+    url: https://127.0.0.1:443/
+    method: GET
+    headers:
+      Host: secure.example.local
+    status_code: 200
+    validate_certs: false
+    return_content: true
+  register: apache_https_port_443_response
+
+- name: Verify HTTPS port 443 returns correct content
+  ansible.builtin.assert:
+    that:
+      - apache_https_port_443_response.status == 200
+      - "'Welcome to secure.example.local' in apache_https_port_443_response.content"
+      - >-
+        'This is a test page for the Apache virtual host'
+        in apache_https_port_443_response.content
+    fail_msg: "HTTPS virtual host on port 443 does not return expected content"
+
+- name: Test HTTPS virtual host responds on port 8443
+  ansible.builtin.uri:
+    url: https://127.0.0.1:8443/
+    method: GET
+    headers:
+      Host: secure.example.local
+    status_code: 200
+    validate_certs: false
+    return_content: true
+  register: apache_https_port_8443_response
+
+- name: Verify HTTPS port 8443 returns correct content
+  ansible.builtin.assert:
+    that:
+      - apache_https_port_8443_response.status == 200
+      - "'Welcome to secure.example.local' in apache_https_port_8443_response.content"
+      - >-
+        'This is a test page for the Apache virtual host'
+        in apache_https_port_8443_response.content
+    fail_msg: "HTTPS virtual host on port 8443 does not return expected content"
+
+- name: Test server aliases work correctly
+  ansible.builtin.uri:
+    url: https://127.0.0.1:443/
+    method: GET
+    headers:
+      Host: www.secure.example.local
+    status_code: 200
+    validate_certs: false
+    return_content: true
+  register: apache_https_alias_response
+
+- name: Verify server alias returns correct content
+  ansible.builtin.assert:
+    that:
+      - apache_https_alias_response.status == 200
+      - "'Welcome to secure.example.local' in apache_https_alias_response.content"
+    fail_msg: "HTTPS virtual host does not respond correctly to server alias"
+
+- name: Test PHP-FPM integration with virtual host
+  ansible.builtin.copy:
+    content: |
+      <?php
+      phpinfo();
+    dest: /var/www/secure.example.local/info.php
+    owner: www-data
+    group: www-data
+    mode: "0644"
+
+- name: Request PHP file through virtual host
+  ansible.builtin.uri:
+    url: https://127.0.0.1:443/info.php
+    method: GET
+    headers:
+      Host: secure.example.local
+    status_code: 200
+    validate_certs: false
+    return_content: true
+  register: apache_php_response
+
+- name: Verify PHP is processed correctly
+  ansible.builtin.assert:
+    that:
+      - apache_php_response.status == 200
+      - "'PHP Version' in apache_php_response.content"
+      - "'PHP License' in apache_php_response.content"
+    fail_msg: "Virtual host does not process PHP files correctly"
+
+- name: Remove test PHP file
+  ansible.builtin.file:
+    path: /var/www/secure.example.local/info.php
+    state: absent

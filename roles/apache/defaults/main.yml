@@ -13,10 +13,36 @@ apache_server_name: "{{ ansible_hostname }}"
 # Type: Boolean
 apache_ssl_enabled: true
 
-# Enable or disable PHP integration.
-# When enabled, the PHP role will be automatically included and configured.
+# ============================================================================
+# PHP-FPM Integration Configuration
+# ============================================================================
+
+# Enable PHP-FPM integration with Apache.
+# When true, Apache will be configured to proxy PHP requests to PHP-FPM.
+# This automatically includes the PHP role to install and configure PHP-FPM.
 # Type: Boolean
-apache_install_php: false
+apache_php_fpm_integration: false
+
+# PHP version for PHP-FPM integration.
+# This should match the version configured in the PHP role.
+# Used for creating version-specific configuration files and socket paths.
+# Type: String
+# Example: "8.4", "8.3", "8.2"
+apache_php_fpm_version: "{{ php_version | default('8.4') }}"
+
+# Set as Default PHP-FPM Handler
+# When true, makes this PHP version the default handler for all PHP files.
+# This creates a symlink in conf-enabled to enable the PHP-FPM configuration.
+# When false, the configuration is created but not enabled (useful for multi-version setups).
+# Type: Boolean
+apache_php_fpm_set_default: true
+
+# Proxy Timeout for PHP-FPM
+# Maximum time in seconds Apache waits for PHP-FPM to respond.
+# Increase for long-running scripts; decrease for fast-fail behavior.
+# Default: 300 seconds (5 minutes)
+# Type: Integer
+apache_php_fpm_proxy_timeout: 300
 
 # ============================================================================
 # Apache Main Settings
@@ -81,8 +107,27 @@ apache_https_ports:
 # ============================================================================
 
 # List of Apache modules to enable.
+# Common modules like "mpm_event",  "setenvif", "headers", "rewrite", "http2", "expires" are often included.
+# Ensure required modules for features you enable are included here.
 # Type: List of Strings
 apache_modules_enabled: []
+
+# ============================================================================
+# Security Configuration
+# ============================================================================
+
+# Apache security settings to configure in security.conf.
+# Each setting is defined as a dictionary with the following keys:
+# - `name`: The Apache directive name (e.g., ServerTokens, ServerSignature).
+# - `value`: The value to assign to the directive.
+# Type: List of Dictionaries
+apache_security_settings:
+  - name: ServerTokens
+    value: Prod
+  - name: ServerSignature
+    value: "Off"
+  - name: TraceEnable
+    value: "Off"
 
 # ============================================================================
 # Custom Configuration Files
@@ -115,38 +160,31 @@ apache_custom_configs: []
 # Each virtual host is defined as a dictionary with the following keys:
 #
 # Common Configuration (applies to both HTTP and HTTPS):
-# - `name`: A descriptive name for the virtual host (used for the config filename).
-# - `state`: State of the virtual host (present or absent). Default: present
-# - `server_name`: The primary server name (FQDN).
+# - `name`: A descriptive name for the virtual host config file like {{ name }}.conf or {{ name }}-ssl.conf.
+# - `server_name`: The primary server name (FQDN) (optional).
 # - `server_alias`: List of server aliases (optional).
 # - `server_admin`: Email address of the server administrator (optional).
 # - `document_root`: The document root directory for the virtual host.
-# - `directory_options`: Options for the DocumentRoot directory (optional).
-#                        Default: "Indexes FollowSymLinks"
-# - `directory_allow_override`: AllowOverride setting for the DocumentRoot (optional).
-#                               Default: "None"
-# - `directory_require`: Require setting for the DocumentRoot (optional).
-#                        Default: "all granted"
-# - `custom_directives`: Additional Apache directives for both HTTP and HTTPS (optional).
 #
 # HTTP Configuration:
 # - `http`: HTTP-specific configuration (optional)
 #   - `enabled`: Whether to enable the HTTP virtual host. Default: true
-#   - `listen`: The address:port or port to listen on. Default: "*:80"
+#   - `listen`: List of the address:port or port to listen on. Default: "*:80"
 #   - `error_log`: Path to the error log file. Default: ${APACHE_LOG_DIR}/<name>-error.log
 #   - `access_log`: Path to the access log file. Default: ${APACHE_LOG_DIR}/<name>-access.log combined
 #   - `custom_directives`: Additional Apache directives for HTTP only (optional).
+#  apache_virtual_hosts:
 #
 # HTTPS Configuration:
 # - `https`: HTTPS-specific configuration (optional)
-#   - `enabled`: Whether to enable the HTTPS virtual host. Default: true
-#   - `listen`: The address:port or port to listen on. Default: "*:443"
-#   - `certificate_file`: Path to the SSL certificate file (required for HTTPS)
-#   - `certificate_key_file`: Path to the SSL certificate key file (required for HTTPS)
-#   - `certificate_chain_file`: Path to the SSL certificate chain file (optional)
-#   - `error_log`: Path to the error log file. Default: ${APACHE_LOG_DIR}/<name>-ssl-error.log
-#   - `access_log`: Path to the access log file. Default: ${APACHE_LOG_DIR}/<name>-ssl-access.log combined
-#   - `custom_directives`: Additional Apache directives for HTTPS only (optional).
+#   - `enabled`: Whether to enable the HTTP virtual host. Default: true
+#   - `listen`: List of the address:port or port to listen on. Default: "*:80"
+#   - `error_log`: Path to the error log file. Default: ${APACHE_LOG_DIR}/<name>-error.log
+#   - `access_log`: Path to the access log file. Default: ${APACHE_LOG_DIR}/<name>-access.log combined
+#   - `certificate_file`: Path to the SSL certificate file (required for HTTPS).
+#   - `certificate_key_file`: Path to the SSL certificate key file (required for HTTPS).
+#   - `certificate_chain_file`: Path to the SSL certificate chain file (optional).
+#   - `custom_directives`: Additional Apache directives for HTTP only (optional).
 #
 # Example - Simple HTTP virtual host:
 # apache_virtual_hosts:
@@ -158,8 +196,8 @@ apache_custom_configs: []
 #     document_root: /var/www/example.com
 #     http:
 #       enabled: true
-#     custom_directives: |
-#       DirectoryIndex index.html index.php
+#       custom_directives: |
+#         DirectoryIndex index.html index.php
 #
 # Example - HTTP and HTTPS virtual host:
 # apache_virtual_hosts:
@@ -176,6 +214,17 @@ apache_custom_configs: []
 #       certificate_file: /etc/ssl/certs/example.com.crt
 #       certificate_key_file: /etc/ssl/private/example.com.key
 #       certificate_chain_file: /etc/ssl/certs/example.com-chain.crt
+#       custom_directives: |
+#         <Directory /var/www/secure.example.com>
+#             Options -Indexes +FollowSymLinks
+#             AllowOverride All
+#             Require all granted
+#         </Directory>
+#
+# Example - Disable a virtual host:
+# apache_virtual_hosts:
+#   - name: old-site.com
+#     enabled: false
 #
 # Type: List of Dictionaries
 apache_virtual_hosts: []
@@ -184,11 +233,15 @@ apache_virtual_hosts: []
 # Virtual Host Templates Configuration
 # ============================================================================
 
+# Directory where the virtual host templates are stored.
+# Type: String
+apache_vhost_templates_dir: /etc/apache2/templates
+
 # List of reusable virtual host templates.
 # Templates define a base configuration that can be reused by multiple virtual hosts
 # with variable substitution. Each template is defined as a dictionary with:
 #
-# - `name`: A unique identifier for the template
+# - `name`: A descriptive name for the virtual host config template file like {{ name }}.template.conf or {{ name }}-ssl.template.conf.
 # - `http`: HTTP virtual host template content (optional)
 #   - `content`: Jinja2 template content for HTTP configuration
 # - `https`: HTTPS virtual host template content (optional)
@@ -217,14 +270,14 @@ apache_vhost_templates: []
 # List of virtual hosts to create from templates.
 # Each entry references a template and provides values for template variables.
 #
-# - `name`: Name for the virtual host configuration file
+# - `name`: A descriptive name for the virtual host config file like {{ name }}.conf or {{ name }}-ssl.conf.
 # - `template`: Name of the template to use (must match a template from apache_vhost_templates)
 # - `state`: State of the virtual host (present or absent). Default: present
 # - `enabled`: Whether to enable the virtual host. Default: true
 # - `vars`: Dictionary of variables to substitute in the template
 #
 # Example:
-# apache_vhosts_from_templates:
+# apache_vhosts_from_template:
 #   - name: myblog.com
 #     template: wordpress_site
 #     enabled: true
@@ -233,71 +286,54 @@ apache_vhost_templates: []
 #       document_root: /var/www/myblog
 #
 # Type: List of Dictionaries
-apache_vhosts_from_templates: []
+apache_vhosts_from_template: []
 
-# ============================================================================
-# Status Page Configuration
-# ============================================================================
+# # ============================================================================
+# # Status Page Configuration
+# # ============================================================================
 
-# Enable or disable Apache status page.
-# When enabled, creates a /server-status endpoint for monitoring.
-# Type: Boolean
-apache_status_page_enabled: false
+# # Enable or disable Apache status page.
+# # When enabled, creates a /server-status endpoint for monitoring.
+# # Type: Boolean
+# apache_status_page_enabled: false
 
-# List of hosts allowed to access the Apache status page.
-# Each entry can be an IP address, hostname, or network range.
-# Type: List of Strings
-# Example:
+# # List of hosts allowed to access the Apache status page.
+# # Each entry can be an IP address, hostname, or network range.
+# # Type: List of Strings
+# # Example:
+# # apache_status_page_allowed_hosts:
+# #   - 127.0.0.1
+# #   - 10.0.0.0/24
+# #   - monitoring.example.com
 # apache_status_page_allowed_hosts:
 #   - 127.0.0.1
-#   - 10.0.0.0/24
-#   - monitoring.example.com
-apache_status_page_allowed_hosts:
-  - 127.0.0.1
 
-# ============================================================================
-# HTTP Authentication Configuration
-# ============================================================================
+# # ============================================================================
+# # HTTP Authentication Configuration
+# # ============================================================================
 
-# List of htpasswd files to create and manage.
-# Each entry defines a password file with one or more users.
-# Type: List of Dictionaries
-#
-# - `path`: Absolute path to the htpasswd file
-# - `users`: List of users to add/update in the file
-#   - `name`: Username
-#   - `password`: Password in plaintext (will be hashed)
-#   - `state`: present or absent (default: present)
-#
-# Example:
-# apache_htpasswd_files:
-#   - path: /etc/apache2/.htpasswd
-#     users:
-#       - name: admin
-#         password: secure_password
-#       - name: user1
-#         password: another_password
-#   - path: /etc/apache2/.htpasswd-api
-#     users:
-#       - name: api_user
-#         password: api_secret
-#
-# Type: List of Dictionaries
-apache_htpasswd_files: []
-
-# ============================================================================
-# Security Configuration
-# ============================================================================
-
-# Apache security settings to configure in security.conf.
-# Each setting is defined as a dictionary with the following keys:
-# - `name`: The Apache directive name (e.g., ServerTokens, ServerSignature).
-# - `value`: The value to assign to the directive.
-# Type: List of Dictionaries
-apache_security_settings:
-  - name: ServerTokens
-    value: Prod
-  - name: ServerSignature
-    value: "Off"
-  - name: TraceEnable
-    value: "Off"
+# # List of htpasswd files to create and manage.
+# # Each entry defines a password file with one or more users.
+# # Type: List of Dictionaries
+# #
+# # - `path`: Absolute path to the htpasswd file
+# # - `users`: List of users to add/update in the file
+# #   - `name`: Username
+# #   - `password`: Password in plaintext (will be hashed)
+# #   - `state`: present or absent (default: present)
+# #
+# # Example:
+# # apache_htpasswd_files:
+# #   - path: /etc/apache2/.htpasswd
+# #     users:
+# #       - name: admin
+# #         password: secure_password
+# #       - name: user1
+# #         password: another_password
+# #   - path: /etc/apache2/.htpasswd-api
+# #     users:
+# #       - name: api_user
+# #         password: api_secret
+# #
+# # Type: List of Dictionaries
+# apache_htpasswd_files: []

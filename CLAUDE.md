@@ -275,6 +275,7 @@ The project is structured as an Ansible collection, which is the standard way to
     -   Ensure tasks are idempotent.
     -   Use appropriate variables, templates, handlers, files, etc.
     -   Implement documentation and comments.
+    -   For Jinja2 templates (.j2 files), always use `## {mark} ANSIBLE MANAGED FILE ##` header instead of `# {{ ansible_managed }}` to clearly mark files as managed by Ansible.
     -   Update the role's `meta/main.yml` and `README.md`.
 6.  Create Tests (Mandatory):
     -   Create a scenario for each role (molecule scenario should match the role name).

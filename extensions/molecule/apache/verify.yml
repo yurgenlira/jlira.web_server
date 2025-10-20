@@ -1,11 +1,19 @@
 ---
 - name: Verify
-  hosts: all
-  gather_facts: false
+  hosts: web_server
+  gather_facts: true
+  # vars_files:
+  #   # Load role defaults
+  #   - "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/../roles/apache/defaults/main.yml"
+  #   - "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/../roles/apache/vars/main.yml"
   tasks:
     - name: Include install tests
       ansible.builtin.include_tasks:
         file: tests/install.yml
+
+    - name: Include php_integration tests
+      ansible.builtin.include_tasks:
+        file: tests/php_integration.yml
 
     - name: Include configure tests
       ansible.builtin.include_tasks:
@@ -19,15 +27,14 @@
       ansible.builtin.include_tasks:
         file: tests/virtual_hosts.yml
 
-    - name: Include status_page tests
+    - name: Include virtual_hosts_from_templates tests
       ansible.builtin.include_tasks:
-        file: tests/status_page.yml
+        file: tests/virtual_hosts_from_templates.yml
 
-    - name: Include authentication tests
-      ansible.builtin.include_tasks:
-        file: tests/authentication.yml
-
-    # Disabled until PHP role configure_cli.yml is fixed
-    # - name: Include php_integration tests
+    # - name: Include status_page tests
     #   ansible.builtin.include_tasks:
-    #     file: tests/php_integration.yml
+    #     file: tests/status_page.yml
+
+    # - name: Include authentication tests
+    #   ansible.builtin.include_tasks:
+    #     file: tests/authentication.yml

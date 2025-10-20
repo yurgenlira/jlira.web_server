@@ -1,5 +1,6 @@
+## {mark} ANSIBLE MANAGED FILE ##
 # SPDX-License-Identifier: MIT-0
-# {{ ansible_managed }}
+#
 # PHP {{ item.version }} FPM Status Page Configuration
 
 # Status page endpoint

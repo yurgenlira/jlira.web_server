@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: MIT-0
+---
+# I don't use community.general.apache2_module because it fail when i have sintax errors and module is already enabled
+- name: Enable Apache proxy_fcgi module for PHP-FPM
+  ansible.builtin.command:
+    cmd: a2enmod proxy_fcgi
+  register: apache_enable_proxy_fcgi_result
+  changed_when: "'Enabling module' in apache_enable_proxy_fcgi_result.stdout"
+  failed_when: false
+  notify: Restart apache
+
+- name: Create Apache PHP-FPM configuration file
+  ansible.builtin.template:
+    src: php-fpm.conf.j2
+    dest: "/etc/apache2/conf-available/php{{ apache_php_fpm_version }}-fpm.conf"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify: Reload apache
+
+- name: Check if PHP-FPM configuration is already enabled
+  ansible.builtin.stat:
+    path: "/etc/apache2/conf-enabled/php{{ apache_php_fpm_version }}-fpm.conf"
+  register: apache_php_fpm_conf_enabled
+
+- name: Enable PHP-FPM configuration in Apache using a2enconf
+  ansible.builtin.command:
+    cmd: "a2enconf php{{ apache_php_fpm_version }}-fpm"
+    creates: "/etc/apache2/conf-enabled/php{{ apache_php_fpm_version }}-fpm.conf"
+  when:
+    - apache_php_fpm_set_default
+    - not apache_php_fpm_conf_enabled.stat.exists
+  notify: Reload apache

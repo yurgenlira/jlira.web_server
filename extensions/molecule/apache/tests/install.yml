@@ -2,6 +2,7 @@
 - name: Check if apache2 package is installed
   ansible.builtin.package_facts:
     manager: auto
+  no_log: true
 
 - name: Assert apache2 package is installed
   ansible.builtin.assert:
@@ -9,8 +10,25 @@
       - "'apache2' in ansible_facts.packages"
     fail_msg: "Apache2 package is not installed."
 
+- name: Check Apache configuration syntax
+  ansible.builtin.command:
+    cmd: apachectl configtest
+  register: apache_configtest
+  changed_when: false
+  failed_when: false
+
+- name: Assert Apache configuration is valid
+  ansible.builtin.assert:
+    that:
+      - "'Syntax OK' in apache_configtest.stderr or 'Syntax OK' in apache_configtest.stdout"
+    fail_msg:  |
+      Apache configuration syntax test failed.
+      {{ apache_configtest.stderr }}
+      Lines: {{ apache_configtest.stderr_lines }}
+
 - name: Check if apache2 service is running and enabled
   ansible.builtin.service_facts:
+  no_log: true
 
 - name: Assert apache2 service is running
   ansible.builtin.assert:

@@ -25,5 +25,3 @@ galaxy_info:
   galaxy_tags: [web, webserver, apache]
 
 dependencies:
-  - role: jlira.web_server.php
-    when: apache_install_php | default(false)
