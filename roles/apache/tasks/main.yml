@@ -116,14 +116,14 @@
 #     - php_fpm_status_proxy
 #     - apache_php_fpm_status_proxy
 
-# - name: Include jlira.web_server.apache.authentication.yml
-#   ansible.builtin.include_tasks:
-#     file: authentication.yml
-#     apply:
-#       tags:
-#         - authentication
-#         - apache_authentication
-#   when: apache_htpasswd_files | length > 0
-#   tags:
-#     - authentication
-#     - apache_authentication
+- name: Include jlira.web_server.apache.authentication.yml
+  ansible.builtin.include_tasks:
+    file: authentication.yml
+    apply:
+      tags:
+        - authentication
+        - apache_authentication
+  when: apache_htpasswd_files | length > 0
+  tags:
+    - authentication
+    - apache_authentication

@@ -94,44 +94,63 @@
     path: /etc/apache2/sites-available/landing1.example.local.conf
   register: apache_landing1_http_config_content
 
-- name: Verify landing1 HTTP config has correct server name
-  ansible.builtin.assert:
-    that:
-      - "'ServerName landing1.mydomain.local' in (apache_landing1_http_config_content.content | b64decode)"
-    fail_msg: "landing1 HTTP config does not contain correct ServerName"
-
-- name: Verify landing1 HTTP config has correct document root
-  ansible.builtin.assert:
-    that:
-      - "'DocumentRoot /var/www/landing1' in (apache_landing1_http_config_content.content | b64decode)"
-    fail_msg: "landing1 HTTP config does not contain correct DocumentRoot"
-
-- name: Verify landing1 HTTP config uses custom log directory
+- name: Verify landing1 HTTP config includes template
   ansible.builtin.assert:
     that:
       - >-
-        'ErrorLog /var/log/apache2/custom/landing1.mydomain.local.error_log'
+        'Include /etc/apache2/templates/landing_site.template.conf'
         in (apache_landing1_http_config_content.content | b64decode)
+    fail_msg: "landing1 HTTP config does not include the template"
+
+- name: Read landing1 HTTP template content
+  ansible.builtin.slurp:
+    path: /etc/apache2/templates/landing_site.template.conf
+  register: apache_landing1_http_template_content
+
+- name: Verify landing1 HTTP template has server name with variables
+  ansible.builtin.assert:
+    that:
       - >-
-        'CustomLog /var/log/apache2/custom/landing1.mydomain.local.access_log common'
-        in (apache_landing1_http_config_content.content | b64decode)
-    fail_msg: "landing1 HTTP config does not use custom log directory"
+        'ServerName ${SUBDOMAIN}.${DOMAIN}'
+        in (apache_landing1_http_template_content.content | b64decode)
+    fail_msg: "landing1 HTTP template does not contain ServerName with variables"
 
-- name: Verify landing1 HTTP config includes custom headers
+- name: Verify landing1 HTTP template has document root with variables
   ansible.builtin.assert:
     that:
-      - "'Include /data/apache-conf/custom-headers.conf' in (apache_landing1_http_config_content.content | b64decode)"
-    fail_msg: "landing1 HTTP config does not include custom headers"
+      - >-
+        'DocumentRoot /var/www/${SUBDOMAIN}'
+        in (apache_landing1_http_template_content.content | b64decode)
+    fail_msg: "landing1 HTTP template does not contain DocumentRoot with variables"
 
-- name: Verify landing1 HTTP config has HTTPS redirect
+- name: Verify landing1 HTTP template uses custom log directory with variables
   ansible.builtin.assert:
     that:
-      - "'RewriteEngine on' in (apache_landing1_http_config_content.content | b64decode)"
-      - "'RewriteCond %{HTTPS} off' in (apache_landing1_http_config_content.content | b64decode)"
+      - >-
+        'ErrorLog ${CUSTOM_LOG_DIR}/${SUBDOMAIN}.${DOMAIN}.error_log'
+        in (apache_landing1_http_template_content.content | b64decode)
+      - >-
+        'CustomLog ${CUSTOM_LOG_DIR}/${SUBDOMAIN}.${DOMAIN}.access_log common'
+        in (apache_landing1_http_template_content.content | b64decode)
+    fail_msg: "landing1 HTTP template does not use custom log directory with variables"
+
+- name: Verify landing1 HTTP template includes custom headers
+  ansible.builtin.assert:
+    that:
+      - >-
+        'Include /data/apache-conf/custom-headers.conf'
+        in (apache_landing1_http_template_content.content | b64decode)
+    fail_msg: "landing1 HTTP template does not include custom headers"
+
+- name: Verify landing1 HTTP template has HTTPS redirect
+  ansible.builtin.assert:
+    that:
+      - "'RewriteEngine on' in (apache_landing1_http_template_content.content | b64decode)"
+      - "'RewriteCond %{HTTPS} off' in (apache_landing1_http_template_content.content | b64decode)"
       - >-
         'RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]'
-        in (apache_landing1_http_config_content.content | b64decode)
-    fail_msg: "landing1 HTTP config does not have HTTPS redirect"
+        in (apache_landing1_http_template_content.content | b64decode)
+    fail_msg: "landing1 HTTP template does not have HTTPS redirect"
 
 - name: Check if landing1 HTTPS config exists
   ansible.builtin.stat:
@@ -150,16 +169,29 @@
     path: /etc/apache2/sites-available/landing1.example.local-ssl.conf
   register: apache_landing1_https_config_content
 
-- name: Verify landing1 HTTPS config has SSL certificates
+- name: Verify landing1 HTTPS config includes template
   ansible.builtin.assert:
     that:
       - >-
-        'SSLCertificateFile /letsencrypt/live/landing1.mydomain.local/fullchain.pem'
+        'Include /etc/apache2/templates/landing_site-ssl.template.conf'
         in (apache_landing1_https_config_content.content | b64decode)
+    fail_msg: "landing1 HTTPS config does not include the SSL template"
+
+- name: Read landing1 HTTPS template content
+  ansible.builtin.slurp:
+    path: /etc/apache2/templates/landing_site-ssl.template.conf
+  register: apache_landing1_https_template_content
+
+- name: Verify landing1 HTTPS template has SSL certificates with variables
+  ansible.builtin.assert:
+    that:
       - >-
-        'SSLCertificateKeyFile /letsencrypt/live/landing1.mydomain.local/privkey.pem'
-        in (apache_landing1_https_config_content.content | b64decode)
-    fail_msg: "landing1 HTTPS config does not have SSL certificate configuration"
+        'SSLCertificateFile /letsencrypt/live/${SUBDOMAIN}.${DOMAIN}/fullchain.pem'
+        in (apache_landing1_https_template_content.content | b64decode)
+      - >-
+        'SSLCertificateKeyFile /letsencrypt/live/${SUBDOMAIN}.${DOMAIN}/privkey.pem'
+        in (apache_landing1_https_template_content.content | b64decode)
+    fail_msg: "landing1 HTTPS template does not have SSL certificate configuration with variables"
 
 - name: Check if landing1 HTTP is enabled
   ansible.builtin.stat:

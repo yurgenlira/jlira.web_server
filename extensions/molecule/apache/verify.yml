@@ -35,6 +35,6 @@
     #   ansible.builtin.include_tasks:
     #     file: tests/status_page.yml
 
-    # - name: Include authentication tests
-    #   ansible.builtin.include_tasks:
-    #     file: tests/authentication.yml
+    - name: Include authentication tests
+      ansible.builtin.include_tasks:
+        file: tests/authentication.yml

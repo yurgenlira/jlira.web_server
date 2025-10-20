@@ -302,3 +302,5 @@
 solo testear variables que se van a usar al iniciar php role
 vcerificar que role php no instale apache
 allow override APACHE_LOG_DIR=/var/log/apache2$SUFFIX (if se sobrteescribe crear folder)
+integracion con letsencrypt
+validar entradas en apache role
