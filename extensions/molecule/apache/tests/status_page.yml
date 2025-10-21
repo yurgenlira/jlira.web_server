@@ -1,4 +1,8 @@
 ---
+# ============================================================================
+# Status Module Tests
+# ============================================================================
+
 - name: Check if status module is enabled
   ansible.builtin.stat:
     path: /etc/apache2/mods-enabled/status.load
@@ -10,6 +14,10 @@
       - apache_status_module_check.stat.exists
       - apache_status_module_check.stat.islnk
     fail_msg: "Status module is not enabled"
+
+# ============================================================================
+# Status Configuration File Tests
+# ============================================================================
 
 - name: Check if status configuration file exists
   ansible.builtin.stat:
@@ -24,6 +32,10 @@
       - apache_status_config_check.stat.pw_name == "root"
       - apache_status_config_check.stat.gr_name == "root"
     fail_msg: "Status configuration file does not exist or has incorrect permissions"
+
+# ============================================================================
+# Status Configuration Content Tests
+# ============================================================================
 
 - name: Read status configuration file content
   ansible.builtin.slurp:
@@ -42,6 +54,10 @@
     that:
       - "'Require ip 127.0.0.1' in (apache_status_config_content.content | b64decode)"
     fail_msg: "Status configuration does not contain access control settings"
+
+# ============================================================================
+# Status Configuration Enablement Tests
+# ============================================================================
 
 - name: Check if status configuration is enabled
   ansible.builtin.stat:

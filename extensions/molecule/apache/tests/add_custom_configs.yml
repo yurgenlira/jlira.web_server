@@ -1,4 +1,8 @@
 ---
+# ============================================================================
+# Custom Configuration Directory Tests
+# ============================================================================
+
 - name: Check if custom config directory exists
   ansible.builtin.stat:
     path: /data/apache-conf
@@ -14,6 +18,10 @@
       - apache_custom_config_dir_check.stat.gr_name == "root"
     fail_msg: "Custom config directory does not exist or has incorrect permissions"
 
+# ============================================================================
+# Custom Configuration File Tests
+# ============================================================================
+
 - name: Check if custom config file exists
   ansible.builtin.stat:
     path: /data/apache-conf/custom-headers.conf
@@ -27,6 +35,10 @@
       - apache_custom_config_file_check.stat.pw_name == "root"
       - apache_custom_config_file_check.stat.gr_name == "root"
     fail_msg: "Custom config file does not exist or has incorrect permissions"
+
+# ============================================================================
+# Custom Configuration Content Tests
+# ============================================================================
 
 - name: Read custom config file content
   ansible.builtin.slurp:

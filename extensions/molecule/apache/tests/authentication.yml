@@ -1,4 +1,8 @@
 ---
+# ============================================================================
+# htpasswd File Existence and Permission Tests
+# ============================================================================
+
 - name: Check if htpasswd file exists
   ansible.builtin.stat:
     path: /etc/apache2/.htpasswd
@@ -12,6 +16,10 @@
       - apache_htpasswd_file_check.stat.pw_name == "root"
       - apache_htpasswd_file_check.stat.gr_name == "www-data"
     fail_msg: "htpasswd file does not exist or has incorrect permissions"
+
+# ============================================================================
+# htpasswd User Content Tests
+# ============================================================================
 
 - name: Read htpasswd file content
   ansible.builtin.slurp:
