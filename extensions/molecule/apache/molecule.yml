@@ -23,6 +23,10 @@ platforms:
     cgroupns_mode: host               # Necessary for cgroups v2 (modern Docker/OS)
     volumes:                          # Mount cgroups filesystem to satisfy systemd
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    #   - ~/Downloads/epic:/var/www/landing1
+    # published_ports:
+    #   - "80:80"
+    #   - "443:443"
 
 ansible:
   cfg:

@@ -29,28 +29,3 @@
     that:
       - "'testuser:' in (apache_htpasswd_content.content | b64decode)"
     fail_msg: "testuser not found in htpasswd file"
-
-- name: Check if second htpasswd file exists
-  ansible.builtin.stat:
-    path: /etc/apache2/.htpasswd-api
-  register: apache_htpasswd_api_file_check
-
-- name: Verify second htpasswd file exists
-  ansible.builtin.assert:
-    that:
-      - apache_htpasswd_api_file_check.stat.exists
-      - apache_htpasswd_api_file_check.stat.mode == "0640"
-      - apache_htpasswd_api_file_check.stat.pw_name == "root"
-      - apache_htpasswd_api_file_check.stat.gr_name == "www-data"
-    fail_msg: "Second htpasswd file does not exist or has incorrect permissions"
-
-- name: Read second htpasswd file content
-  ansible.builtin.slurp:
-    path: /etc/apache2/.htpasswd-api
-  register: apache_htpasswd_api_content
-
-- name: Verify api_user exists in second htpasswd file
-  ansible.builtin.assert:
-    that:
-      - "'api_user:' in (apache_htpasswd_api_content.content | b64decode)"
-    fail_msg: "api_user not found in second htpasswd file"

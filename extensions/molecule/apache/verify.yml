@@ -31,9 +31,9 @@
       ansible.builtin.include_tasks:
         file: tests/virtual_hosts_from_templates.yml
 
-    # - name: Include status_page tests
-    #   ansible.builtin.include_tasks:
-    #     file: tests/status_page.yml
+    - name: Include status_page tests
+      ansible.builtin.include_tasks:
+        file: tests/status_page.yml
 
     - name: Include authentication tests
       ansible.builtin.include_tasks:

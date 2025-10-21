@@ -12,8 +12,6 @@
   ansible.builtin.template:
     src: status.conf.j2
     dest: /etc/apache2/conf-available/status.conf
-    owner: root
-    group: root
     mode: "0644"
   when: apache_status_page_enabled
   notify: Reload apache

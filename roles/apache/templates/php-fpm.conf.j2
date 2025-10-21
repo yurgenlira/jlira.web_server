@@ -38,4 +38,32 @@
       Require all denied
     </FilesMatch>
   </IfModule>
+
+{# {% if apache_status_page_enabled %}
+    # Enable 'status' and 'ping' page
+{% if apache_php_fpm_set_default %%}
+    <FilesMatch "^ping{{ apache_php_fpm_version | replace('.', '') }}|status{{ apache_php_fpm_version | replace('.', '') }}$">
+{% else %}
+    <FilesMatch "^ping|status$">
+{% endif %}
+{% for host in apache_status_page_allowed_hosts %}
+        Require ip {{ host }}
+{% endfor %}
+        SetHandler "proxy:unix:/run/php/php{{ apache_php_fpm_version }}-fpm.sock|fcgi://localhost"
+    </FilesMatch>
+
+    # Enable *real-time* 'status' page
+    <IfModule alias_module>
+        Alias /realtime-status "/usr/share/php/{{ apache_php_fpm_version }}/fpm/status.html"
+        <Directory /usr/share/php/{{ apache_php_fpm_version }}/fpm/status.html>
+{% for host in apache_status_page_allowed_hosts %}
+            Require ip {{ host }}
+{% endfor %}
+        </Directory>
+    </IfModule>
+{% endif %} #}
 </IfModule>
+
+
+
+
