@@ -2,10 +2,6 @@
 - name: Verify
   hosts: web_server
   gather_facts: true
-  # vars_files:
-  #   # Load role defaults
-  #   - "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/../roles/apache/defaults/main.yml"
-  #   - "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/../roles/apache/vars/main.yml"
   tasks:
     - name: Include install tests
       ansible.builtin.include_tasks:

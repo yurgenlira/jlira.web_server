@@ -5,7 +5,7 @@
     cmd: a2enmod status
   register: apache_enable_status_module_result
   changed_when: "'Enabling module' in apache_enable_status_module_result.stdout"
-  when: apache_status_page_enabled
+  when: apache_status_page.enabled
   notify: Reload apache
 
 - name: Create status page configuration
@@ -13,7 +13,7 @@
     src: status.conf.j2
     dest: /etc/apache2/conf-available/status.conf
     mode: "0644"
-  when: apache_status_page_enabled
+  when: apache_status_page.enabled
   notify: Reload apache
 
 - name: Enable status page configuration
@@ -21,7 +21,7 @@
     cmd: a2enconf status
   register: apache_enable_status_conf_result
   changed_when: "'Enabling conf' in apache_enable_status_conf_result.stdout"
-  when: apache_status_page_enabled
+  when: apache_status_page.enabled
   notify: Reload apache
 
 - name: Disable status page configuration
@@ -31,12 +31,12 @@
   changed_when:
     - "'Conf' in apache_disable_status_conf_result.stdout"
     - "'disabled' in apache_disable_status_conf_result.stdout"
-  when: not apache_status_page_enabled
+  when: not apache_status_page.enabled
   notify: Reload apache
 
 - name: Remove status page configuration
   ansible.builtin.file:
     path: /etc/apache2/conf-available/status.conf
     state: absent
-  when: not apache_status_page_enabled
+  when: not apache_status_page.enabled
   notify: Reload apache

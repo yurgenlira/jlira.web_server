@@ -305,3 +305,4 @@ allow override APACHE_LOG_DIR=/var/log/apache2$SUFFIX (if se sobrteescribe crear
 integracion con letsencrypt
 validar entradas en apache role
 crear/actualizar readme
+linter a todo
