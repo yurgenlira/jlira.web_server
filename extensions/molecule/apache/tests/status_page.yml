@@ -33,7 +33,7 @@
 - name: Verify status configuration has correct location
   ansible.builtin.assert:
     that:
-      - "'<Location /server-status>' in (apache_status_config_content.content | b64decode)"
+      - "'<Location ' + apache_status_page.endpoint + '>' in (apache_status_config_content.content | b64decode)"
       - "'SetHandler server-status' in (apache_status_config_content.content | b64decode)"
     fail_msg: "Status configuration does not contain correct location settings"
 

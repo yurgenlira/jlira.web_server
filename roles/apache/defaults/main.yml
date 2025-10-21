@@ -45,6 +45,50 @@ apache_php_fpm_set_default: true
 apache_php_fpm_proxy_timeout: 300
 
 # ============================================================================
+# PHP-FPM Status Page Configuration
+# ============================================================================
+
+# Configuration for the PHP-FPM status page accessible through Apache.
+# When enabled, creates status, ping, and real-time status endpoints for monitoring PHP-FPM.
+# These endpoints provide information about FPM pool activity and performance.
+#
+# This configuration is passed to the PHP role to configure the FPM pool status endpoints,
+# and also used by Apache to create proxy endpoints for accessing the FPM status pages.
+#
+# - `enabled`: Enable or disable the PHP-FPM status page endpoints
+# - `status_path`: URI path for the FPM status page endpoint in the pool configuration
+#                  (default: /status). This is also used by Apache as the proxy endpoint.
+# - `ping_path`: URI path for the FPM ping endpoint in the pool configuration
+#                (default: /ping). This is also used by Apache as the proxy endpoint.
+# - `ping_response`: Response text for ping requests in the pool configuration (default: pong)
+# - `realtime_endpoint`: URI path for the real-time status page served by Apache
+#                        (default: /realtime-status)
+# - `allowed_hosts`: List of IP addresses, hostnames, or network ranges allowed to access
+#                    the endpoints through Apache
+#
+# Type: Dictionary
+#
+# Example:
+# apache_php_status_page:
+#   enabled: true
+#   status_path: /fpm-status
+#   ping_path: /fpm-ping
+#   ping_response: healthy
+#   realtime_endpoint: /fpm-realtime
+#   allowed_hosts:
+#     - 127.0.0.1
+#     - 10.0.0.0/24
+#     - monitoring.example.com
+apache_php_status_page:
+  enabled: false
+  status_path: /status
+  ping_path: /ping
+  ping_response: pong
+  realtime_endpoint: /realtime-status
+  allowed_hosts:
+    - 127.0.0.1
+
+# ============================================================================
 # Apache Main Settings
 # ============================================================================
 
@@ -241,7 +285,8 @@ apache_vhost_templates_dir: /etc/apache2/templates
 # Templates define a base configuration that can be reused by multiple virtual hosts
 # with variable substitution. Each template is defined as a dictionary with:
 #
-# - `name`: A descriptive name for the virtual host config template file like {{ name }}.template.conf or {{ name }}-ssl.template.conf.
+# - `name`: A descriptive name for the virtual host config template file like
+#           {{ name }}.template.conf or {{ name }}-ssl.template.conf.
 # - `http`: HTTP virtual host template content (optional)
 #   - `content`: Jinja2 template content for HTTP configuration
 # - `https`: HTTPS virtual host template content (optional)
@@ -292,21 +337,29 @@ apache_vhosts_from_template: []
 # Status Page Configuration
 # ============================================================================
 
-# Enable or disable Apache status page.
-# When enabled, creates a /server-status endpoint for monitoring.
-# Type: Boolean
-apache_status_page_enabled: false
-
-# List of hosts allowed to access the Apache status page.
-# Each entry can be an IP address, hostname, or network range.
-# Type: List of Strings
+# Configuration for the Apache status page.
+# When enabled, creates a status endpoint for monitoring Apache server metrics.
+# The status page provides real-time information about server activity and performance.
+#
+# - `enabled`: Enable or disable the Apache status page
+# - `endpoint`: URI path for the Apache status page (default: /status)
+# - `allowed_hosts`: List of IP addresses, hostnames, or network ranges allowed to access the endpoint
+#
+# Type: Dictionary
+#
 # Example:
-# apache_status_page_allowed_hosts:
-#   - 127.0.0.1
-#   - 10.0.0.0/24
-#   - monitoring.example.com
-apache_status_page_allowed_hosts:
-  - 127.0.0.1
+# apache_status_page:
+#   enabled: true
+#   endpoint: /apache-performance
+#   allowed_hosts:
+#     - 127.0.0.1
+#     - 10.0.0.0/24
+#     - monitoring.example.com
+apache_status_page:
+  enabled: false
+  endpoint: /server-status
+  allowed_hosts:
+    - 127.0.0.1
 
 # ============================================================================
 # HTTP Authentication Configuration

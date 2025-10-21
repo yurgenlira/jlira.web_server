@@ -223,14 +223,33 @@ php_pool_settings:
   pm_start_servers: 2       # Number of child processes created on startup (dynamic only)
   pm_min_spare_servers: 1   # Minimum number of spare idle processes (dynamic only)
   pm_max_spare_servers: 3   # Maximum number of spare idle processes (dynamic only)
-  status_path: /status      # URI path for the FPM status page (optional)
-  ping_path: /ping          # URI path for the FPM ping endpoint (optional)
-  ping_response: pong       # Response text for ping requests (optional)
 
-# Determines whether to enable the PHP-FPM status page.
-# If true, the status page will be configured and accessible via the web server.
-# Type: Boolean
-php_status_page_enabled: false
+# ============================================================================
+# PHP-FPM Status Page Configuration
+# ============================================================================
+
+# Configuration for the PHP-FPM status page.
+# When enabled, creates status and ping endpoints for monitoring PHP-FPM pool.
+# The status page provides real-time information about FPM pool activity and performance.
+#
+# - `enabled`: Enable or disable the PHP-FPM status page
+# - `status_path`: URI path for the FPM status page (default: /status)
+# - `ping_path`: URI path for the FPM ping endpoint (default: /ping)
+# - `ping_response`: Response text for ping requests (default: pong)
+#
+# Type: Dictionary
+#
+# Example:
+# php_status_page:
+#   enabled: true
+#   status_path: /fpm-status
+#   ping_path: /fpm-ping
+#   ping_response: healthy
+php_status_page:
+  enabled: false
+  status_path: /status
+  ping_path: /ping
+  ping_response: pong
 
 # ============================================================================
 # Logrotate Configuration

@@ -616,6 +616,7 @@
       - "CLI Logrotate Enabled: {{ php_cli_logrotate_enabled }}"
       - "FPM Logrotate Enabled: {{ php_fpm_logrotate_enabled }}"
       - "MSSQL Extension Enabled: {{ php_mssql_extension_enabled }}"
+      - "PHP Status Page Enabled: {{ php_status_page.enabled }}"
       - "==================================================================="
       - "All variable validations passed successfully!"
       - "==================================================================="

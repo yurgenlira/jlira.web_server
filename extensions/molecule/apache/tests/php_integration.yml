@@ -1,5 +1,9 @@
 # SPDX-License-Identifier: MIT-0
 ---
+# ============================================================================
+# Module and Configuration Tests
+# ============================================================================
+
 - name: Verify proxy_fcgi module is enabled
   ansible.builtin.command: apache2ctl -M
   register: apache_modules
@@ -10,15 +14,27 @@
   ansible.builtin.stat:
     path: "/etc/apache2/conf-available/php{{ apache_php_fpm_version }}-fpm.conf"
   register: php_conf_available
-  failed_when: not php_conf_available.stat.exists
+
+- name: Assert PHP-FPM configuration exists with correct permissions
+  ansible.builtin.assert:
+    that:
+      - php_conf_available.stat.exists
+      - php_conf_available.stat.mode == "0644"
+      - php_conf_available.stat.pw_name == "root"
+      - php_conf_available.stat.gr_name == "root"
+    fail_msg: "PHP-FPM configuration file missing or incorrect permissions"
 
 - name: Verify PHP-FPM configuration is enabled when set_default is true
   ansible.builtin.stat:
     path: "/etc/apache2/conf-enabled/php{{ apache_php_fpm_version }}-fpm.conf"
   register: php_conf_enabled
-  failed_when:
-    - not php_conf_enabled.stat.exists
-    - not php_conf_enabled.stat.islnk
+
+- name: Assert PHP-FPM configuration is properly enabled
+  ansible.builtin.assert:
+    that:
+      - php_conf_enabled.stat.exists
+      - php_conf_enabled.stat.islnk
+    fail_msg: "PHP-FPM configuration not enabled when set_default is true"
   when: apache_php_fpm_set_default
 
 - name: Verify PHP-FPM configuration contains ProxyTimeout
@@ -39,6 +55,10 @@
   register: file_check
   failed_when: file_check.rc != 0
 
+# ============================================================================
+# PHP-FPM Service Tests
+# ============================================================================
+
 - name: Verify PHP-FPM service is running
   ansible.builtin.service_facts:
 
@@ -50,12 +70,17 @@
     fail_msg: "PHP-FPM service is not running or not enabled"
   when: apache_php_fpm_integration
 
+# ============================================================================
+# Functional PHP Processing Tests
+# ============================================================================
+
 - name: Create test PHP file
   ansible.builtin.copy:
-    dest: /var/www/html/test.php
+    dest: /var/www/html/test-php-fpm.php
     content: |
       <?php
       echo "PHP Version: " . phpversion();
+      echo "\nSAPI: " . php_sapi_name();
       ?>
     mode: '0644'
     owner: www-data
@@ -63,14 +88,71 @@
 
 - name: Test PHP processing through Apache
   ansible.builtin.uri:
-    url: "http://localhost/test.php"
+    url: "http://localhost/test-php-fpm.php"
     return_content: true
   register: php_test
-  failed_when: >-
-    'PHP Version' not in php_test.content or
-    apache_php_fpm_version not in php_test.content
+
+- name: Verify PHP version and FPM
+  ansible.builtin.assert:
+    that:
+      - "'PHP Version' in php_test.content"
+      - "apache_php_fpm_version in php_test.content"
+      - "'fpm-fcgi' in php_test.content or 'FPM' in php_test.content"
+    fail_msg: "PHP not processing correctly through FPM"
 
 - name: Remove test PHP file
   ansible.builtin.file:
-    path: /var/www/html/test.php
+    path: /var/www/html/test-php-fpm.php
     state: absent
+
+# ============================================================================
+# PHP-FPM Status Page Tests
+# ============================================================================
+
+- name: Read PHP-FPM configuration to check status page settings
+  ansible.builtin.slurp:
+    path: "/etc/apache2/conf-available/php{{ apache_php_fpm_version }}-fpm.conf"
+  register: php_fpm_conf_content
+  when: apache_php_status_page.enabled | default(false)
+
+- name: Verify PHP-FPM status page configuration in Apache
+  ansible.builtin.assert:
+    that:
+      - "'FilesMatch' in (php_fpm_conf_content.content | b64decode)"
+      - "apache_php_status_page.status_path | default('/status') | basename in (php_fpm_conf_content.content | b64decode)"
+    fail_msg: "PHP-FPM status page not configured in Apache"
+  when: apache_php_status_page.enabled | default(false)
+
+- name: Test PHP-FPM status endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1{{ apache_php_status_page.status_path | default('/status-php') }}"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: php_status_response
+  when: apache_php_status_page.enabled | default(false)
+
+- name: Verify PHP-FPM status page responds
+  ansible.builtin.assert:
+    that:
+      - php_status_response.status == 200
+      - "'pool' in php_status_response.content or 'accepted conn' in php_status_response.content"
+    fail_msg: "PHP-FPM status endpoint not responding correctly"
+  when: apache_php_status_page.enabled | default(false)
+
+- name: Test PHP-FPM ping endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1{{ apache_php_status_page.ping_path | default('/ping') }}"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: php_ping_response
+  when: apache_php_status_page.enabled | default(false)
+
+- name: Verify PHP-FPM ping responds
+  ansible.builtin.assert:
+    that:
+      - php_ping_response.status == 200
+      - "'pong' in php_ping_response.content"
+    fail_msg: "PHP-FPM ping endpoint not responding correctly"
+  when: apache_php_status_page.enabled | default(false)

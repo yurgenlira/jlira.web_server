@@ -14,13 +14,22 @@
 - name: Include php role
   ansible.builtin.include_role:
     name: php
+    apply:
+      tags:
+        - php_integration
+        - apache_php_integration
+        - apache_php_status_page
+        - php_status_page
   when: apache_php_fpm_integration
   vars:
     php_version: "{{ apache_php_fpm_version }}"
     php_fpm_enabled: true
+    php_status_page: "{{ apache_php_status_page }}"
   tags:
     - php_integration
     - apache_php_integration
+    - apache_php_status_page
+    - php_status_page
     - php_uninstall
     - php_install
     - php_configure_cli
@@ -37,10 +46,14 @@
       tags:
         - php_integration
         - apache_php_integration
+        - apache_php_status_page
+        - php_status_page
   when: apache_php_fpm_integration
   tags:
     - php_integration
     - apache_php_integration
+    - apache_php_status_page
+    - php_status_page
 
 - name: Include jlira.web_server.apache.configure.yml
   ansible.builtin.include_tasks:

@@ -39,14 +39,14 @@
     </FilesMatch>
   </IfModule>
 
-{# {% if apache_status_page.enabled %}
+{% if apache_php_status_page.enabled %}
     # Enable 'status' and 'ping' page
-{% if apache_php_fpm_set_default %%}
-    <FilesMatch "^ping{{ apache_php_fpm_version | replace('.', '') }}|status{{ apache_php_fpm_version | replace('.', '') }}$">
+{% if apache_php_fpm_set_default %}
+    <FilesMatch "^{{ apache_php_status_page.ping_path | default('/ping') | basename }}|{{ apache_php_status_page.status_path | default('/status') | basename }}$">
 {% else %}
-    <FilesMatch "^ping|status$">
+    <FilesMatch "^{{ apache_php_status_page.ping_path | default('/ping') | basename }}{{ apache_php_fpm_version | replace('.', '') }}|{{ apache_php_status_page.status_path | default('/status') | basename }}{{ apache_php_fpm_version | replace('.', '') }}$">
 {% endif %}
-{% for host in apache_status_page.allowed_hosts %}
+{% for host in apache_php_status_page.allowed_hosts | default(['127.0.0.1']) %}
         Require ip {{ host }}
 {% endfor %}
         SetHandler "proxy:unix:/run/php/php{{ apache_php_fpm_version }}-fpm.sock|fcgi://localhost"
@@ -54,14 +54,19 @@
 
     # Enable *real-time* 'status' page
     <IfModule alias_module>
-        Alias /realtime-status "/usr/share/php/{{ apache_php_fpm_version }}/fpm/status.html"
+{% if apache_php_fpm_set_default %}
+        Alias {{ apache_php_status_page.realtime_endpoint | default('/realtime-status') }} "/usr/share/php/{{ apache_php_fpm_version }}/fpm/status.html"
         <Directory /usr/share/php/{{ apache_php_fpm_version }}/fpm/status.html>
-{% for host in apache_status_page.allowed_hosts %}
+{% else %}
+        Alias {{ apache_php_status_page.realtime_endpoint | default('/realtime-status') }}-{{ apache_php_fpm_version | replace('.', '') }} "/usr/share/php/{{ apache_php_fpm_version }}/fpm/status-{{ apache_php_fpm_version | replace('.', '') }}.html"
+        <Directory /usr/share/php/{{ apache_php_fpm_version }}/fpm/status.html>
+{% endif %}
+{% for host in apache_php_status_page.allowed_hosts | default(['127.0.0.1']) %}
             Require ip {{ host }}
 {% endfor %}
         </Directory>
     </IfModule>
-{% endif %} #}
+{% endif %}
 </IfModule>
 
 

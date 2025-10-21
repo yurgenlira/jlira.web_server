@@ -1,4 +1,8 @@
 ---
+# ============================================================================
+# Package Installation Tests
+# ============================================================================
+
 - name: Check if apache2 package is installed
   ansible.builtin.package_facts:
     manager: auto
@@ -8,7 +12,17 @@
   ansible.builtin.assert:
     that:
       - "'apache2' in ansible_facts.packages"
-    fail_msg: "Apache2 package is not installed."
+    fail_msg: "Apache2 package is not installed"
+
+- name: Assert apache2-utils package is installed
+  ansible.builtin.assert:
+    that:
+      - "'apache2-utils' in ansible_facts.packages"
+    fail_msg: "Apache2-utils package is not installed"
+
+# ============================================================================
+# Configuration Syntax Tests
+# ============================================================================
 
 - name: Check Apache configuration syntax
   ansible.builtin.command:
@@ -21,10 +35,14 @@
   ansible.builtin.assert:
     that:
       - "'Syntax OK' in apache_configtest.stderr or 'Syntax OK' in apache_configtest.stdout"
-    fail_msg:  |
+    fail_msg: |
       Apache configuration syntax test failed.
       {{ apache_configtest.stderr }}
       Lines: {{ apache_configtest.stderr_lines }}
+
+# ============================================================================
+# Service State Tests
+# ============================================================================
 
 - name: Check if apache2 service is running and enabled
   ansible.builtin.service_facts:
@@ -33,5 +51,45 @@
 - name: Assert apache2 service is running
   ansible.builtin.assert:
     that:
-      - "ansible_facts.services['apache2'].state == 'running'"
-    fail_msg: "Apache2 service is not running."
+      - ansible_facts.services['apache2.service'].state == 'running'
+    fail_msg: "Apache2 service is not running"
+
+- name: Assert apache2 service is enabled
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.services['apache2.service'].status == 'enabled'
+    fail_msg: "Apache2 service is not enabled"
+
+# ============================================================================
+# Functional Endpoint Tests
+# ============================================================================
+
+- name: Test Apache HTTP endpoint responds
+  ansible.builtin.uri:
+    url: http://127.0.0.1:80/
+    method: GET
+    status_code: 200
+    return_content: true
+  register: apache_http_response
+
+- name: Verify Apache HTTP endpoint is accessible
+  ansible.builtin.assert:
+    that:
+      - apache_http_response.status == 200
+    fail_msg: "Apache HTTP endpoint not responding correctly"
+
+# ============================================================================
+# Version Verification Tests
+# ============================================================================
+
+- name: Check Apache version
+  ansible.builtin.command:
+    cmd: apache2 -v
+  register: apache_version_check
+  changed_when: false
+
+- name: Verify Apache version is reported
+  ansible.builtin.assert:
+    that:
+      - "'Apache/2.' in apache_version_check.stdout"
+    fail_msg: "Apache version check failed"
