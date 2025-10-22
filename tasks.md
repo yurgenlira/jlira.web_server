@@ -174,13 +174,33 @@
   - ✅ Configure status page endpoint access
   - ✅ Create version-specific status and ping endpoints
   - ✅ Support IP-based access control for status endpoints
+  - ✅ Create real-time status HTML page for PHP-FPM monitoring
+  - ✅ Fix Apache Directory directive to point to directory instead of file
+  - ✅ Deploy fpm-status.html.j2 template for interactive status monitoring
 
+## ✅ 12. Variable Validation
+- ✅ **Apache Role Validation:**
+  - ✅ Create comprehensive validation task file (validate.yml)
+  - ✅ Validate basic configuration (server_name, ssl_enabled)
+  - ✅ Validate PHP-FPM integration settings (version, timeout, set_default)
+  - ✅ Validate PHP-FPM status page configuration (paths, endpoints, allowed_hosts)
+  - ✅ Validate Apache status page configuration (endpoint, allowed_hosts)
+  - ✅ Validate ports and modules (HTTP/HTTPS ports, module names)
+  - ✅ Validate main settings and environment variables
+  - ✅ Validate security settings structure
+  - ✅ Validate virtual hosts configuration
+  - ✅ Validate authentication configuration (htpasswd files and users)
+  - ✅ Include validation in main.yml with 'always' tag
+  - ✅ Test validation with molecule converge
 
 **Technical Debt:**
 - ✅ ~~PHP integration tests temporarily disabled in Apache molecule tests~~ - RESOLVED: Tests enabled in converge.yml
 - ✅ ~~Need to complete PHP role implementation before re-enabling integration tests~~ - RESOLVED: PHP role complete
-- **FPM Version Management:**
-  - ✅ ~~Configure PHP-FPM as default version when enabled~~ - RESOLVED: Implemented apache_php_fpm_set_default variable
+- ✅ ~~Configure PHP-FPM as default version when enabled~~ - RESOLVED: Implemented apache_php_fpm_set_default variable
+- ✅ ~~Real-time status endpoint returns 404 error~~ - RESOLVED: Fixed Directory directive and created HTML template
+- Integrate with CA provider like letsencrypt or get certs for another provider / source (i accept suggestions)
+- Update role documentation (README.md) for php and apache
+- Update collection documentation
 
 # PHP Role Functional Requirements
 
@@ -259,50 +279,33 @@
   - ✅ Remove old extension files and directories
   - ✅ Support clean migration between versions
 
-
-
-**Technical Debt:**
-  - ⚠️ Test in check mode and diff mode
-
-
-
-
-
-
 # General Functional Requirements
 
 ## ✅ 1. Testing Requirements
 - **Molecule Tests:**
   - ✅ Support create, converge, verify, and destroy lifecycle
 
-## 2. Integration Requirements
+## ✅ 2. Integration Requirements
 - **Web Server Integration:**
-  - Integrate with web servers via environment variables
-  - Configure FPM status page endpoint access
-  - Add file existence checks for secure execution
+  - ✅ Integrate with web servers via environment variables
+  - ✅ Configure FPM status page endpoint access
+  - ✅ Add file existence checks for secure execution
 
 - **Tag Support:**
-  - Support role-wide tags (php_*)
-  - Support task-specific tags for granular execution
-  - Allow selective execution of specific functionality
-  - Support conditional task execution based on variables
+  - ✅ Support role-wide tags (php_*)
+  - ✅ Support task-specific tags for granular execution
+  - ✅ Allow selective execution of specific functionality
+  - ✅ Support conditional task execution based on variables
 
-## 3. Idempotency Requirements
+## ✅ 3. Idempotency Requirements
 - **Change Detection:**
-  - Check if files exist before creating backups
-  - Use 'creates' parameter for idempotent installations
-  - Register and check task results before triggering handlers
-  - Only restart/reload services when configuration actually changes
-
-### 4. playbooks
-- Create playbook for install multiple php versions (use role serveral times)
+  - ✅ Check if files exist before creating backups
+  - ✅ Use 'creates' parameter for idempotent installations
+  - ✅ Register and check task results before triggering handlers
+  - ✅ Only restart/reload services when configuration actually changes
+  - ⚠️ Test in check mode and diff mode
 
 
-
-solo testear variables que se van a usar al iniciar php role
-vcerificar que role php no instale apache
-allow override APACHE_LOG_DIR=/var/log/apache2$SUFFIX (if se sobrteescribe crear folder)
-integracion con letsencrypt
-validar entradas en apache role
-crear/actualizar readme
-linter a todo
+# Playbooks
+  - Create playbook for Setup an web_server (apache + php). Use the roles in te collection
+  - Create playbook for Setup an web_server with multiples php versions (apache + php). Use the roles in te collection

@@ -17,7 +17,7 @@
 
 - name: Install PHP CLI and packages for version {{ php_version }}
   ansible.builtin.apt:
-    name: "{{ ['php' ~ php_version] + php_packages }}"
+    name: "{{ ['php' ~ php_version ~ '-cli'] + php_packages }}"
     state: present
     update_cache: true
     cache_valid_time: 3600

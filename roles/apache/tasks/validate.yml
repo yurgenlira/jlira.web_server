@@ -1,0 +1,569 @@
+# SPDX-License-Identifier: MIT-0
+---
+# =============================================================================
+# Variable Validation Tasks for Apache Role
+# =============================================================================
+# This file contains all validation logic for the Apache role variables.
+# It performs comprehensive checks to ensure all inputs are valid before
+# any system modifications occur.
+#
+# Validation Strategy:
+# - FAIL HARD: For critical misconfigurations that would break functionality
+# - WARN: For suboptimal but functional configurations (not implemented here)
+#
+# Execution Order:
+# 1. Basic configuration validation
+# 2. PHP-FPM integration validation
+# 3. Status page configuration validation
+# 4. Ports and modules validation
+# 5. Virtual hosts validation
+# 6. Security settings validation
+# 7. Authentication configuration validation
+# =============================================================================
+
+# =============================================================================
+# 1. Basic Configuration Validation
+# =============================================================================
+
+- name: Validate apache_server_name
+  ansible.builtin.assert:
+    that:
+      - apache_server_name is defined
+      - apache_server_name is string
+      - apache_server_name | length > 0
+      # Valid hostname format (alphanumeric, dots, hyphens)
+      - apache_server_name is match('^[a-zA-Z0-9.-]+$')
+    fail_msg: >-
+      apache_server_name must be a valid hostname.
+      Current value: '{{ apache_server_name | default("undefined") }}'
+    success_msg: "apache_server_name is valid: {{ apache_server_name }}"
+    quiet: true
+
+- name: Validate apache_ssl_enabled
+  ansible.builtin.assert:
+    that:
+      - apache_ssl_enabled is defined
+      - apache_ssl_enabled is boolean
+    fail_msg: "apache_ssl_enabled must be a boolean (true/false)"
+    success_msg: "apache_ssl_enabled is valid: {{ apache_ssl_enabled }}"
+    quiet: true
+
+# =============================================================================
+# 2. PHP-FPM Integration Validation
+# =============================================================================
+
+- name: Validate apache_php_fpm_integration
+  ansible.builtin.assert:
+    that:
+      - apache_php_fpm_integration is defined
+      - apache_php_fpm_integration is boolean
+    fail_msg: "apache_php_fpm_integration must be a boolean (true/false)"
+    success_msg: "apache_php_fpm_integration is valid: {{ apache_php_fpm_integration }}"
+    quiet: true
+
+- name: Validate PHP-FPM integration settings
+  when: apache_php_fpm_integration | bool
+  block:
+    - name: Validate apache_php_fpm_version format
+      ansible.builtin.assert:
+        that:
+          - apache_php_fpm_version is defined
+          - apache_php_fpm_version is string
+          - apache_php_fpm_version | length > 0
+          - apache_php_fpm_version is match('^[0-9]+\.[0-9]+$')
+        fail_msg: >-
+          apache_php_fpm_version must be in format 'X.Y' (e.g., '8.3', '8.4').
+          Current value: '{{ apache_php_fpm_version | default("undefined") }}'
+        success_msg: "apache_php_fpm_version is valid: {{ apache_php_fpm_version }}"
+        quiet: true
+
+    - name: Validate apache_php_fpm_set_default
+      ansible.builtin.assert:
+        that:
+          - apache_php_fpm_set_default is defined
+          - apache_php_fpm_set_default is boolean
+        fail_msg: "apache_php_fpm_set_default must be a boolean (true/false)"
+        success_msg: "apache_php_fpm_set_default is valid: {{ apache_php_fpm_set_default }}"
+        quiet: true
+
+    - name: Validate apache_php_fpm_proxy_timeout
+      ansible.builtin.assert:
+        that:
+          - apache_php_fpm_proxy_timeout is defined
+          - apache_php_fpm_proxy_timeout is number
+          - apache_php_fpm_proxy_timeout | int > 0
+          - apache_php_fpm_proxy_timeout | int <= 3600
+        fail_msg: >-
+          apache_php_fpm_proxy_timeout must be a positive integer between 1 and 3600 seconds.
+          Current value: '{{ apache_php_fpm_proxy_timeout | default("undefined") }}'
+        success_msg: "apache_php_fpm_proxy_timeout is valid: {{ apache_php_fpm_proxy_timeout }}"
+        quiet: true
+
+# =============================================================================
+# 3. PHP-FPM Status Page Configuration Validation
+# =============================================================================
+
+- name: Validate apache_php_status_page dictionary
+  ansible.builtin.assert:
+    that:
+      - apache_php_status_page is defined
+      - apache_php_status_page is mapping
+    fail_msg: "apache_php_status_page must be defined as a dictionary"
+    success_msg: "apache_php_status_page is defined and is a dictionary"
+    quiet: true
+
+- name: Validate apache_php_status_page.enabled
+  ansible.builtin.assert:
+    that:
+      - apache_php_status_page.enabled is defined
+      - apache_php_status_page.enabled is boolean
+    fail_msg: "apache_php_status_page.enabled must be a boolean (true/false)"
+    success_msg: "apache_php_status_page.enabled is valid: {{ apache_php_status_page.enabled }}"
+    quiet: true
+
+- name: Validate PHP-FPM status page settings
+  when: apache_php_status_page.enabled | bool
+  block:
+    - name: Validate apache_php_status_page.status_path
+      ansible.builtin.assert:
+        that:
+          - apache_php_status_page.status_path is defined
+          - apache_php_status_page.status_path is string
+          - apache_php_status_page.status_path | length > 0
+          - apache_php_status_page.status_path is match('^/')
+          - apache_php_status_page.status_path is match('^/[a-zA-Z0-9/_-]+$')
+        fail_msg: >-
+          apache_php_status_page.status_path must be a valid URI path starting with '/'.
+          Current value: '{{ apache_php_status_page.status_path | default("undefined") }}'
+        success_msg: "apache_php_status_page.status_path is valid: {{ apache_php_status_page.status_path }}"
+        quiet: true
+
+    - name: Validate apache_php_status_page.ping_path
+      ansible.builtin.assert:
+        that:
+          - apache_php_status_page.ping_path is defined
+          - apache_php_status_page.ping_path is string
+          - apache_php_status_page.ping_path | length > 0
+          - apache_php_status_page.ping_path is match('^/')
+          - apache_php_status_page.ping_path is match('^/[a-zA-Z0-9/_-]+$')
+        fail_msg: >-
+          apache_php_status_page.ping_path must be a valid URI path starting with '/'.
+          Current value: '{{ apache_php_status_page.ping_path | default("undefined") }}'
+        success_msg: "apache_php_status_page.ping_path is valid: {{ apache_php_status_page.ping_path | default('/ping') }}"
+        quiet: true
+      when: apache_php_status_page.ping_path is defined
+
+    - name: Validate apache_php_status_page.realtime_endpoint
+      ansible.builtin.assert:
+        that:
+          - apache_php_status_page.realtime_endpoint is defined
+          - apache_php_status_page.realtime_endpoint is string
+          - apache_php_status_page.realtime_endpoint | length > 0
+          - apache_php_status_page.realtime_endpoint is match('^/')
+          - apache_php_status_page.realtime_endpoint is match('^/[a-zA-Z0-9/_-]+$')
+        fail_msg: >-
+          apache_php_status_page.realtime_endpoint must be a valid URI path starting with '/'.
+          Current value: '{{ apache_php_status_page.realtime_endpoint | default("undefined") }}'
+        success_msg: "apache_php_status_page.realtime_endpoint is valid: {{ apache_php_status_page.realtime_endpoint | default('/realtime-status') }}"
+        quiet: true
+      when: apache_php_status_page.realtime_endpoint is defined
+
+    - name: Validate apache_php_status_page.ping_response
+      ansible.builtin.assert:
+        that:
+          - apache_php_status_page.ping_response is defined
+          - apache_php_status_page.ping_response is string
+          - apache_php_status_page.ping_response | length > 0
+        fail_msg: >-
+          apache_php_status_page.ping_response must be a non-empty string.
+          Current value: '{{ apache_php_status_page.ping_response | default("undefined") }}'
+        success_msg: "apache_php_status_page.ping_response is valid: {{ apache_php_status_page.ping_response | default('pong') }}"
+        quiet: true
+      when: apache_php_status_page.ping_response is defined
+
+    - name: Validate apache_php_status_page.allowed_hosts
+      ansible.builtin.assert:
+        that:
+          - apache_php_status_page.allowed_hosts is defined
+          - apache_php_status_page.allowed_hosts is iterable
+          - apache_php_status_page.allowed_hosts is not string
+          - apache_php_status_page.allowed_hosts is not mapping
+          - apache_php_status_page.allowed_hosts | length > 0
+        fail_msg: "apache_php_status_page.allowed_hosts must be a non-empty list"
+        success_msg: "apache_php_status_page.allowed_hosts has {{ apache_php_status_page.allowed_hosts | length }} host(s)"
+        quiet: true
+
+    - name: Validate each allowed host format
+      ansible.builtin.assert:
+        that:
+          - item is string
+          - item | length > 0
+          # Valid IP, CIDR, or hostname
+          - >-
+            item is match('^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$') or
+            item is match('^[a-zA-Z0-9.-]+$')
+        fail_msg: >-
+          apache_php_status_page.allowed_hosts entry must be a valid IP address, CIDR notation, or hostname.
+          Invalid entry: '{{ item }}'
+        success_msg: "Allowed host is valid: {{ item }}"
+        quiet: true
+      loop: "{{ apache_php_status_page.allowed_hosts }}"
+      loop_control:
+        label: "{{ item }}"
+
+# =============================================================================
+# 4. Apache Status Page Configuration Validation
+# =============================================================================
+
+- name: Validate apache_status_page dictionary
+  ansible.builtin.assert:
+    that:
+      - apache_status_page is defined
+      - apache_status_page is mapping
+    fail_msg: "apache_status_page must be defined as a dictionary"
+    success_msg: "apache_status_page is defined and is a dictionary"
+    quiet: true
+
+- name: Validate apache_status_page.enabled
+  ansible.builtin.assert:
+    that:
+      - apache_status_page.enabled is defined
+      - apache_status_page.enabled is boolean
+    fail_msg: "apache_status_page.enabled must be a boolean (true/false)"
+    success_msg: "apache_status_page.enabled is valid: {{ apache_status_page.enabled }}"
+    quiet: true
+
+- name: Validate Apache status page settings
+  when: apache_status_page.enabled | bool
+  block:
+    - name: Validate apache_status_page.endpoint
+      ansible.builtin.assert:
+        that:
+          - apache_status_page.endpoint is defined
+          - apache_status_page.endpoint is string
+          - apache_status_page.endpoint | length > 0
+          - apache_status_page.endpoint is match('^/')
+          - apache_status_page.endpoint is match('^/[a-zA-Z0-9/_-]+$')
+        fail_msg: >-
+          apache_status_page.endpoint must be a valid URI path starting with '/'.
+          Current value: '{{ apache_status_page.endpoint | default("undefined") }}'
+        success_msg: "apache_status_page.endpoint is valid: {{ apache_status_page.endpoint | default('/server-status') }}"
+        quiet: true
+      when: apache_status_page.endpoint is defined
+
+    - name: Validate apache_status_page.allowed_hosts
+      ansible.builtin.assert:
+        that:
+          - apache_status_page.allowed_hosts is defined
+          - apache_status_page.allowed_hosts is iterable
+          - apache_status_page.allowed_hosts is not string
+          - apache_status_page.allowed_hosts is not mapping
+          - apache_status_page.allowed_hosts | length > 0
+        fail_msg: "apache_status_page.allowed_hosts must be a non-empty list"
+        success_msg: "apache_status_page.allowed_hosts has {{ apache_status_page.allowed_hosts | length }} host(s)"
+        quiet: true
+      when: apache_status_page.allowed_hosts is defined
+
+# =============================================================================
+# 5. Ports and Modules Validation
+# =============================================================================
+
+- name: Validate apache_http_ports
+  ansible.builtin.assert:
+    that:
+      - apache_http_ports is defined
+      - apache_http_ports is iterable
+      - apache_http_ports is not string
+      - apache_http_ports is not mapping
+      - apache_http_ports | length > 0
+    fail_msg: "apache_http_ports must be a non-empty list"
+    success_msg: "apache_http_ports has {{ apache_http_ports | length }} port(s)"
+    quiet: true
+
+- name: Validate HTTP port numbers
+  ansible.builtin.assert:
+    that:
+      - item is number
+      - item | int > 0
+      - item | int < 65536
+    fail_msg: >-
+      HTTP port must be a valid port number (1-65535).
+      Invalid port: '{{ item }}'
+    success_msg: "HTTP port is valid: {{ item }}"
+    quiet: true
+  loop: "{{ apache_http_ports }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Validate apache_https_ports
+  ansible.builtin.assert:
+    that:
+      - apache_https_ports is defined
+      - apache_https_ports is iterable
+      - apache_https_ports is not string
+      - apache_https_ports is not mapping
+      - apache_https_ports | length > 0
+    fail_msg: "apache_https_ports must be a non-empty list"
+    success_msg: "apache_https_ports has {{ apache_https_ports | length }} port(s)"
+    quiet: true
+
+- name: Validate HTTPS port numbers
+  ansible.builtin.assert:
+    that:
+      - item is number
+      - item | int > 0
+      - item | int < 65536
+    fail_msg: >-
+      HTTPS port must be a valid port number (1-65535).
+      Invalid port: '{{ item }}'
+    success_msg: "HTTPS port is valid: {{ item }}"
+    quiet: true
+  loop: "{{ apache_https_ports }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Validate apache_modules_enabled
+  ansible.builtin.assert:
+    that:
+      - apache_modules_enabled is defined
+      - apache_modules_enabled is iterable
+      - apache_modules_enabled is not string
+      - apache_modules_enabled is not mapping
+    fail_msg: "apache_modules_enabled must be a list"
+    success_msg: "apache_modules_enabled has {{ apache_modules_enabled | length }} module(s)"
+    quiet: true
+
+- name: Validate module names
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item | length > 0
+      - item is match('^[a-zA-Z0-9_-]+$')
+    fail_msg: >-
+      Module name must be alphanumeric with optional underscores/hyphens.
+      Invalid module: '{{ item }}'
+    success_msg: "Module name is valid: {{ item }}"
+    quiet: true
+  loop: "{{ apache_modules_enabled }}"
+  loop_control:
+    label: "{{ item }}"
+  when: apache_modules_enabled | length > 0
+
+# =============================================================================
+# 6. Main Settings Validation
+# =============================================================================
+
+- name: Validate apache_main_settings
+  ansible.builtin.assert:
+    that:
+      - apache_main_settings is defined
+      - apache_main_settings is iterable
+      - apache_main_settings is not string
+      - apache_main_settings is not mapping
+    fail_msg: "apache_main_settings must be a list"
+    success_msg: "apache_main_settings has {{ apache_main_settings | length }} setting(s)"
+    quiet: true
+
+- name: Validate main settings structure
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name is string
+      - item.name | length > 0
+      - item.value is defined
+    fail_msg: >-
+      Each apache_main_settings entry must have 'name' and 'value' keys.
+      Invalid entry: {{ item }}
+    success_msg: "Main setting '{{ item.name }}' is valid"
+    quiet: true
+  loop: "{{ apache_main_settings }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed') }}"
+  when: apache_main_settings | length > 0
+
+# =============================================================================
+# 7. Environment Variables Validation
+# =============================================================================
+
+- name: Validate apache_envvars
+  ansible.builtin.assert:
+    that:
+      - apache_envvars is defined
+      - apache_envvars is iterable
+      - apache_envvars is not string
+      - apache_envvars is not mapping
+    fail_msg: "apache_envvars must be a list"
+    success_msg: "apache_envvars has {{ apache_envvars | length }} variable(s)"
+    quiet: true
+
+- name: Validate environment variables structure
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name is string
+      - item.name | length > 0
+      - item.name is match('^[A-Z][A-Z0-9_]*$')
+      - item.value is defined
+      - item.value is string
+    fail_msg: >-
+      Each apache_envvars entry must have valid 'name' (uppercase with underscores) and 'value'.
+      Invalid entry: {{ item }}
+    success_msg: "Environment variable '{{ item.name }}' is valid"
+    quiet: true
+  loop: "{{ apache_envvars }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed') }}"
+  when: apache_envvars | length > 0
+
+# =============================================================================
+# 8. Security Settings Validation
+# =============================================================================
+
+- name: Validate apache_security_settings
+  ansible.builtin.assert:
+    that:
+      - apache_security_settings is defined
+      - apache_security_settings is iterable
+      - apache_security_settings is not string
+      - apache_security_settings is not mapping
+    fail_msg: "apache_security_settings must be a list"
+    success_msg: "apache_security_settings has {{ apache_security_settings | length }} setting(s)"
+    quiet: true
+
+- name: Validate security settings structure
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name is string
+      - item.name | length > 0
+    fail_msg: >-
+      Each apache_security_settings entry must have a 'name' key.
+      Invalid entry: {{ item }}
+    success_msg: "Security setting '{{ item.name }}' is valid"
+    quiet: true
+  loop: "{{ apache_security_settings }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed') }}"
+  when: apache_security_settings | length > 0
+
+# =============================================================================
+# 9. Virtual Hosts Validation
+# =============================================================================
+
+- name: Validate apache_virtual_hosts
+  ansible.builtin.assert:
+    that:
+      - apache_virtual_hosts is defined
+      - apache_virtual_hosts is iterable
+      - apache_virtual_hosts is not string
+      - apache_virtual_hosts is not mapping
+    fail_msg: "apache_virtual_hosts must be a list"
+    success_msg: "apache_virtual_hosts has {{ apache_virtual_hosts | length }} virtual host(s)"
+    quiet: true
+
+- name: Validate virtual hosts structure
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name is string
+      - item.name | length > 0
+      - item.server_name is defined
+      - item.server_name is string
+      - item.server_name | length > 0
+    fail_msg: >-
+      Each apache_virtual_hosts entry must have 'name' and 'server_name'.
+      Invalid entry: {{ item }}
+    success_msg: "Virtual host '{{ item.name }}' is valid"
+    quiet: true
+  loop: "{{ apache_virtual_hosts }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed') }}"
+  when: apache_virtual_hosts | length > 0
+
+# =============================================================================
+# 10. Authentication Configuration Validation
+# =============================================================================
+
+- name: Validate apache_htpasswd_files
+  ansible.builtin.assert:
+    that:
+      - apache_htpasswd_files is defined
+      - apache_htpasswd_files is iterable
+      - apache_htpasswd_files is not string
+      - apache_htpasswd_files is not mapping
+    fail_msg: "apache_htpasswd_files must be a list"
+    success_msg: "apache_htpasswd_files has {{ apache_htpasswd_files | length }} file(s)"
+    quiet: true
+
+- name: Validate htpasswd files structure
+  ansible.builtin.assert:
+    that:
+      - item.path is defined
+      - item.path is string
+      - item.path | length > 0
+      - item.path is match('^/')
+      - item.users is defined
+      - item.users is iterable
+      - item.users is not string
+      - item.users is not mapping
+      - item.users | length > 0
+    fail_msg: >-
+      Each apache_htpasswd_files entry must have 'path' (absolute) and 'users' (non-empty list).
+      Invalid entry: {{ item }}
+    success_msg: "htpasswd file '{{ item.path }}' is valid with {{ item.users | length }} user(s)"
+    quiet: true
+  loop: "{{ apache_htpasswd_files }}"
+  loop_control:
+    label: "{{ item.path | default('undefined') }}"
+  when: apache_htpasswd_files | length > 0
+
+- name: Validate htpasswd users structure
+  ansible.builtin.assert:
+    that:
+      - user.name is defined
+      - user.name is string
+      - user.name | length > 0
+      - user.name is match('^[a-zA-Z0-9_-]+$')
+      - user.password is defined
+      - user.password is string
+      - user.password | length >= 8
+    fail_msg: >-
+      Each user must have valid 'name' (alphanumeric) and 'password' (min 8 chars).
+      Invalid user in {{ item.path }}: {{ user }}
+    success_msg: "User '{{ user.name }}' in {{ item.path }} is valid"
+    quiet: true
+  loop: "{{ apache_htpasswd_files }}"
+  loop_control:
+    loop_var: item
+    label: "{{ item.path | default('undefined') }}"
+  when:
+    - apache_htpasswd_files | length > 0
+    - item.users is defined
+  vars:
+    user: "{{ item.users | first }}"
+
+# =============================================================================
+# 11. Validation Summary
+# =============================================================================
+
+- name: Display validation summary
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "Apache Role Variable Validation Summary"
+      - "==================================================================="
+      - "Server Name: {{ apache_server_name }}"
+      - "SSL Enabled: {{ apache_ssl_enabled }}"
+      - "PHP-FPM Integration: {{ apache_php_fpm_integration }}"
+      - "PHP-FPM Status Page: {{ apache_php_status_page.enabled }}"
+      - "Apache Status Page: {{ apache_status_page.enabled }}"
+      - "HTTP Ports: {{ apache_http_ports | join(', ') }}"
+      - "HTTPS Ports: {{ apache_https_ports | join(', ') }}"
+      - "Modules Enabled: {{ apache_modules_enabled | length }}"
+      - "Virtual Hosts: {{ apache_virtual_hosts | length }}"
+      - "Main Settings: {{ apache_main_settings | length }}"
+      - "Security Settings: {{ apache_security_settings | length }}"
+      - "Htpasswd Files: {{ apache_htpasswd_files | length }}"
+      - "==================================================================="
+      - "All variable validations passed successfully!"
+      - "==================================================================="
