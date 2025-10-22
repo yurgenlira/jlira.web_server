@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Example configuration for multi-PHP web server setup
+#
+# This file demonstrates how to configure multiple PHP versions
+# with Apache web server integration.
+#
+# Usage:
+#   ansible-playbook -i inventory playbooks/web-server-multi-php.yml \
+#     -e '@playbooks/vars/multi-php-example.yml'
+
+# Apache configuration
+apache_server_name: "multi-php.local"
+apache_ssl_enabled: true
+apache_http_ports:
+  - 80
+apache_https_ports:
+  - 443
+
+# Multiple PHP versions configuration
+# Each version is configured independently with the following options:
+# - version: PHP version number (e.g., "8.3", "8.4")
+# - fpm_enabled: Enable PHP-FPM for this version (default: true)
+# - cli_set_as_default: Set this version as the default PHP CLI (only one should be true)
+# - apache_integration: Enable Apache integration for this version (default: true)
+# - apache_set_as_default: Set this version as default in Apache (only one should be true)
+# - packages: List of additional PHP packages to install (optional)
+# - composer_enabled: Install Composer for this version (default: false)
+php_versions:
+  # PHP 8.2 - Legacy version for older applications
+  - version: "8.2"
+    fpm_enabled: true
+    cli_set_as_default: false
+    apache_integration: true
+    apache_set_as_default: false
+    composer_enabled: false
+    packages:
+      - "php8.2-mysql"
+      - "php8.2-mbstring"
+      - "php8.2-xml"
+      - "php8.2-curl"
+      - "php8.2-gd"
+
+  # PHP 8.3 - Current stable version
+  - version: "8.3"
+    fpm_enabled: true
+    cli_set_as_default: false
+    apache_integration: true
+    apache_set_as_default: false
+    composer_enabled: true
+    packages:
+      - "php8.3-mysql"
+      - "php8.3-mbstring"
+      - "php8.3-xml"
+      - "php8.3-curl"
+      - "php8.3-gd"
+      - "php8.3-zip"
+      - "php8.3-intl"
+
+  # PHP 8.4 - Latest version (default)
+  - version: "8.4"
+    fpm_enabled: true
+    cli_set_as_default: true  # This version will be the default CLI
+    apache_integration: true
+    apache_set_as_default: true  # This version will be default in Apache
+    composer_enabled: true
+    packages:
+      - "php8.4-mysql"
+      - "php8.4-mbstring"
+      - "php8.4-xml"
+      - "php8.4-curl"
+      - "php8.4-gd"
+      - "php8.4-zip"
+      - "php8.4-intl"
+      - "php8.4-bcmath"
+
+# Skip confirmation prompt for automated deployments
+web_server_skip_confirm: false

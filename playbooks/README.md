@@ -1,10 +1,95 @@
-# PHP Management Playbooks
+# Web Server Playbooks
 
-This directory contains example playbooks for managing PHP installations using the `jlira.web_server.php` role.
+This directory contains example playbooks for managing web server infrastructure using the `jlira.web_server` collection.
 
 ## Available Playbooks
 
-### 1. php-install.yml
+### Web Server Setup
+
+#### 1. web-server-setup.yml
+Complete web server setup with Apache and PHP integration.
+
+**Use when:**
+- Setting up a new web server
+- Installing Apache with PHP-FPM support
+- Creating a standard LAMP-like environment
+
+**Features:**
+- Apache web server installation and configuration
+- PHP installation with FPM support
+- Automatic PHP-FPM integration with Apache
+- SSL support (enabled by default)
+- Customizable ports and server name
+
+**Example:**
+```bash
+# Basic installation (Apache + PHP 8.4 with FPM)
+ansible-playbook -i inventory playbooks/web-server-setup.yml
+
+# With custom PHP version
+ansible-playbook -i inventory playbooks/web-server-setup.yml \
+  -e "php_version=8.3"
+
+# With custom Apache server name
+ansible-playbook -i inventory playbooks/web-server-setup.yml \
+  -e "apache_server_name=example.com"
+
+# Without PHP-FPM integration
+ansible-playbook -i inventory playbooks/web-server-setup.yml \
+  -e "apache_php_fpm_integration=false" \
+  -e "php_fpm_enabled=false"
+
+# Skip confirmation prompts
+ansible-playbook -i inventory playbooks/web-server-setup.yml \
+  -e "web_server_skip_confirm=true"
+```
+
+---
+
+#### 2. web-server-multi-php.yml
+Advanced web server setup with multiple PHP versions.
+
+**Use when:**
+- Running applications requiring different PHP versions
+- Maintaining legacy applications alongside modern ones
+- Testing applications across PHP versions
+- Gradual migration between PHP versions
+
+**Features:**
+- Apache web server installation
+- Multiple PHP versions with separate FPM pools
+- Independent configuration per PHP version
+- Select default CLI and Apache integration versions
+- Per-version composer installation
+
+**Example:**
+```bash
+# Basic installation with default config (PHP 8.3 and 8.4)
+ansible-playbook -i inventory playbooks/web-server-multi-php.yml
+
+# With custom configuration
+ansible-playbook -i inventory playbooks/web-server-multi-php.yml \
+  -e '@playbooks/vars/multi-php-example.yml'
+
+# Skip confirmation prompts
+ansible-playbook -i inventory playbooks/web-server-multi-php.yml \
+  -e "web_server_skip_confirm=true"
+```
+
+**Configuration:**
+See `playbooks/vars/multi-php-example.yml` for a complete configuration example with three PHP versions (8.2, 8.3, 8.4).
+
+**Important:**
+- Only one PHP version can be set as default CLI
+- Only one PHP version can be set as default in Apache
+- Each PHP version has its own FPM pool
+- Virtual hosts can be configured to use specific PHP versions
+
+---
+
+### PHP Management
+
+#### 3. php-install.yml
 Fresh installation of PHP on servers.
 
 **Use when:**
@@ -26,7 +111,7 @@ ansible-playbook -i inventory playbooks/php-install.yml -e "php_fpm_enabled=true
 
 ---
 
-### 2. php-upgrade.yml
+#### 4. php-upgrade.yml
 Upgrade PHP from one version to another.
 
 **Use when:**
@@ -68,7 +153,7 @@ ansible-playbook -i inventory playbooks/php-upgrade.yml \
 
 ---
 
-### 3. php-uninstall.yml
+#### 5. php-uninstall.yml
 Complete removal of PHP from servers.
 
 **Use when:**

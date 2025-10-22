@@ -1,0 +1,270 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Playbook for setting up a web server with Apache and multiple PHP versions
+#
+# This playbook installs and configures Apache web server with multiple PHP versions.
+# It allows running different PHP versions simultaneously using PHP-FPM pools.
+#
+# Requirements:
+#   - Define php_versions as a list of PHP version configurations
+#   - Each PHP version can have its own settings
+#   - Only one version can be set as the default CLI version
+#
+# Usage Examples:
+#
+# Basic installation with two PHP versions (8.3 and 8.4):
+#   ansible-playbook -i inventory playbooks/web-server-multi-php.yml
+#
+# With custom PHP versions configuration:
+#   ansible-playbook -i inventory playbooks/web-server-multi-php.yml \
+#     -e '@playbooks/vars/multi-php-example.yml'
+#
+# Skip confirmation prompts:
+#   ansible-playbook -i inventory playbooks/web-server-multi-php.yml \
+#     -e "web_server_skip_confirm=true"
+#
+# Example variable file (playbooks/vars/multi-php-example.yml):
+# ---
+# php_versions:
+#   - version: "8.3"
+#     fpm_enabled: true
+#     cli_set_as_default: false
+#     apache_integration: true
+#     apache_set_as_default: false
+#   - version: "8.4"
+#     fpm_enabled: true
+#     cli_set_as_default: true
+#     apache_integration: true
+#     apache_set_as_default: true
+
+- name: Setup Web Server with Apache and Multiple PHP Versions
+  hosts: webservers
+  become: true
+
+  vars:
+    # Default configuration for multiple PHP versions
+    # This will install PHP 8.3 and 8.4 with the following setup:
+    # - PHP 8.3: FPM enabled, not default CLI, Apache integration enabled, not default in Apache
+    # - PHP 8.4: FPM enabled, default CLI, Apache integration enabled, default in Apache
+    php_versions:
+      - version: "8.3"
+        fpm_enabled: true
+        cli_set_as_default: false
+        apache_integration: true
+        apache_set_as_default: false
+        packages: []  # Use role defaults
+        composer_enabled: false
+      - version: "8.4"
+        fpm_enabled: true
+        cli_set_as_default: true
+        apache_integration: true
+        apache_set_as_default: true
+        packages: []  # Use role defaults
+        composer_enabled: false
+
+  pre_tasks:
+    - name: Validate php_versions variable
+      ansible.builtin.assert:
+        that:
+          - php_versions is defined
+          - php_versions | length > 0
+          - php_versions is iterable
+        fail_msg: "php_versions must be defined as a non-empty list"
+        success_msg: "php_versions validation passed"
+      tags: always
+
+    - name: Count default CLI versions
+      ansible.builtin.set_fact:
+        default_cli_count: >-
+          {{ php_versions
+          | selectattr('cli_set_as_default', 'defined')
+          | selectattr('cli_set_as_default', 'equalto', true)
+          | list
+          | length }}
+      tags: always
+
+    - name: Validate only one default CLI version
+      ansible.builtin.assert:
+        that:
+          - default_cli_count | int <= 1
+        fail_msg: "Only one PHP version can be set as default CLI (cli_set_as_default: true)"
+        success_msg: "Default CLI validation passed"
+      tags: always
+
+    - name: Count default Apache integration versions
+      ansible.builtin.set_fact:
+        default_apache_count: >-
+          {{ php_versions
+          | selectattr('apache_integration', 'defined')
+          | selectattr('apache_integration', 'equalto', true)
+          | selectattr('apache_set_as_default', 'defined')
+          | selectattr('apache_set_as_default', 'equalto', true)
+          | list
+          | length }}
+      tags: always
+
+    - name: Validate only one default Apache integration
+      ansible.builtin.assert:
+        that:
+          - default_apache_count | int <= 1
+        fail_msg: "Only one PHP version can be set as default in Apache (apache_set_as_default: true)"
+        success_msg: "Default Apache integration validation passed"
+      tags: always
+
+    - name: Display web server setup parameters
+      ansible.builtin.debug:
+        msg:
+          - "===================================================================="
+          - "          Web Server with Multiple PHP Versions Setup              "
+          - "===================================================================="
+          - ""
+          - "  Target Hosts:           {{ ansible_play_hosts_all | join(', ') }}"
+          - ""
+          - "  Apache Configuration:"
+          - "    • Server Name:        {{ apache_server_name | default(ansible_fqdn) }}"
+          - "    • SSL Enabled:        {{ apache_ssl_enabled | default(true) }}"
+          - "    • HTTP Ports:         {{ apache_http_ports | default([80]) | join(', ') }}"
+          - >-
+            • HTTPS Ports:        {{ apache_https_ports | default([443]) | join(', ')
+            if apache_ssl_enabled | default(true) else 'N/A' }}
+          - ""
+          - "  PHP Versions to Install:"
+          - >-
+            {% for php in php_versions %}
+              • PHP {{ php.version }}:
+                FPM={{ php.fpm_enabled | default(true) }},
+                Default CLI={{ php.cli_set_as_default | default(false) }},
+                Apache Integration={{ php.apache_integration | default(true) }},
+                Apache Default={{ php.apache_set_as_default | default(false) }}
+            {% endfor %}
+          - ""
+          - "  This playbook will install Apache and {{ php_versions | length }} PHP version(s)."
+          - "  Each PHP version will have its own FPM pool and configuration."
+          - "  Review the parameters above before proceeding."
+          - ""
+          - "===================================================================="
+      tags: always
+
+    - name: Confirm web server setup
+      ansible.builtin.pause:
+        prompt: "Press Enter to continue with multi-PHP web server setup, or Ctrl+C and then 'a' to abort."
+      when: not (web_server_skip_confirm | default(false))
+      tags: always
+
+  tasks:
+    - name: Install and configure PHP versions
+      ansible.builtin.include_role:
+        name: jlira.web_server.php
+      vars:
+        php_version: "{{ php_item.version }}"
+        php_fpm_enabled: "{{ php_item.fpm_enabled | default(true) }}"
+        php_cli_set_as_default_version: "{{ php_item.cli_set_as_default | default(false) }}"
+        php_composer_enabled: "{{ php_item.composer_enabled | default(false) }}"
+        php_packages: "{{ php_item.packages | default([]) }}"
+      loop: "{{ php_versions }}"
+      loop_control:
+        loop_var: php_item
+        label: "PHP {{ php_item.version }}"
+
+    - name: Install and configure Apache with PHP-FPM integration
+      ansible.builtin.include_role:
+        name: jlira.web_server.apache
+      vars:
+        # Prepare list of PHP versions for Apache integration
+        apache_php_versions: >-
+          {{ php_versions
+          | selectattr('apache_integration', 'defined')
+          | selectattr('apache_integration', 'equalto', true)
+          | list }}
+
+    - name: Configure Apache PHP-FPM integration for each version
+      ansible.builtin.include_role:
+        name: jlira.web_server.apache
+        tasks_from: php_integration
+      vars:
+        php_version: "{{ php_item.version }}"
+        apache_php_fpm_integration: true
+        apache_php_fpm_set_default: "{{ php_item.apache_set_as_default | default(false) }}"
+      loop: >-
+        {{ php_versions
+        | selectattr('apache_integration', 'defined')
+        | selectattr('apache_integration', 'equalto', true)
+        | list }}
+      loop_control:
+        loop_var: php_item
+        label: "PHP {{ php_item.version }} Apache integration"
+
+  post_tasks:
+    - name: Verify Apache installation
+      ansible.builtin.command: apache2 -v
+      register: apache_version_check
+      changed_when: false
+
+    - name: Verify PHP installations
+      ansible.builtin.command: "php{{ php_item.version }} --version"
+      register: php_versions_check
+      changed_when: false
+      loop: "{{ php_versions }}"
+      loop_control:
+        loop_var: php_item
+        label: "PHP {{ php_item.version }}"
+
+    - name: Check Apache service status
+      ansible.builtin.service_facts:
+
+    - name: Check PHP-FPM services status
+      ansible.builtin.set_fact:
+        php_fpm_services: >-
+          {{ php_versions
+          | selectattr('fpm_enabled', 'defined')
+          | selectattr('fpm_enabled', 'equalto', true)
+          | map(attribute='version')
+          | map('regex_replace', '^(.*)$', 'php\1-fpm.service')
+          | list }}
+
+    - name: Display installation summary
+      ansible.builtin.debug:
+        msg:
+          - "═══════════════════════════════════════════════════════════════════════"
+          - "Multi-PHP Web Server Setup Complete"
+          - "═══════════════════════════════════════════════════════════════════════"
+          - ""
+          - "Apache:"
+          - >-
+            {{ apache_version_check.stdout_lines[0]
+            if apache_version_check.stdout_lines | length > 0
+            else 'Version check failed' }}
+          - "  • Service Status: {{ ansible_facts.services['apache2.service'].state | default('unknown') }}"
+          - "  • Server Name: {{ apache_server_name | default(ansible_fqdn) }}"
+          - "  • SSL Enabled: {{ apache_ssl_enabled | default(true) }}"
+          - ""
+          - "PHP Versions Installed:"
+          - >-
+            {% for result in php_versions_check.results %}
+              • {{ result.stdout_lines[0]
+                if result.stdout_lines | length > 0
+                else 'Version check failed' }}
+                - FPM Service: {{ ansible_facts.services['php' + result.php_item.version +
+                  '-fpm.service'].state | default('not running') }}
+                - Default CLI: {{ 'Yes'
+                  if result.php_item.cli_set_as_default | default(false) else 'No' }}
+                - Apache Integration: {{ 'Yes'
+                  if result.php_item.apache_integration | default(true) else 'No' }}
+                - Apache Default: {{ 'Yes'
+                  if result.php_item.apache_set_as_default | default(false) else 'No' }}
+            {% endfor %}
+          - ""
+          - "Next Steps:"
+          - "  • Access your web server at http://{{ apache_server_name | default(ansible_fqdn) }}"
+          - >-
+            {% if apache_ssl_enabled | default(true) %}
+            • Access via HTTPS at https://{{ apache_server_name | default(ansible_fqdn) }}
+            {% endif %}
+          - "  • Configure virtual hosts to use specific PHP versions"
+          - "  • Use ProxyPassMatch in virtual host configs to specify PHP-FPM version"
+          - >-
+            • Example: ProxyPassMatch ^/(.*\.php(/.*)?)$
+            unix:/run/php/php8.4-fpm.sock|fcgi://localhost/var/www/html/
+          - "  • Deploy your web applications"
+          - ""
+          - "═══════════════════════════════════════════════════════════════════════"

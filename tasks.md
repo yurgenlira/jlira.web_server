@@ -197,8 +197,8 @@
 - ✅ ~~Configure PHP-FPM as default version when enabled~~ - RESOLVED: Implemented apache_php_fpm_set_default variable
 - ✅ ~~Real-time status endpoint returns 404 error~~ - RESOLVED: Fixed Directory directive and created HTML template
 - Integrate with CA provider like letsencrypt or get certs for another provider / source (i accept suggestions)
-- Update role documentation (README.md) for php and apache
-- Update collection documentation
+- ✅ ~~Update role documentation (README.md) for php and apache~~ - RESOLVED: Comprehensive READMEs created
+- ✅ ~~Update collection documentation~~ - RESOLVED: Collection README updated with features, examples, and use cases
 
 # PHP Role Functional Requirements
 
@@ -301,8 +301,9 @@
   - ✅ Use 'creates' parameter for idempotent installations
   - ✅ Register and check task results before triggering handlers
   - ✅ Only restart/reload services when configuration actually changes
-  - ⚠️ Test in check mode and diff mode
+  - Test in check mode and diff mode
 
-# Playbooks
-  - Create playbook for Setup an web_server (apache + php). Use the roles in te collection
-  - Create playbook for Setup an web_server with multiples php versions (apache + php). Use the roles in te collection
+# ✅ Playbooks
+  - ✅ Create playbook for Setup an web_server (apache + php). Use the roles in te collection
+  - ✅ Create playbook for Setup an web_server with multiples php versions (apache + php). Use the roles in te collection
+  - Create scenarios for test multi php playbook
