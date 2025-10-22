@@ -149,7 +149,9 @@
         fail_msg: >-
           apache_php_status_page.ping_path must be a valid URI path starting with '/'.
           Current value: '{{ apache_php_status_page.ping_path | default("undefined") }}'
-        success_msg: "apache_php_status_page.ping_path is valid: {{ apache_php_status_page.ping_path | default('/ping') }}"
+        success_msg: >-
+          apache_php_status_page.ping_path is valid:
+          {{ apache_php_status_page.ping_path | default('/ping') }}
         quiet: true
       when: apache_php_status_page.ping_path is defined
 
@@ -164,7 +166,9 @@
         fail_msg: >-
           apache_php_status_page.realtime_endpoint must be a valid URI path starting with '/'.
           Current value: '{{ apache_php_status_page.realtime_endpoint | default("undefined") }}'
-        success_msg: "apache_php_status_page.realtime_endpoint is valid: {{ apache_php_status_page.realtime_endpoint | default('/realtime-status') }}"
+        success_msg: >-
+          apache_php_status_page.realtime_endpoint is valid:
+          {{ apache_php_status_page.realtime_endpoint | default('/realtime-status') }}
         quiet: true
       when: apache_php_status_page.realtime_endpoint is defined
 
@@ -177,7 +181,9 @@
         fail_msg: >-
           apache_php_status_page.ping_response must be a non-empty string.
           Current value: '{{ apache_php_status_page.ping_response | default("undefined") }}'
-        success_msg: "apache_php_status_page.ping_response is valid: {{ apache_php_status_page.ping_response | default('pong') }}"
+        success_msg: >-
+          apache_php_status_page.ping_response is valid:
+          {{ apache_php_status_page.ping_response | default('pong') }}
         quiet: true
       when: apache_php_status_page.ping_response is defined
 
@@ -190,7 +196,9 @@
           - apache_php_status_page.allowed_hosts is not mapping
           - apache_php_status_page.allowed_hosts | length > 0
         fail_msg: "apache_php_status_page.allowed_hosts must be a non-empty list"
-        success_msg: "apache_php_status_page.allowed_hosts has {{ apache_php_status_page.allowed_hosts | length }} host(s)"
+        success_msg: >-
+          apache_php_status_page.allowed_hosts has
+          {{ apache_php_status_page.allowed_hosts | length }} host(s)
         quiet: true
 
     - name: Validate each allowed host format
@@ -247,7 +255,9 @@
         fail_msg: >-
           apache_status_page.endpoint must be a valid URI path starting with '/'.
           Current value: '{{ apache_status_page.endpoint | default("undefined") }}'
-        success_msg: "apache_status_page.endpoint is valid: {{ apache_status_page.endpoint | default('/server-status') }}"
+        success_msg: >-
+          apache_status_page.endpoint is valid:
+          {{ apache_status_page.endpoint | default('/server-status') }}
         quiet: true
       when: apache_status_page.endpoint is defined
 

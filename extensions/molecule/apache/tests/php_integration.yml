@@ -119,7 +119,9 @@
   ansible.builtin.assert:
     that:
       - "'FilesMatch' in (php_fpm_conf_content.content | b64decode)"
-      - "apache_php_status_page.status_path | default('/status') | basename in (php_fpm_conf_content.content | b64decode)"
+      - >-
+        apache_php_status_page.status_path | default('/status') | basename
+        in (php_fpm_conf_content.content | b64decode)
     fail_msg: "PHP-FPM status page not configured in Apache"
   when: apache_php_status_page.enabled | default(false)
 
@@ -170,6 +172,9 @@
   ansible.builtin.assert:
     that:
       - php_realtime_status_response.status == 200
-      - "'PHP' in php_realtime_status_response.content or 'FPM' in php_realtime_status_response.content or 'status' in php_realtime_status_response.content"
+      - >-
+        'PHP' in php_realtime_status_response.content or
+        'FPM' in php_realtime_status_response.content or
+        'status' in php_realtime_status_response.content
     fail_msg: "PHP-FPM real-time status endpoint not responding correctly"
   when: apache_php_status_page.enabled | default(false)
