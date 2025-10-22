@@ -26,8 +26,6 @@
   - ✅ Support custom Apache directives like LimitRequestLine, LimitRequestFieldSize, etc
   - ✅ Support documentation via comments
   - ✅ Support arbitrary user-defined environment variables
-  - Allow to use a custom configuration directory path
-  - Allow to set custom log directory path if you want
 
 - ✅ **SSL Configuration:**
   - ✅ Enable SSL site by default
@@ -304,7 +302,6 @@
   - ✅ Register and check task results before triggering handlers
   - ✅ Only restart/reload services when configuration actually changes
   - ⚠️ Test in check mode and diff mode
-
 
 # Playbooks
   - Create playbook for Setup an web_server (apache + php). Use the roles in te collection
