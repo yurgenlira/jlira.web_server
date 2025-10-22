@@ -61,6 +61,8 @@ php_pool_settings:
   pm_start_servers: 3
   pm_min_spare_servers: 2
   pm_max_spare_servers: 5
+php_status_page:
+  enabled: true
   status_path: /fpm-status
   ping_path: /fpm-ping
   ping_response: pong-test
