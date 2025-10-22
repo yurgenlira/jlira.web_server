@@ -156,3 +156,20 @@
       - "'pong' in php_ping_response.content"
     fail_msg: "PHP-FPM ping endpoint not responding correctly"
   when: apache_php_status_page.enabled | default(false)
+
+- name: Test PHP-FPM real-time status endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1{{ apache_php_status_page.realtime_endpoint | default('/realtime-status') }}"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: php_realtime_status_response
+  when: apache_php_status_page.enabled | default(false)
+
+- name: Verify PHP-FPM real-time status page responds
+  ansible.builtin.assert:
+    that:
+      - php_realtime_status_response.status == 200
+      - "'PHP' in php_realtime_status_response.content or 'FPM' in php_realtime_status_response.content or 'status' in php_realtime_status_response.content"
+    fail_msg: "PHP-FPM real-time status endpoint not responding correctly"
+  when: apache_php_status_page.enabled | default(false)

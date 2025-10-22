@@ -117,18 +117,6 @@
     - status_page
     - apache_status_page
 
-# - name: Include jlira.web_server.apache.php_fpm_status_proxy.yml
-#   ansible.builtin.include_tasks:
-#     file: php_fpm_status_proxy.yml
-#     apply:
-#       tags:
-#         - php_fpm_status_proxy
-#         - apache_php_fpm_status_proxy
-#   when: apache_php_fpm_status_configs is defined and apache_php_fpm_status_configs | length > 0
-#   tags:
-#     - php_fpm_status_proxy
-#     - apache_php_fpm_status_proxy
-
 - name: Include jlira.web_server.apache.authentication.yml
   ansible.builtin.include_tasks:
     file: authentication.yml

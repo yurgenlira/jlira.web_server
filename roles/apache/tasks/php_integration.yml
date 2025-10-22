@@ -32,3 +32,36 @@
     - apache_php_fpm_set_default
     - not apache_php_fpm_conf_enabled.stat.exists
   notify: Reload apache
+
+- name: Create directory for PHP-FPM status HTML files
+  ansible.builtin.file:
+    path: "/usr/share/php/{{ apache_php_fpm_version }}/fpm"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when: apache_php_status_page.enabled
+
+- name: Create PHP-FPM real-time status HTML page (default version)
+  ansible.builtin.template:
+    src: fpm-status.html.j2
+    dest: "/usr/share/php/{{ apache_php_fpm_version }}/fpm/status.html"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  when:
+    - apache_php_fpm_set_default
+    - apache_php_status_page.enabled
+
+- name: Create PHP-FPM real-time status HTML page (versioned)
+  ansible.builtin.template:
+    src: fpm-status.html.j2
+    dest: "/usr/share/php/{{ apache_php_fpm_version }}/fpm/status-{{ apache_php_fpm_version | replace('.', '') }}.html"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  when:
+    - not apache_php_fpm_set_default
+    - apache_php_status_page.enabled

@@ -56,10 +56,10 @@
     <IfModule alias_module>
 {% if apache_php_fpm_set_default %}
         Alias {{ apache_php_status_page.realtime_endpoint | default('/realtime-status') }} "/usr/share/php/{{ apache_php_fpm_version }}/fpm/status.html"
-        <Directory /usr/share/php/{{ apache_php_fpm_version }}/fpm/status.html>
+        <Directory /usr/share/php/{{ apache_php_fpm_version }}/fpm>
 {% else %}
         Alias {{ apache_php_status_page.realtime_endpoint | default('/realtime-status') }}-{{ apache_php_fpm_version | replace('.', '') }} "/usr/share/php/{{ apache_php_fpm_version }}/fpm/status-{{ apache_php_fpm_version | replace('.', '') }}.html"
-        <Directory /usr/share/php/{{ apache_php_fpm_version }}/fpm/status.html>
+        <Directory /usr/share/php/{{ apache_php_fpm_version }}/fpm>
 {% endif %}
 {% for host in apache_php_status_page.allowed_hosts | default(['127.0.0.1']) %}
             Require ip {{ host }}
