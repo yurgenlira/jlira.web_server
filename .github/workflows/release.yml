@@ -1,0 +1,84 @@
+name: Release to Ansible Galaxy
+
+# Trigger on version tags (e.g., v0.0.2, v1.0.0)
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Build and Release Collection
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out the codebase
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for changelog generation
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install Ansible
+        run: pip install ansible-core
+        # todo add cache
+
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          # Remove 'v' prefix from tag (v0.0.2 -> 0.0.2)
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Update galaxy.yml version
+        run: |
+          sed -i "s/^version:.*/version: ${{ steps.get_version.outputs.version }}/" galaxy.yml
+
+      - name: Build Ansible Collection
+        run: ansible-galaxy collection build
+
+      - name: Get collection filename
+        id: collection
+        run: |
+          FILENAME=$(ls jlira-web_server-*.tar.gz)
+          echo "filename=$FILENAME" >> $GITHUB_OUTPUT
+
+      - name: Publish to Ansible Galaxy
+        env:
+          GALAXY_API_KEY: ${{ secrets.GALAXY_API_KEY }}
+        run: |
+          ansible-galaxy collection publish ${{ steps.collection.outputs.filename }} --api-key $GALAXY_API_KEY
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          # Extract the changelog section for this version
+          VERSION=${{ steps.get_version.outputs.version }}
+
+          # Create a temporary file for the changelog
+          awk "/## \[$VERSION\]/,/## \[/" CHANGELOG.md | sed '$d' > release_notes.md
+
+          # If release notes are empty, use a default message
+          if [ ! -s release_notes.md ]; then
+            echo "Release version $VERSION" > release_notes.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: release_notes.md
+          files: ${{ steps.collection.outputs.filename }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload collection artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: collection-${{ steps.get_version.outputs.version }}
+          path: ${{ steps.collection.outputs.filename }}
