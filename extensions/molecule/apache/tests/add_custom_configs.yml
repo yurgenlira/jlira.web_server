@@ -1,0 +1,58 @@
+---
+# ============================================================================
+# Custom Configuration Directory Tests
+# ============================================================================
+
+- name: Check if custom config directory exists
+  ansible.builtin.stat:
+    path: /data/apache-conf
+  register: apache_custom_config_dir_check
+
+- name: Verify custom config directory exists
+  ansible.builtin.assert:
+    that:
+      - apache_custom_config_dir_check.stat.exists
+      - apache_custom_config_dir_check.stat.isdir
+      - apache_custom_config_dir_check.stat.mode == "0755"
+      - apache_custom_config_dir_check.stat.pw_name == "root"
+      - apache_custom_config_dir_check.stat.gr_name == "root"
+    fail_msg: "Custom config directory does not exist or has incorrect permissions"
+
+# ============================================================================
+# Custom Configuration File Tests
+# ============================================================================
+
+- name: Check if custom config file exists
+  ansible.builtin.stat:
+    path: /data/apache-conf/custom-headers.conf
+  register: apache_custom_config_file_check
+
+- name: Verify custom config file exists
+  ansible.builtin.assert:
+    that:
+      - apache_custom_config_file_check.stat.exists
+      - apache_custom_config_file_check.stat.mode == "0644"
+      - apache_custom_config_file_check.stat.pw_name == "root"
+      - apache_custom_config_file_check.stat.gr_name == "root"
+    fail_msg: "Custom config file does not exist or has incorrect permissions"
+
+# ============================================================================
+# Custom Configuration Content Tests
+# ============================================================================
+
+- name: Read custom config file content
+  ansible.builtin.slurp:
+    path: /data/apache-conf/custom-headers.conf
+  register: apache_custom_config_content
+
+- name: Verify custom config file has managed marker
+  ansible.builtin.assert:
+    that:
+      - "'ANSIBLE MANAGED FILE' in (apache_custom_config_content.content | b64decode)"
+    fail_msg: "Custom config file does not contain expected content or managed marker"
+
+- name: Verify custom config file has correct content
+  ansible.builtin.assert:
+    that:
+      - "'Header always set X-Frame-Options' in (apache_custom_config_content.content | b64decode)"
+    fail_msg: "Custom config file does not contain expected configuration directives"

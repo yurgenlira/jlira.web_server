@@ -1,0 +1,74 @@
+---
+# ============================================================================
+# Status Module Tests
+# ============================================================================
+
+- name: Check if status module is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/mods-enabled/status.load
+  register: apache_status_module_check
+
+- name: Verify status module is enabled
+  ansible.builtin.assert:
+    that:
+      - apache_status_module_check.stat.exists
+      - apache_status_module_check.stat.islnk
+    fail_msg: "Status module is not enabled"
+
+# ============================================================================
+# Status Configuration File Tests
+# ============================================================================
+
+- name: Check if status configuration file exists
+  ansible.builtin.stat:
+    path: /etc/apache2/conf-available/status.conf
+  register: apache_status_config_check
+
+- name: Verify status configuration file exists
+  ansible.builtin.assert:
+    that:
+      - apache_status_config_check.stat.exists
+      - apache_status_config_check.stat.mode == "0644"
+      - apache_status_config_check.stat.pw_name == "root"
+      - apache_status_config_check.stat.gr_name == "root"
+    fail_msg: "Status configuration file does not exist or has incorrect permissions"
+
+# ============================================================================
+# Status Configuration Content Tests
+# ============================================================================
+
+- name: Read status configuration file content
+  ansible.builtin.slurp:
+    path: /etc/apache2/conf-available/status.conf
+  register: apache_status_config_content
+
+- name: Verify status configuration has correct location
+  ansible.builtin.assert:
+    that:
+      - >-
+        '<Location ' + (apache_status_page.endpoint | default('/server-status')) + '>'
+        in (apache_status_config_content.content | b64decode)
+      - "'SetHandler server-status' in (apache_status_config_content.content | b64decode)"
+    fail_msg: "Status configuration does not contain correct location settings"
+
+- name: Verify status configuration has access control
+  ansible.builtin.assert:
+    that:
+      - "'Require ip 127.0.0.1' in (apache_status_config_content.content | b64decode)"
+    fail_msg: "Status configuration does not contain access control settings"
+
+# ============================================================================
+# Status Configuration Enablement Tests
+# ============================================================================
+
+- name: Check if status configuration is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/conf-enabled/status.conf
+  register: apache_status_conf_enabled_check
+
+- name: Verify status configuration is enabled
+  ansible.builtin.assert:
+    that:
+      - apache_status_conf_enabled_check.stat.exists
+      - apache_status_conf_enabled_check.stat.islnk
+    fail_msg: "Status configuration is not enabled"

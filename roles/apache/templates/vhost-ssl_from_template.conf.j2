@@ -1,0 +1,9 @@
+## ANSIBLE MANAGED FILE ##
+# HTTP Virtual Host: {{ item.name }}
+# Template: {{ item.template }}
+
+{% for var in item.vars %}
+define {{ var.name }} {{ var.value }}
+{% endfor %}
+
+Include {{ apache_vhost_templates_dir }}/{{ item.template }}-ssl.template.conf

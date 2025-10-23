@@ -1,0 +1,109 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Playbook for uninstalling PHP
+#
+# This playbook completely removes PHP from target servers including:
+# - PHP packages and extensions
+# - PHP-FPM service (if installed)
+# - Configuration files
+# - Logrotate configurations
+# - Alternatives system entries
+# - Extension files and directories
+#
+# Usage:
+#   ansible-playbook -i inventory playbooks/php-uninstall.yml \
+#     -e "php_version_to_remove=8.4"
+#
+# With specific version removal:
+#   ansible-playbook -i inventory playbooks/php-uninstall.yml \
+#     -e "php_old_version=8.3" \
+#     -e "php_version=8.4"
+#
+# Warning:
+#   - This will completely remove PHP from the system
+#   - Applications depending on PHP will stop working
+#   - Backup important data before running
+#   - Consider using php-upgrade.yml instead for version changes
+#
+# How it works:
+#   - Uses the php role with only the uninstall tag
+#   - The role requires php_old_version to trigger uninstall
+#   - php_version is used as the "current" version to prevent conflicts
+
+- name: Uninstall PHP
+  hosts: php
+  become: true
+
+  pre_tasks:
+    - name: Validate versions are different
+      ansible.builtin.assert:
+        that:
+          - php_old_version is defined
+          - php_version is defined
+          - php_old_version != php_version
+        fail_msg: >-
+          php_old_version ({{ php_old_version | default('undefined') }}) must be defined
+          and different from php_version ({{ php_version | default('undefined') }})
+        success_msg: "Will proceed to remove PHP {{ php_old_version }}"
+
+    - name: Confirm PHP version to remove
+      ansible.builtin.pause:
+        prompt: |
+
+          ╔═══════════════════════════════════════════════════════════════════════╗
+          ║                            WARNING                                    ║
+          ╚═══════════════════════════════════════════════════════════════════════╝
+
+          This will completely remove PHP {{ php_old_version }} from the system.
+
+          This includes:
+          ✗ All PHP {{ php_old_version }} packages and extensions
+          ✗ PHP-FPM service (if running)
+          ✗ Configuration files (/etc/php/{{ php_old_version }})
+          ✗ Logrotate configurations
+          ✗ Alternatives system entries
+          ✗ Extension files and directories
+
+          Applications depending on PHP {{ php_old_version }} will STOP WORKING.
+
+          Press CTRL+C and then A to abort, or ENTER to continue
+      when:
+        - not ansible_check_mode
+        - not (php_skip_confirm | default(false))
+
+  # roles:
+  #   - role: php
+  #     tags:
+  #       - uninstall
+  #       - php_uninstall
+
+  tasks:
+    - name: Run php role
+      ansible.builtin.include_role:
+        name: php
+      tags:
+        - uninstall
+        - php_uninstall
+
+  post_tasks:
+    - name: Display uninstall summary
+      ansible.builtin.debug:
+        msg:
+          - "═══════════════════════════════════════════════════════════════════════"
+          - "PHP {{ php_old_version }} Uninstallation Complete"
+          - "═══════════════════════════════════════════════════════════════════════"
+          - ""
+          - "Removed:"
+          - "  • All PHP {{ php_old_version }} packages"
+          - "  • Configuration directory: /etc/php/{{ php_old_version }}"
+          - "  • PHP-FPM service"
+          - "  • Logrotate configurations"
+          - "  • Alternatives system entries"
+          - "  • Extension files"
+          - ""
+          - "Next steps:"
+          - "  1. Verify no applications are broken"
+          - "  2. Check for any remaining PHP processes"
+          - "  3. Consider cleaning up application-specific configs"
+          - ""
+          - "═══════════════════════════════════════════════════════════════════════"

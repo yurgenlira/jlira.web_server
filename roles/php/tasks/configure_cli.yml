@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Check if backup of php.ini.original already exists
+  ansible.builtin.stat:
+    path: "/etc/php/{{ php_version }}/cli/php.ini.original"
+  register: php_ini_backup_stat
+
+- name: Create one-time backup of original php.ini
+  ansible.builtin.copy:
+    src: "/etc/php/{{ php_version }}/cli/php.ini"
+    dest: "/etc/php/{{ php_version }}/cli/php.ini.original"
+    remote_src: true
+    mode: "0644"
+  when: not php_ini_backup_stat.stat.exists
+
+- name: Create PHP CLI error log directory if error_log is defined
+  ansible.builtin.file:
+    path: "{{ php_cli_settings.error_log.value | dirname }}"
+    state: directory
+    mode: '0750'
+    owner: root
+    group: root
+  when:
+    - php_cli_settings.error_log is defined
+    - php_cli_settings.error_log.type == 'path'
+    - php_cli_settings.error_log.value is defined
+    - php_cli_settings.error_log.value | dirname != ""
+
+- name: Build PHP CLI settings configuration list
+  ansible.builtin.set_fact:
+    php_cli_settings_list: >-
+      {{ php_cli_settings_list | default([]) + [setting_item] }}
+  loop: "{{ php_cli_settings | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  vars:
+    setting_item:
+      regex: >-
+        {{ php_regex_patterns[item.value.type] | replace('__KEY__', item.key) }}
+      line: >-
+        {{ item.key }} = {% if item.value.type == 'bool' %}{{ 'On' if item.value.value else 'Off' }}{%- else -%}
+        {{ item.value.value }}{%- endif -%}
+
+- name: Display PHP CLI settings list
+  ansible.builtin.debug:
+    var: php_cli_settings_list
+
+- name: Configure PHP CLI settings in php.ini
+  ansible.builtin.lineinfile:
+    path: "/etc/php/{{ php_version }}/cli/php.ini"
+    regexp: "{{ item.regex }}"
+    line: "{{ item.line }}"
+  loop: "{{ php_cli_settings_list }}"
+  loop_control:
+    label: "{{ item.line }}"

@@ -1,0 +1,39 @@
+---
+# ============================================================================
+# htpasswd File Existence and Permission Tests
+# ============================================================================
+
+- name: Check if htpasswd file exists
+  ansible.builtin.stat:
+    path: /etc/apache2/.htpasswd
+  register: apache_htpasswd_file_check
+
+- name: Verify htpasswd file exists
+  ansible.builtin.assert:
+    that:
+      - apache_htpasswd_file_check.stat.exists
+      - apache_htpasswd_file_check.stat.mode == "0640"
+      - apache_htpasswd_file_check.stat.pw_name == "root"
+      - apache_htpasswd_file_check.stat.gr_name == "www-data"
+    fail_msg: "htpasswd file does not exist or has incorrect permissions"
+
+# ============================================================================
+# htpasswd User Content Tests
+# ============================================================================
+
+- name: Read htpasswd file content
+  ansible.builtin.slurp:
+    path: /etc/apache2/.htpasswd
+  register: apache_htpasswd_content
+
+- name: Verify admin user exists in htpasswd file
+  ansible.builtin.assert:
+    that:
+      - "'admin:' in (apache_htpasswd_content.content | b64decode)"
+    fail_msg: "admin user not found in htpasswd file"
+
+- name: Verify testuser exists in htpasswd file
+  ansible.builtin.assert:
+    that:
+      - "'testuser:' in (apache_htpasswd_content.content | b64decode)"
+    fail_msg: "testuser not found in htpasswd file"

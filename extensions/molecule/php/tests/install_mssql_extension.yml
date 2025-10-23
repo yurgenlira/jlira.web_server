@@ -1,0 +1,76 @@
+---
+- name: Verify mssql extension installation
+  block:
+    - name: Check for Microsoft GPG key
+      ansible.builtin.stat:
+        path: "{{ php_mssql_apt.key_file }}"
+      register: microsoft_gpg_key
+      failed_when: not microsoft_gpg_key.stat.exists
+
+    - name: Check for Microsoft APT repository
+      ansible.builtin.stat:
+        path: /etc/apt/sources.list.d/microsoft.list
+      register: microsoft_apt_repo
+      failed_when: not microsoft_apt_repo.stat.exists
+
+    - name: Verify that msodbcsql is installed in {{ php_mssql_package_version }}
+      ansible.builtin.package:
+        name: "msodbcsql{{ php_mssql_package_version }}"
+        state: present
+      check_mode: true
+      register: msodbcsql_installed
+      failed_when: msodbcsql_installed.changed
+
+    - name: Verify that mssql-tools is installed in {{ php_mssql_package_version }}
+      ansible.builtin.package:
+        name: "mssql-tools{{ php_mssql_package_version }}"
+        state: present
+      check_mode: true
+      register: mssql_tools_installed
+      failed_when: mssql_tools_installed.changed
+
+    - name: Check for mssql-tools in PATH
+      ansible.builtin.stat:
+        path: /etc/profile.d/mssql-tools.sh
+      register: mssql_tools_path
+      failed_when: not mssql_tools_path.stat.exists
+
+    - name: Get PHP extension directory
+      ansible.builtin.shell:
+        cmd: '$(which php{{ php_version }}) -r "echo ini_get(''extension_dir'');"'
+      register: php_extension_dir_output
+      changed_when: false
+      check_mode: false
+
+    - name: Check for sqlsrv.so
+      ansible.builtin.stat:
+        path: "{{ php_extension_dir_output.stdout }}/sqlsrv.so"
+      register: sqlsrv_so
+      failed_when: not sqlsrv_so.stat.exists
+
+    - name: Check for pdo_sqlsrv.so
+      ansible.builtin.stat:
+        path: "{{ php_extension_dir_output.stdout }}/pdo_sqlsrv.so"
+      register: pdo_sqlsrv_so
+      failed_when: not pdo_sqlsrv_so.stat.exists
+
+    - name: Check for sqlsrv.ini
+      ansible.builtin.stat:
+        path: "/etc/php/{{ php_version }}/mods-available/sqlsrv.ini"
+      register: sqlsrv_ini
+      failed_when: not sqlsrv_ini.stat.exists
+
+    - name: Check for pdo_sqlsrv.ini
+      ansible.builtin.stat:
+        path: "/etc/php/{{ php_version }}/mods-available/pdo_sqlsrv.ini"
+      register: pdo_sqlsrv_ini
+      failed_when: not pdo_sqlsrv_ini.stat.exists
+
+    - name: Check if PHP sqlsrv and pdo_sqlsrv modules are enabled
+      ansible.builtin.command:
+        cmd: php{{ php_version }} -m
+      register: php_modules
+      changed_when: false
+      failed_when:
+        - "'sqlsrv' not in php_modules.stdout"
+        - "'pdo_sqlsrv' not in php_modules.stdout"

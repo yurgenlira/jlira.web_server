@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Prepare installs PHP version that will be uninstalled
+# This sets up the starting state for the uninstall test
+
+- name: Prepare environment with PHP to be uninstalled
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Display preparation information
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Preparing Uninstall Test Environment"
+          - "=========================================="
+          - "Installing PHP {{ php_version_to_remove }}"
+          - "This will be uninstalled in converge"
+          - "=========================================="
+
+    - name: Ensure required testing utilities (logrotate) are installed
+      ansible.builtin.package:
+        name: logrotate
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install PHP version to be removed
+      ansible.builtin.include_role:
+        name: php
+      vars:
+        php_version: "{{ php_version_to_remove }}"
+        php_fpm_enabled: true
+        php_packages:
+          - "php{{ php_version_to_remove }}-curl"
+          - "php{{ php_version_to_remove }}-mbstring"
+          - "php{{ php_version_to_remove }}-xml"
+          - "php{{ php_version_to_remove }}-zip"
+          - "php{{ php_version_to_remove }}-mysql"
+          - "php{{ php_version_to_remove }}-gd"
+        php_cli_set_as_default_version: true
+        php_cli_logrotate_enabled: true
+        php_fpm_logrotate_enabled: true
+
+    - name: Verify version is installed
+      ansible.builtin.command: php --version
+      register: installed_version_check
+      changed_when: false
+
+    - name: Verify PHP-FPM service is running
+      ansible.builtin.systemd:
+        name: "php{{ php_version_to_remove }}-fpm"
+      register: fpm_status
+
+    - name: Display installed state
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Preparation Complete"
+          - "=========================================="
+          - "Installed: {{ installed_version_check.stdout_lines[0] }}"
+          - "FPM Service: {{ fpm_status.status.ActiveState }}"
+          - "Ready for uninstall test"
+          - "=========================================="

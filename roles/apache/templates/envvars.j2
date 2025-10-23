@@ -1,0 +1,8 @@
+{% if apache_envvars %}
+{% for envvar in apache_envvars %}
+{% if envvar.comment is defined %}
+{{ envvar.comment | comment }}
+{% endif %}
+export {{ envvar.name }}={{ envvar.value }}
+{% endfor %}
+{% endif %}

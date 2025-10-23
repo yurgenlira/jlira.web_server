@@ -1,0 +1,273 @@
+---
+# Test virtual hosts from templates (landing1.example.local)
+# Test that environment variables were expanded correctly
+- name: Check if custom log directory exists (expanded from ${CUSTOM_LOG_DIR})
+  ansible.builtin.stat:
+    path: /var/log/apache2/custom
+  register: apache_custom_log_dir_check
+
+- name: Verify custom log directory exists
+  ansible.builtin.assert:
+    that:
+      - apache_custom_log_dir_check.stat.exists
+      - apache_custom_log_dir_check.stat.isdir
+      - apache_custom_log_dir_check.stat.mode == "0755"
+    fail_msg: "Custom log directory does not exist or has incorrect permissions"
+
+- name: Verify DocumentRoot was created with expanded variables
+  ansible.builtin.stat:
+    path: /var/www/landing1
+  register: apache_expanded_docroot_check
+
+- name: Assert DocumentRoot directory exists (expanded from ${SUBDOMAIN})
+  ansible.builtin.assert:
+    that:
+      - apache_expanded_docroot_check.stat.exists
+      - apache_expanded_docroot_check.stat.isdir
+    fail_msg: >-
+      DocumentRoot /var/www/landing1 was not created
+      (should be expanded from ${SUBDOMAIN})
+
+- name: Check if template directory exists
+  ansible.builtin.stat:
+    path: /etc/apache2/templates
+  register: apache_template_dir_check
+
+- name: Verify template directory exists
+  ansible.builtin.assert:
+    that:
+      - apache_template_dir_check.stat.exists
+      - apache_template_dir_check.stat.isdir
+    fail_msg: "Apache template directory does not exist"
+
+- name: Check if HTTP template file exists
+  ansible.builtin.stat:
+    path: /etc/apache2/templates/landing_site.template.conf
+  register: apache_http_template_check
+
+- name: Verify HTTP template file exists
+  ansible.builtin.assert:
+    that:
+      - apache_http_template_check.stat.exists
+      - apache_http_template_check.stat.mode == "0644"
+    fail_msg: "HTTP template file does not exist"
+
+- name: Check if HTTPS template file exists
+  ansible.builtin.stat:
+    path: /etc/apache2/templates/landing_site-ssl.template.conf
+  register: apache_https_template_check
+
+- name: Verify HTTPS template file exists
+  ansible.builtin.assert:
+    that:
+      - apache_https_template_check.stat.exists
+      - apache_https_template_check.stat.mode == "0644"
+    fail_msg: "HTTPS template file does not exist"
+
+# Test landing1.example.local virtual host
+- name: Check if landing1 document root exists
+  ansible.builtin.stat:
+    path: /var/www/landing1
+  register: apache_landing1_docroot_check
+
+- name: Verify landing1 document root exists
+  ansible.builtin.assert:
+    that:
+      - apache_landing1_docroot_check.stat.exists
+      - apache_landing1_docroot_check.stat.isdir
+    fail_msg: "landing1 document root does not exist"
+
+- name: Check if landing1 HTTP config exists
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-available/landing1.example.local.conf
+  register: apache_landing1_http_config_check
+
+- name: Verify landing1 HTTP config exists
+  ansible.builtin.assert:
+    that:
+      - apache_landing1_http_config_check.stat.exists
+      - apache_landing1_http_config_check.stat.mode == "0644"
+    fail_msg: "landing1 HTTP configuration file does not exist"
+
+- name: Read landing1 HTTP config content
+  ansible.builtin.slurp:
+    path: /etc/apache2/sites-available/landing1.example.local.conf
+  register: apache_landing1_http_config_content
+
+- name: Verify landing1 HTTP config includes template
+  ansible.builtin.assert:
+    that:
+      - >-
+        'Include /etc/apache2/templates/landing_site.template.conf'
+        in (apache_landing1_http_config_content.content | b64decode)
+    fail_msg: "landing1 HTTP config does not include the template"
+
+- name: Read landing1 HTTP template content
+  ansible.builtin.slurp:
+    path: /etc/apache2/templates/landing_site.template.conf
+  register: apache_landing1_http_template_content
+
+- name: Verify landing1 HTTP template has server name with variables
+  ansible.builtin.assert:
+    that:
+      - >-
+        'ServerName ${SUBDOMAIN}.${DOMAIN}'
+        in (apache_landing1_http_template_content.content | b64decode)
+    fail_msg: "landing1 HTTP template does not contain ServerName with variables"
+
+- name: Verify landing1 HTTP template has document root with variables
+  ansible.builtin.assert:
+    that:
+      - >-
+        'DocumentRoot /var/www/${SUBDOMAIN}'
+        in (apache_landing1_http_template_content.content | b64decode)
+    fail_msg: "landing1 HTTP template does not contain DocumentRoot with variables"
+
+- name: Verify landing1 HTTP template uses custom log directory with variables
+  ansible.builtin.assert:
+    that:
+      - >-
+        'ErrorLog ${CUSTOM_LOG_DIR}/${SUBDOMAIN}.${DOMAIN}.error_log'
+        in (apache_landing1_http_template_content.content | b64decode)
+      - >-
+        'CustomLog ${CUSTOM_LOG_DIR}/${SUBDOMAIN}.${DOMAIN}.access_log common'
+        in (apache_landing1_http_template_content.content | b64decode)
+    fail_msg: "landing1 HTTP template does not use custom log directory with variables"
+
+- name: Verify landing1 HTTP template includes custom headers
+  ansible.builtin.assert:
+    that:
+      - >-
+        'Include /data/apache-conf/custom-headers.conf'
+        in (apache_landing1_http_template_content.content | b64decode)
+    fail_msg: "landing1 HTTP template does not include custom headers"
+
+- name: Verify landing1 HTTP template has HTTPS redirect
+  ansible.builtin.assert:
+    that:
+      - "'RewriteEngine on' in (apache_landing1_http_template_content.content | b64decode)"
+      - "'RewriteCond %{HTTPS} off' in (apache_landing1_http_template_content.content | b64decode)"
+      - >-
+        'RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]'
+        in (apache_landing1_http_template_content.content | b64decode)
+    fail_msg: "landing1 HTTP template does not have HTTPS redirect"
+
+- name: Check if landing1 HTTPS config exists
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-available/landing1.example.local-ssl.conf
+  register: apache_landing1_https_config_check
+
+- name: Verify landing1 HTTPS config exists
+  ansible.builtin.assert:
+    that:
+      - apache_landing1_https_config_check.stat.exists
+      - apache_landing1_https_config_check.stat.mode == "0644"
+    fail_msg: "landing1 HTTPS configuration file does not exist"
+
+- name: Read landing1 HTTPS config content
+  ansible.builtin.slurp:
+    path: /etc/apache2/sites-available/landing1.example.local-ssl.conf
+  register: apache_landing1_https_config_content
+
+- name: Verify landing1 HTTPS config includes template
+  ansible.builtin.assert:
+    that:
+      - >-
+        'Include /etc/apache2/templates/landing_site-ssl.template.conf'
+        in (apache_landing1_https_config_content.content | b64decode)
+    fail_msg: "landing1 HTTPS config does not include the SSL template"
+
+- name: Read landing1 HTTPS template content
+  ansible.builtin.slurp:
+    path: /etc/apache2/templates/landing_site-ssl.template.conf
+  register: apache_landing1_https_template_content
+
+- name: Verify landing1 HTTPS template has SSL certificates with variables
+  ansible.builtin.assert:
+    that:
+      - >-
+        'SSLCertificateFile /letsencrypt/live/${SUBDOMAIN}.${DOMAIN}/fullchain.pem'
+        in (apache_landing1_https_template_content.content | b64decode)
+      - >-
+        'SSLCertificateKeyFile /letsencrypt/live/${SUBDOMAIN}.${DOMAIN}/privkey.pem'
+        in (apache_landing1_https_template_content.content | b64decode)
+    fail_msg: "landing1 HTTPS template does not have SSL certificate configuration with variables"
+
+- name: Check if landing1 HTTP is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-enabled/landing1.example.local.conf
+  register: apache_landing1_http_enabled_check
+
+- name: Verify landing1 HTTP is enabled
+  ansible.builtin.assert:
+    that:
+      - apache_landing1_http_enabled_check.stat.exists
+      - apache_landing1_http_enabled_check.stat.islnk
+    fail_msg: "landing1 HTTP virtual host is not enabled"
+
+- name: Check if landing1 HTTPS is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-enabled/landing1.example.local-ssl.conf
+  register: apache_landing1_https_enabled_check
+
+- name: Verify landing1 HTTPS is enabled
+  ansible.builtin.assert:
+    that:
+      - apache_landing1_https_enabled_check.stat.exists
+      - apache_landing1_https_enabled_check.stat.islnk
+    fail_msg: "landing1 HTTPS virtual host is not enabled"
+
+# Test landing2.example.local virtual host
+- name: Check if landing2 document root exists
+  ansible.builtin.stat:
+    path: /var/www/landing1
+  register: apache_landing2_docroot_check
+
+- name: Verify landing2 document root exists
+  ansible.builtin.assert:
+    that:
+      - apache_landing2_docroot_check.stat.exists
+      - apache_landing2_docroot_check.stat.isdir
+    fail_msg: "landing2 document root does not exist"
+
+- name: Check if landing2 HTTP config exists
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-available/landing2.example.local.conf
+  register: apache_landing2_http_config_check
+
+- name: Verify landing2 HTTP config exists
+  ansible.builtin.assert:
+    that:
+      - apache_landing2_http_config_check.stat.exists
+      - apache_landing2_http_config_check.stat.mode == "0644"
+    fail_msg: "landing2 HTTP configuration file does not exist"
+
+- name: Check if landing2 HTTPS config exists
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-available/landing2.example.local-ssl.conf
+  register: apache_landing2_https_config_check
+
+- name: Verify landing2 HTTPS config exists
+  ansible.builtin.assert:
+    that:
+      - apache_landing2_https_config_check.stat.exists
+      - apache_landing2_https_config_check.stat.mode == "0644"
+    fail_msg: "landing2 HTTPS configuration file does not exist"
+
+# Verify Apache config syntax is OK
+- name: Run Apache config test
+  ansible.builtin.command:
+    cmd: apachectl configtest
+  register: apache_configtest_final
+  changed_when: false
+  failed_when: false
+
+- name: Display Apache config test result
+  ansible.builtin.debug:
+    var: apache_configtest_final
+
+- name: Verify Apache config is valid (no critical errors)
+  ansible.builtin.assert:
+    that:
+      - apache_configtest_final.rc == 0
+    fail_msg: "Apache configuration has critical errors"

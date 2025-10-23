@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Check if logrotate configuration file exists
+  ansible.builtin.stat:
+    path: /etc/logrotate.d/php{{ php_version }}-cli
+  register: logrotate_cli_file
+  when: php_cli_logrotate_enabled
+
+- name: Assert logrotate configuration file exists
+  ansible.builtin.assert:
+    that:
+      - logrotate_cli_file.stat.exists
+      - logrotate_cli_file.stat.isreg
+    fail_msg: "Logrotate configuration file /etc/logrotate.d/php{{ php_version }}-cli does not exist"
+  when: php_cli_logrotate_enabled
+
+- name: Assert logrotate configuration file has correct permissions
+  ansible.builtin.assert:
+    that:
+      - logrotate_cli_file.stat.mode == '0644'
+      - logrotate_cli_file.stat.pw_name == 'root'
+      - logrotate_cli_file.stat.gr_name == 'root'
+    fail_msg: "Logrotate configuration file has incorrect permissions, owner, or group"
+  when: php_cli_logrotate_enabled
+
+- name: Read logrotate configuration file
+  ansible.builtin.slurp:
+    path: /etc/logrotate.d/php{{ php_version }}-cli
+  register: logrotate_cli_content
+  when: php_cli_logrotate_enabled
+
+- name: Decode logrotate configuration content
+  ansible.builtin.set_fact:
+    logrotate_cli_config: "{{ logrotate_cli_content.content | b64decode }}"
+  when: php_cli_logrotate_enabled
+
+- name: Assert logrotate configuration contains correct log path
+  ansible.builtin.assert:
+    that:
+      - "php_cli_logrotate_path in logrotate_cli_config"
+    fail_msg: "Logrotate configuration does not contain the expected log path {{ php_cli_logrotate_path }}"
+  when: php_cli_logrotate_enabled
+
+- name: Assert logrotate configuration contains expected options
+  ansible.builtin.assert:
+    that:
+      - "'daily' in logrotate_cli_config"
+      - "'rotate 7' in logrotate_cli_config"
+      - "'missingok' in logrotate_cli_config"
+      - "'notifempty' in logrotate_cli_config"
+      - "'compress' in logrotate_cli_config"
+      - "'delaycompress' in logrotate_cli_config"
+    fail_msg: "Logrotate configuration is missing expected rotation options"
+  when: php_cli_logrotate_enabled
+
+- name: Verify logrotate configuration syntax
+  ansible.builtin.command: logrotate -d /etc/logrotate.d/php{{ php_version }}-cli
+  register: logrotate_syntax_check
+  changed_when: false
+  failed_when: logrotate_syntax_check.rc != 0
+  when: php_cli_logrotate_enabled
+
+- name: Assert logrotate configuration has valid syntax
+  ansible.builtin.assert:
+    that:
+      - logrotate_syntax_check.rc == 0
+    fail_msg: "Logrotate configuration has invalid syntax"
+  when: php_cli_logrotate_enabled
+
+- name: Check if PHP CLI log directory exists
+  ansible.builtin.stat:
+    path: "{{ php_cli_logrotate_path | dirname }}"
+  register: php_cli_log_dir
+  when: php_cli_logrotate_enabled
+
+- name: Assert PHP CLI log directory exists
+  ansible.builtin.assert:
+    that:
+      - php_cli_log_dir.stat.exists
+      - php_cli_log_dir.stat.isdir
+    fail_msg: "PHP CLI log directory {{ php_cli_logrotate_path | dirname }} does not exist"
+  when: php_cli_logrotate_enabled

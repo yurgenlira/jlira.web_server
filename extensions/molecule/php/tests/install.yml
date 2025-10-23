@@ -1,31 +1,65 @@
+# SPDX-License-Identifier: MIT-0
 ---
+- name: Check if PHP binary exists
+  ansible.builtin.stat:
+    path: /usr/bin/php{{ php_version }}
+  register: php_binary_check
+
+- name: Assert PHP binary exists
+  ansible.builtin.assert:
+    that:
+      - php_binary_check.stat.exists
+      - php_binary_check.stat.executable
+    fail_msg: "PHP {{ php_version }} binary not found at /usr/bin/php{{ php_version }}"
+
 - name: Check PHP version
-  ansible.builtin.command: php --version
-  register: php_version
+  ansible.builtin.command: /usr/bin/php{{ php_version }} --version
+  register: php_version_check
   changed_when: false
 
-- name: Assert PHP 8.4 is installed
+- name: Assert PHP is installed
   ansible.builtin.assert:
-    that: "'PHP 8.4' in php_version.stdout"
-    fail_msg: "PHP 8.4 is not installed"
+    that: "php_version in php_version_check.stdout"
+    fail_msg: "PHP {{ php_version }} is not installed"
 
 - name: Check PHP extensions
-  ansible.builtin.command: php -m
-  register: php_modules
+  ansible.builtin.command: php{{ php_version }} -m
+  register: php_modules_check
   changed_when: false
 
 - name: Assert core extensions are loaded
   ansible.builtin.assert:
     that:
-      - "'Core' in php_modules.stdout"
+      - "'bcmath' in php_modules_check.stdout"
+      - "'curl' in php_modules_check.stdout"
     fail_msg: "Core PHP extensions are not loaded"
 
-- name: Test basic PHP execution
-  ansible.builtin.command: php -r "echo 'PHP is working';"
-  register: php_test
+- name: Check if PHP-FPM is installed
+  ansible.builtin.command: php-fpm{{ php_version }} --version
+  register: phpfpm_version_check
   changed_when: false
+  failed_when: false
+  when: php_fpm_enabled
 
-- name: Assert PHP basic functionality
+- name: Assert PHP-FPM is installed
   ansible.builtin.assert:
-    that: "'PHP is working' in php_test.stdout"
-    fail_msg: "Basic PHP execution failed"
+    that:
+      - phpfpm_version_check.rc == 0
+      - "php_version in phpfpm_version_check.stdout"
+    fail_msg: "PHP-FPM {{ php_version }} is not installed"
+  when: php_fpm_enabled
+
+- name: Check if Composer is installed
+  ansible.builtin.command: composer --version
+  register: composer_version_check
+  changed_when: false
+  failed_when: false
+  when: php_composer_enabled
+
+- name: Assert Composer is installed
+  ansible.builtin.assert:
+    that:
+      - composer_version_check.rc == 0
+      - "'Composer' in composer_version_check.stdout"
+    fail_msg: "Composer is not installed"
+  when: php_composer_enabled

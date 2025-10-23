@@ -1,0 +1,175 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Create HTTP virtual host configuration files
+  ansible.builtin.template:
+    src: vhost.conf.j2
+    dest: "/etc/apache2/sites-available/{{ item.name }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.http is defined
+  notify: Reload apache
+
+- name: Create HTTPS virtual host configuration files
+  ansible.builtin.template:
+    src: vhost-ssl.conf.j2
+    dest: "/etc/apache2/sites-available/{{ item.name }}-ssl.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.https is defined
+  notify: Reload apache
+
+- name: Create document root directories for virtual hosts
+  ansible.builtin.shell: |
+    set -o pipefail
+    source /etc/apache2/envvars
+    {% for envvar in apache_envvars | default([]) %}
+    export {{ envvar.name }}="{{ envvar.value }}"
+    {% endfor %}
+    path=$(echo "{{ item.document_root }}" | envsubst)
+    mkdir -p "$path"
+  args:
+    executable: /bin/bash
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+  changed_when: false
+
+- name: Create HTTP error log directories for virtual hosts
+  ansible.builtin.shell: |
+    set -o pipefail
+    source /etc/apache2/envvars
+    {% for envvar in apache_envvars | default([]) %}
+    export {{ envvar.name }}="{{ envvar.value }}"
+    {% endfor %}
+    logpath=$(echo "{{ item.http.error_log }}" | envsubst)
+    logdir=$(dirname "$logpath")
+    mkdir -p "$logdir"
+    echo "$logdir"
+  args:
+    executable: /bin/bash
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.http is defined
+    - item.http.error_log is defined
+  changed_when: false
+
+- name: Create HTTP custom log directories for virtual hosts
+  ansible.builtin.shell: |
+    set -o pipefail
+    source /etc/apache2/envvars
+    {% for envvar in apache_envvars | default([]) %}
+    export {{ envvar.name }}="{{ envvar.value }}"
+    {% endfor %}
+    logpath=$(echo "{{ item.http.access_log }}" | envsubst | awk '{print $1}')
+    logdir=$(dirname "$logpath")
+    mkdir -p "$logdir"
+    echo "$logdir"
+  args:
+    executable: /bin/bash
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.http is defined
+    - item.http.access_log is defined
+  changed_when: false
+
+- name: Create HTTPS error log directories for virtual hosts
+  ansible.builtin.shell: |
+    set -o pipefail
+    source /etc/apache2/envvars
+    {% for envvar in apache_envvars | default([]) %}
+    export {{ envvar.name }}="{{ envvar.value }}"
+    {% endfor %}
+    logpath=$(echo "{{ item.https.error_log }}" | envsubst)
+    logdir=$(dirname "$logpath")
+    mkdir -p "$logdir"
+    echo "$logdir"
+  args:
+    executable: /bin/bash
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.https is defined
+    - item.https.error_log is defined
+  changed_when: false
+
+- name: Create HTTPS custom log directories for virtual hosts
+  ansible.builtin.shell: |
+    set -o pipefail
+    source /etc/apache2/envvars
+    {% for envvar in apache_envvars | default([]) %}
+    export {{ envvar.name }}="{{ envvar.value }}"
+    {% endfor %}
+    logpath=$(echo "{{ item.https.access_log }}" | envsubst | awk '{print $1}')
+    logdir=$(dirname "$logpath")
+    mkdir -p "$logdir"
+    echo "$logdir"
+  args:
+    executable: /bin/bash
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.https is defined
+    - item.https.access_log is defined
+  changed_when: false
+
+- name: Enable HTTP virtual hosts
+  ansible.builtin.command:
+    cmd: "a2ensite {{ item.name }}"
+  register: apache_enable_http_vhost_result
+  changed_when: "'Enabling site' in apache_enable_http_vhost_result.stdout"
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.http is defined
+    - item.http.enabled | default(true)
+  notify: Reload apache
+
+- name: Disable HTTP virtual hosts
+  ansible.builtin.command:
+    cmd: "a2dissite {{ item.name }}"
+  register: apache_disable_http_vhost_result
+  changed_when:
+    - "'Site' in apache_disable_http_vhost_result.stdout"
+    - "'disabled' in apache_disable_http_vhost_result.stdout"
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.http is defined
+    - not (item.http.enabled | default(true))
+  notify: Reload apache
+
+- name: Enable HTTPS virtual hosts
+  ansible.builtin.command:
+    cmd: "a2ensite {{ item.name }}-ssl"
+  register: apache_enable_https_vhost_result
+  changed_when: "'Enabling site' in apache_enable_https_vhost_result.stdout"
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.https is defined
+    - item.https.enabled | default(true)
+  notify: Reload apache
+
+- name: Disable HTTPS virtual hosts
+  ansible.builtin.command:
+    cmd: "a2dissite {{ item.name }}-ssl"
+  register: apache_disable_https_vhost_result
+  changed_when:
+    - "'Site' in apache_disable_https_vhost_result.stdout"
+    - "'disabled' in apache_disable_https_vhost_result.stdout"
+  loop: "{{ apache_virtual_hosts }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.https is defined
+    - not (item.https.enabled | default(true))
+  notify: Reload apache

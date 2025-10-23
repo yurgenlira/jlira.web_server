@@ -1,8 +1,27 @@
 ---
 - name: Converge
-  hosts: all
+  hosts: web_server
   gather_facts: true
   tasks:
-    - name: Apply role under test
+    - name: Apply apache role under test
       ansible.builtin.include_role:
         name: apache
+      tags:
+        - install
+        - apache_install
+        - php_integration
+        - apache_php_integration
+        - configure
+        - apache_configure
+        - custom_configs
+        - apache_custom_configs
+        - virtual_hosts
+        - apache_virtual_hosts
+        - virtual_hosts_from_templates
+        - apache_virtual_hosts_from_templates
+        - status_page
+        - apache_status_page
+        - php_fpm_status_proxy
+        - apache_php_fpm_status_proxy
+        - authentication
+        - apache_authentication

@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Check if logrotate FPM configuration file exists
+  ansible.builtin.stat:
+    path: "/etc/logrotate.d/php{{ php_version }}-fpm-pool"
+  register: logrotate_fpm_file
+  when: php_fpm_enabled and php_fpm_logrotate_enabled
+
+- name: Assert logrotate FPM configuration file exists
+  ansible.builtin.assert:
+    that:
+      - logrotate_fpm_file.stat.exists
+      - logrotate_fpm_file.stat.isreg
+    fail_msg: "Logrotate FPM configuration file /etc/logrotate.d/php{{ php_version }}-fpm-pool does not exist"
+  when: php_fpm_enabled and php_fpm_logrotate_enabled
+
+- name: Assert logrotate FPM configuration file has correct permissions
+  ansible.builtin.assert:
+    that:
+      - logrotate_fpm_file.stat.mode == '0644'
+      - logrotate_fpm_file.stat.pw_name == 'root'
+      - logrotate_fpm_file.stat.gr_name == 'root'
+    fail_msg: "Logrotate FPM configuration file has incorrect permissions, owner, or group"
+  when: php_fpm_enabled and php_fpm_logrotate_enabled
+
+- name: Read logrotate FPM configuration file
+  ansible.builtin.slurp:
+    path: "/etc/logrotate.d/php{{ php_version }}-fpm-pool"
+  register: logrotate_fpm_content
+  when: php_fpm_enabled and php_fpm_logrotate_enabled
+
+- name: Decode logrotate FPM configuration content
+  ansible.builtin.set_fact:
+    logrotate_fpm_config: "{{ logrotate_fpm_content.content | b64decode }}"
+  when: php_fpm_enabled and php_fpm_logrotate_enabled
+
+- name: Assert logrotate FPM configuration contains correct log path
+  ansible.builtin.assert:
+    that:
+      - "php_fpm_logrotate_path in logrotate_fpm_config"
+    fail_msg: "Logrotate FPM configuration does not contain the expected log path {{ php_fpm_logrotate_path }}"
+  when: php_fpm_enabled and php_fpm_logrotate_enabled
+
+- name: Assert logrotate FPM configuration contains expected options
+  ansible.builtin.assert:
+    that:
+      - "'daily' in logrotate_fpm_config"
+      - "'rotate 7' in logrotate_fpm_config"
+      - "'missingok' in logrotate_fpm_config"
+      - "'notifempty' in logrotate_fpm_config"
+      - "'compress' in logrotate_fpm_config"
+      - "'delaycompress' in logrotate_fpm_config"
+    fail_msg: "Logrotate FPM configuration is missing expected rotation options"
+  when: php_fpm_enabled and php_fpm_logrotate_enabled
+
+- name: Verify logrotate FPM configuration syntax
+  ansible.builtin.command: logrotate -d /etc/logrotate.d/php{{ php_version }}-fpm-pool
+  register: logrotate_fpm_syntax_check
+  changed_when: false
+  failed_when: logrotate_fpm_syntax_check.rc != 0
+  when: php_fpm_enabled and php_fpm_logrotate_enabled
+
+- name: Assert logrotate FPM configuration has valid syntax
+  ansible.builtin.assert:
+    that:
+      - logrotate_fpm_syntax_check.rc == 0
+    fail_msg: "Logrotate FPM configuration has invalid syntax"
+  when: php_fpm_enabled and php_fpm_logrotate_enabled
+
+- name: Check if PHP FPM log directory exists
+  ansible.builtin.stat:
+    path: "{{ php_fpm_logrotate_path | dirname }}"
+  register: php_fpm_log_dir
+  when: php_fpm_enabled and php_fpm_logrotate_enabled
+
+- name: Assert PHP FPM log directory exists
+  ansible.builtin.assert:
+    that:
+      - php_fpm_log_dir.stat.exists
+      - php_fpm_log_dir.stat.isdir
+    fail_msg: "PHP FPM log directory {{ php_fpm_logrotate_path | dirname }} does not exist"
+  when: php_fpm_enabled and php_fpm_logrotate_enabled

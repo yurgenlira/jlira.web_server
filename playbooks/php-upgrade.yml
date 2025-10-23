@@ -1,0 +1,161 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Playbook for upgrading PHP versions
+#
+# This playbook performs a complete PHP version upgrade by:
+# 1. Validating old and new versions
+# 2. Removing the old PHP version (packages, configs, services)
+# 3. Installing the new PHP version
+# 4. Configuring the new version
+# 5. Setting the new version as default
+#
+# Usage Examples:
+#
+# Basic upgrade (8.3 -> 8.4):
+#   ansible-playbook -i inventory playbooks/php-upgrade.yml \
+#     -e "php_old_version=8.3" \
+#     -e "php_version=8.4"
+#
+# With PHP-FPM:
+#   ansible-playbook -i inventory playbooks/php-upgrade.yml \
+#     -e "php_old_version=8.3" \
+#     -e "php_version=8.4" \
+#     -e "php_fpm_enabled=true"
+#
+# With custom packages:
+#   ansible-playbook -i inventory playbooks/php-upgrade.yml \
+#     -e "php_old_version=8.3" \
+#     -e "php_version=8.4" \
+#     -e '{"php_packages": ["php8.4-cli", "php8.4-fpm", "php8.4-mysql"]}'
+#
+# Important:
+#   - Always specify php_old_version to trigger removal
+#   - Ensure php_old_version != php_version
+#   - Test in staging environment first
+#   - Backup databases and configurations before upgrading
+#   - Review application compatibility with new PHP version
+#   - Check extension availability for new version
+
+- name: Upgrade PHP Version
+  hosts: php
+  become: true
+
+  pre_tasks:
+    - name: Validate upgrade parameters
+      ansible.builtin.assert:
+        that:
+          - php_old_version is defined
+          - php_version is defined
+          - php_old_version | length > 0
+          - php_version | length > 0
+          - php_old_version != php_version
+        fail_msg: >-
+          Both php_old_version and php_version must be defined and different.
+          Current values: php_old_version={{ php_old_version | default('undefined') }},
+          php_version={{ php_version | default('undefined') }}
+        success_msg: >-
+          Upgrade validated: PHP {{ php_old_version }} -> {{ php_version }}
+
+    - name: Display upgrade plan
+      ansible.builtin.debug:
+        msg:
+          - "═══════════════════════════════════════════════════════════════════════"
+          - "PHP Upgrade Plan"
+          - "═══════════════════════════════════════════════════════════════════════"
+          - ""
+          - "Current Version: PHP {{ php_old_version }}"
+          - "Target Version:  PHP {{ php_version }}"
+          - ""
+          - "Steps:"
+          - "  1. Validate PHP versions"
+          - "  2. Remove PHP {{ php_old_version }}"
+          - "     • Stop and disable services"
+          - "     • Remove packages and configurations"
+          - "     • Clean up alternatives system"
+          - "  3. Install PHP {{ php_version }}"
+          - "     • Add repository if needed"
+          - "     • Install packages"
+          - "     • Configure PHP settings"
+          - "  4. Set PHP {{ php_version }} as default"
+          - "  5. Verify installation"
+          - ""
+          - "═══════════════════════════════════════════════════════════════════════"
+
+    - name: Confirm upgrade
+      ansible.builtin.pause:
+        prompt: |
+
+          ⚠️  This will upgrade PHP from {{ php_old_version }} to {{ php_version }}.
+
+          This is a potentially disruptive operation:
+          • PHP {{ php_old_version }} will be completely removed
+          • All services using PHP will be restarted
+          • Application compatibility should be verified beforehand
+
+          Have you:
+          ✓ Tested in staging environment?
+          ✓ Backed up configurations and databases?
+          ✓ Verified application compatibility?
+          ✓ Scheduled maintenance window?
+
+          Press CTRL+C and then A to abort, or ENTER to continue
+      when:
+        - not ansible_check_mode
+        - not (php_skip_confirm | default(false))
+
+  roles:
+    - role: php
+
+  post_tasks:
+    - name: Verify PHP upgrade
+      ansible.builtin.command: php --version
+      register: php_version_check
+      changed_when: false
+
+    - name: Verify PHP-FPM service (if enabled)
+      ansible.builtin.systemd:
+        name: "php{{ php_version }}-fpm"
+      register: php_fpm_status
+      when: php_fpm_enabled | default(true)
+
+    - name: Display upgrade summary
+      ansible.builtin.debug:
+        msg:
+          - "═══════════════════════════════════════════════════════════════════════"
+          - "PHP Upgrade Completed Successfully!"
+          - "═══════════════════════════════════════════════════════════════════════"
+          - ""
+          - "Upgrade Summary:"
+          - "  • Old version {{ php_old_version }}: Removed ✓"
+          - "  • New version {{ php_version }}: Installed ✓"
+          - "  • Default CLI version: {{ php_version }} ✓"
+          - >-
+            • PHP-FPM {{ php_version }}:
+            {{ 'Running ✓' if (php_fpm_enabled | default(true)
+            and php_fpm_status.status.ActiveState == 'active')
+            else 'Not enabled' }}
+          - ""
+          - "Current PHP Version:"
+          - >-
+            {{ php_version_check.stdout_lines[0]
+            if php_version_check.stdout_lines | length > 0
+            else 'Version check failed' }}
+          - ""
+          - "⚠️  Important Next Steps:"
+          - "  1. Test your applications thoroughly"
+          - "  2. Check error logs: /var/log/php{{ php_version }}-fpm.log"
+          - "  3. Monitor application performance"
+          - "  4. Verify all extensions are working"
+          - "  5. Update any application-specific PHP configurations"
+          - ""
+          - "Common Issues:"
+          - "  • Deprecated functions: Check PHP {{ php_version }} migration guide"
+          - "  • Missing extensions: Install with apt install php{{ php_version }}-<ext>"
+          - "  • Configuration changes: Review php.ini differences"
+          - ""
+          - "Rollback (if needed):"
+          - >-
+            ansible-playbook playbooks/php-upgrade.yml
+            -e 'php_old_version={{ php_version }} php_version={{ php_old_version }}'
+          - ""
+          - "═══════════════════════════════════════════════════════════════════════"

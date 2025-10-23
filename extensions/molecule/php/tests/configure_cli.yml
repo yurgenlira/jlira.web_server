@@ -1,0 +1,108 @@
+---
+- name: Check if error log directory exists
+  ansible.builtin.stat:
+    path: "{{ php_cli_settings.error_log.value | dirname }}"
+  register: error_log_dir_stat
+  when:
+    - php_cli_settings.error_log is defined
+    - php_cli_settings.error_log.type == 'path'
+    - php_cli_settings.error_log.value | dirname != ""
+
+- name: Assert error log directory exists
+  ansible.builtin.assert:
+    that:
+      - error_log_dir_stat.stat.exists
+      - error_log_dir_stat.stat.isdir
+    fail_msg: >-
+      Error log directory '{{ php_cli_settings.error_log.value | dirname }}'
+      does not exist
+    success_msg: >-
+      Error log directory '{{ php_cli_settings.error_log.value | dirname }}'
+      exists
+  when:
+    - php_cli_settings.error_log is defined
+    - php_cli_settings.error_log.type == 'path'
+    - php_cli_settings.error_log.value | dirname != ""
+
+- name: Get PHP CLI configuration via php -i
+  ansible.builtin.command: php{{ php_version }} -i
+  register: php_info
+  changed_when: false
+
+- name: Extract PHP CLI configuration values from php -i output
+  ansible.builtin.set_fact:
+    php_config_values:
+      short_open_tag: "{{ php_info.stdout | regex_search('short_open_tag => ([^ ]+) ', '\\1') | first }}"
+      memory_limit: "{{ php_info.stdout | regex_search('memory_limit => ([^ ]+) ', '\\1') | first }}"
+      error_reporting: "{{ php_info.stdout | regex_search('error_reporting => ([^ ]+) ', '\\1') | first }}"
+      error_log: "{{ php_info.stdout | regex_search('error_log => ([^ ]+) ', '\\1') | first }}"
+      post_max_size: "{{ php_info.stdout | regex_search('post_max_size => ([^ ]+) ', '\\1') | first }}"
+
+- name: Display extracted PHP CLI configuration values
+  ansible.builtin.debug:
+    var: php_config_values
+
+- name: Normalize expected values for comparison
+  ansible.builtin.set_fact:
+    expected_values:
+      short_open_tag: "{{ 'On' if php_cli_settings.short_open_tag.value else 'Off' }}"
+      memory_limit: "{{ php_cli_settings.memory_limit.value }}"
+      error_reporting: "{{ php_cli_settings.error_reporting.value }}"
+      error_log: "{{ php_cli_settings.error_log.value }}"
+      post_max_size: "{{ php_cli_settings.post_max_size.value }}"
+
+- name: Display expected configuration values
+  ansible.builtin.debug:
+    var: expected_values
+
+- name: Assert short_open_tag is configured correctly
+  ansible.builtin.assert:
+    that:
+      - php_config_values.short_open_tag == expected_values.short_open_tag
+    fail_msg: >-
+      short_open_tag is '{{ php_config_values.short_open_tag }}'
+      but expected '{{ expected_values.short_open_tag }}'
+    success_msg: >-
+      short_open_tag is correctly set to '{{ expected_values.short_open_tag }}'
+
+- name: Assert memory_limit is configured correctly
+  ansible.builtin.assert:
+    that:
+      - php_config_values.memory_limit == expected_values.memory_limit
+    fail_msg: "memory_limit is '{{ php_config_values.memory_limit }}' but expected '{{ expected_values.memory_limit }}'"
+    success_msg: "memory_limit is correctly set to '{{ expected_values.memory_limit }}'"
+
+- name: Get numeric value of expected error_reporting
+  ansible.builtin.command: php -r 'error_reporting({{ expected_values.error_reporting }}); echo error_reporting();'
+  register: expected_error_reporting_numeric
+  changed_when: false
+
+- name: Assert error_reporting is configured correctly
+  ansible.builtin.assert:
+    that:
+      - php_config_values.error_reporting == expected_error_reporting_numeric.stdout
+    fail_msg: >-
+      error_reporting is '{{ php_config_values.error_reporting }}'
+      but expected '{{ expected_error_reporting_numeric.stdout }}'
+      ({{ expected_values.error_reporting }})
+    success_msg: >-
+      error_reporting is correctly set to
+      '{{ expected_error_reporting_numeric.stdout }}'
+      ({{ expected_values.error_reporting }})
+
+- name: Assert error_log is configured correctly
+  ansible.builtin.assert:
+    that:
+      - php_config_values.error_log == expected_values.error_log
+    fail_msg: "error_log is '{{ php_config_values.error_log }}' but expected '{{ expected_values.error_log }}'"
+    success_msg: "error_log is correctly set to '{{ expected_values.error_log }}'"
+
+- name: Assert post_max_size is configured correctly
+  ansible.builtin.assert:
+    that:
+      - php_config_values.post_max_size == expected_values.post_max_size
+    fail_msg: >-
+      post_max_size is '{{ php_config_values.post_max_size }}'
+      but expected '{{ expected_values.post_max_size }}'
+    success_msg: >-
+      post_max_size is correctly set to '{{ expected_values.post_max_size }}'

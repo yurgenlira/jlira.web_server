@@ -1,0 +1,75 @@
+---
+# yamllint disable-line rule:document-start
+# This is a vars file, not a playbook
+# ansible-lint: skip=syntax-check
+
+# ============================================================================
+# Molecule Test Variables for PHP Role
+# ============================================================================
+#
+# This vars file is used for the initial PHP installation in converge.yml
+# The side_effect.yml playbook tests the upgrade scenario from 8.2 to 8.4
+#
+# Test Flow:
+# 1. converge.yml  - Installs PHP 8.2 with all features
+# 2. side_effect.yml - Upgrades from PHP 8.2 to PHP 8.4 (tests uninstall)
+# 3. verify.yml    - Verifies PHP 8.4 is installed and 8.2 is removed
+# ============================================================================
+
+# Note: php_old_version is NOT set here - it's only used in side_effect.yml
+# to test the upgrade scenario
+
+php_fpm_enabled: true
+php_composer_enabled: true
+php_cli_set_as_default_version: true
+php_packages:
+  - "php{{ php_version }}-bcmath"
+  - "php{{ php_version }}-curl"
+php_cli_settings:
+  short_open_tag:
+    value: true
+    type: bool
+  memory_limit:
+    value: "512M"
+    type: string
+  error_reporting:
+    value: E_ALL & ~E_NOTICE & ~E_STRICT & ~E_DEPRECATED
+    type: string
+  error_log:
+    value: /var/log/php/error.log
+    type: path
+  post_max_size:
+    value: 256M
+    type: size
+php_fpm_settings:
+  max_execution_time:
+    value: 120
+    type: int
+  memory_limit:
+    value: "1024M"
+    type: string
+  error_reporting:
+    value: E_ALL & ~E_NOTICE & ~E_STRICT
+    type: string
+  error_log:
+    value: /var/log/php8.2/php-fpm-error.log
+    type: path
+php_pool_settings:
+  pool_name: test-pool
+  pm: dynamic
+  pm_max_children: 10
+  pm_start_servers: 3
+  pm_min_spare_servers: 2
+  pm_max_spare_servers: 5
+php_status_page:
+  enabled: true
+  status_path: /fpm-status
+  ping_path: /fpm-ping
+  ping_response: pong-test
+php_pool_additional_settings:
+  slowlog: /var/log/php/php-fpm-slow.log
+  php_admin_value[error_log]: /var/log/php/pool-admin-error.log
+  php_admin_flag[log_errors]: "on"
+php_mssql_extension_enabled: true
+php_fpm_logrotate_enabled: true
+php_cli_logrotate_enabled: true

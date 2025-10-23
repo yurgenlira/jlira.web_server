@@ -1,0 +1,14 @@
+---
+- name: Configure logrotate for PHP FPM
+  ansible.builtin.template:
+    src: logrotate_fpm.conf.j2
+    dest: /etc/logrotate.d/php{{ php_version }}-fpm-pool
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Verify PHP FPM logrotate configuration syntax
+  ansible.builtin.command: logrotate -d /etc/logrotate.d/php{{ php_version }}-fpm-pool
+  register: php_fpm_logrotate_syntax_check
+  changed_when: false
+  failed_when: php_fpm_logrotate_syntax_check.rc != 0

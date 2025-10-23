@@ -1,0 +1,73 @@
+; SPDX-License-Identifier: MIT-0
+;## ANSIBLE MANAGED FILE ##.
+{% if php_pool_settings.pool_name is defined %}
+[{{ php_pool_settings.pool_name }}]
+{% else %}
+[www-{{ php_version }}]
+{% endif %}
+user = www-data
+group = www-data
+listen = /run/php/php{{ php_version }}-fpm.sock
+listen.owner = www-data
+listen.group = www-data
+{% if php_pool_settings.pm is defined %}
+pm = {{ php_pool_settings.pm }}
+{% else %}
+pm = dynamic
+{% endif %}
+
+; The number of child processes to be created when pm is set to 'static' and the
+; maximum number of child processes when pm is set to 'dynamic' or 'ondemand'.
+; This value sets the limit on the number of simultaneous requests that will be
+; served. Equivalent to the ApacheMaxClients directive with mpm_prefork.
+; Equivalent to the PHP_FCGI_CHILDREN environment variable in the original PHP
+; CGI. The below defaults are based on a server without much resources. Don't
+; forget to tweak pm.* to fit your needs.
+; Note: Used when pm is set to 'static', 'dynamic' or 'ondemand'
+; Note: This value is mandatory.
+{% if php_pool_settings.pm_max_children is defined %}
+pm.max_children = {{ php_pool_settings.pm_max_children }}
+{% else %}
+pm.max_children = 5
+{% endif %}
+
+; The number of child processes created on startup.
+; Note: Used only when pm is set to 'dynamic'
+; Default Value: (min_spare_servers + max_spare_servers) / 2
+{% if php_pool_settings.pm_start_servers is defined %}
+pm.start_servers = {{ php_pool_settings.pm_start_servers }}
+{% else %}
+pm.start_servers = 2
+{% endif %}
+
+; The desired minimum number of idle server processes.
+; Note: Used only when pm is set to 'dynamic'
+; Note: Mandatory when pm is set to 'dynamic'
+{% if php_pool_settings.pm_min_spare_servers is defined %}
+pm.min_spare_servers = {{ php_pool_settings.pm_min_spare_servers }}
+{% else %}
+pm.min_spare_servers = 1
+{% endif %}
+
+; The desired maximum number of idle server processes.
+; Note: Used only when pm is set to 'dynamic'
+; Note: Mandatory when pm is set to 'dynamic'
+{% if php_pool_settings.pm_max_spare_servers is defined %}
+pm.max_spare_servers = {{ php_pool_settings.pm_max_spare_servers }}
+{% else %}
+pm.max_spare_servers = 3
+{% endif %}
+
+{% if php_status_page.enabled | default(false) %}
+; Status page configuration
+pm.status_path = {{ php_status_page.status_path | default('/status') }}
+ping.path = {{ php_status_page.ping_path | default('/ping') }}
+ping.response = {{ php_status_page.ping_response | default('pong') }}
+{% endif %}
+
+{% if php_pool_additional_settings is defined and php_pool_additional_settings | length > 0 %}
+; Additional pool configuration settings
+{% for setting_name, setting_value in php_pool_additional_settings.items() %}
+{{ setting_name }} = {{ setting_value }}
+{% endfor %}
+{% endif %}

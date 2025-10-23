@@ -1,33 +1,46 @@
+# SPDX-License-Identifier: MIT-0
 ---
-- name: Add Ondrej PHP PPA
-  ansible.builtin.command:
-    cmd: "apt-add-repository {{ php_ppa_repository }} -y"
-  args:
-    creates: "/etc/apt/sources.list.d/{{ php_ppa_file }}"
-
-- name: Install basic packages {{ php_version }}
-  ansible.builtin.apt:
-    name: "{{ php_packages }}"
-    state: present
-
-- name: Install fpm package {{ php_version }}
+- name: Install prerequisites for installation
   ansible.builtin.apt:
     name:
-      - "php{{ php_version }}-fpm"
+      - curl
+      - gnupg
+      - dirmngr
+    state: present
+    update_cache: true
+
+- name: Add Ondrej PHP PPA repository
+  ansible.builtin.apt_repository:
+    repo: "{{ php_ppa_repository }}"
+    state: present
+    update_cache: true
+
+- name: Install PHP CLI and packages for version {{ php_version }}
+  ansible.builtin.apt:
+    name: "{{ ['php' ~ php_version ~ '-cli'] + php_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install PHP-FPM for version {{ php_version }}
+  ansible.builtin.apt:
+    name: "php{{ php_version }}-fpm"
     state: present
   when: php_fpm_enabled
 
-- name: Download and install Composer
+- name: Ensure PHP-FPM service is started and enabled
+  ansible.builtin.service:
+    name: "php{{ php_version }}-fpm"
+    state: started
+    enabled: true
+  when: php_fpm_enabled
+
+- name: Download and install Composer globally
   ansible.builtin.shell: |
     set -o pipefail
     curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer --quiet
+    chmod +x /usr/local/bin/composer
   args:
     creates: /usr/local/bin/composer
     executable: /bin/bash
-  when: php_composer_enabled
-
-- name: Make Composer executable
-  ansible.builtin.file:
-    path: /usr/local/bin/composer
-    mode: '0755'
   when: php_composer_enabled

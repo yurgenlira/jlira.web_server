@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Create directories for custom configuration files
+  ansible.builtin.file:
+    path: "{{ item.path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ apache_custom_configs }}"
+  when: apache_custom_configs | length > 0
+
+- name: Create custom Apache configuration files
+  ansible.builtin.copy:
+    content: |
+      ## ANSIBLE MANAGED FILE - {{ item.name }} ##
+      {{ item.content }}
+    dest: "{{ item.path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ apache_custom_configs }}"
+  when: apache_custom_configs | length > 0
+  notify: Reload apache

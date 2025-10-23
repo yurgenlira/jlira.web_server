@@ -8,7 +8,7 @@
     state: present
     update_cache: true
 
-- name: Start and enable apache2 service
+- name: Start apache2 service
   ansible.builtin.service:
     name: apache2
     state: started

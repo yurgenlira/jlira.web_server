@@ -1,0 +1,28 @@
+## ANSIBLE MANAGED FILE ##
+
+<IfModule mod_ssl.c>
+    <VirtualHost {% for port in apache_https_ports %}_default_:{{ port }}{% if not loop.last %} {% endif %}{% endfor %}>
+        ServerName {{ apache_server_name }}
+        ServerAdmin webmaster@{{ apache_server_name }}
+        DocumentRoot /var/www/html
+
+        ErrorLog ${APACHE_LOG_DIR}/error.log
+        CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+        SSLEngine on
+        SSLCertificateFile /etc/ssl/certs/ssl-cert-snakeoil.pem
+        SSLCertificateKeyFile /etc/ssl/private/ssl-cert-snakeoil.key
+
+{% if apache_php_fpm_integration and (not apache_php_fpm_set_default) %}
+        Include /etc/apache2/conf-available/php-fpm.conf
+{% endif %}
+
+        <FilesMatch "\.(?:cgi|shtml|phtml|php)$">
+            SSLOptions +StdEnvVars
+        </FilesMatch>
+
+        <Directory /usr/lib/cgi-bin>
+            SSLOptions +StdEnvVars
+        </Directory>
+    </VirtualHost>
+</IfModule>

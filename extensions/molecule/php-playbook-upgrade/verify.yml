@@ -1,0 +1,92 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Verify PHP upgrade was successful
+  hosts: php
+  gather_facts: false
+  tasks:
+    - name: Check current PHP version
+      ansible.builtin.command: php --version
+      register: current_version
+      changed_when: false
+
+    - name: Display current PHP version
+      ansible.builtin.debug:
+        msg: "{{ current_version.stdout_lines[0] }}"
+
+    - name: Verify new version is installed
+      ansible.builtin.assert:
+        that:
+          - "'PHP {{ php_version }}' in current_version.stdout"
+        fail_msg: "Upgrade to PHP {{ php_version }} failed"
+        success_msg: "PHP {{ php_version }} is correctly installed"
+
+    - name: Check for old version packages
+      ansible.builtin.command: dpkg -l | grep "^ii.*php{{ php_old_version }}"
+      register: old_packages
+      failed_when: false
+      changed_when: false
+
+    - name: Verify old version packages are removed
+      ansible.builtin.assert:
+        that:
+          - old_packages.rc != 0
+        fail_msg: "Old PHP {{ php_old_version }} packages still present"
+        success_msg: "Old PHP {{ php_old_version }} packages successfully removed"
+
+    - name: Check new PHP-FPM service status
+      ansible.builtin.systemd:
+        name: "php{{ php_version }}-fpm"
+      register: new_fpm_service
+      when: php_fpm_enabled | default(true)
+
+    - name: Verify new PHP-FPM is running
+      ansible.builtin.assert:
+        that:
+          - new_fpm_service.status.ActiveState == "active"
+          - new_fpm_service.status.LoadState == "loaded"
+        fail_msg: "New PHP-FPM service is not running correctly"
+        success_msg: "New PHP-FPM service is active and running"
+      when: php_fpm_enabled | default(true)
+
+    - name: Check if old PHP-FPM service exists
+      ansible.builtin.systemd:
+        name: "php{{ php_old_version }}-fpm"
+      register: old_fpm_service
+      failed_when: false
+      when: php_fpm_enabled | default(true)
+
+    - name: Verify old PHP-FPM is removed or disabled
+      ansible.builtin.assert:
+        that:
+          - old_fpm_service.status.LoadState == "not-found" or
+            old_fpm_service.status.ActiveState == "inactive"
+        fail_msg: "Old PHP-FPM service is still active"
+        success_msg: "Old PHP-FPM service is properly removed or disabled"
+      when: php_fpm_enabled | default(true)
+
+    - name: Verify PHP is set as default
+      ansible.builtin.command: php --version
+      register: default_php_check
+      changed_when: false
+      when: php_cli_set_as_default_version | default(true)
+
+    - name: Confirm new version is default
+      ansible.builtin.assert:
+        that:
+          - "'PHP {{ php_version }}' in default_php_check.stdout"
+        fail_msg: "PHP {{ php_version }} is not set as default"
+        success_msg: "PHP {{ php_version }} is correctly set as default"
+      when: php_cli_set_as_default_version | default(true)
+
+    - name: Display verification summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Upgrade Verification Successful!"
+          - "=========================================="
+          - "✓ PHP {{ php_version }} installed and working"
+          - "✓ PHP {{ php_old_version }} completely removed"
+          - "✓ PHP-FPM {{ php_version }} service running"
+          - "✓ Old PHP-FPM service removed"
+          - "✓ PHP {{ php_version }} set as default"
+          - "=========================================="

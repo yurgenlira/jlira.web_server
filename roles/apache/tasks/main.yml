@@ -1,5 +1,14 @@
 # SPDX-License-Identifier: MIT-0
 ---
+- name: Include jlira.web_server.apache.validate.yml
+  ansible.builtin.include_tasks:
+    file: validate.yml
+    apply:
+      tags:
+        - always
+  tags:
+    - always
+
 - name: Include jlira.web_server.apache.install.yml
   ansible.builtin.include_tasks:
     file: install.yml
@@ -10,3 +19,121 @@
   tags:
     - install
     - apache_install
+
+- name: Include php role
+  ansible.builtin.include_role:
+    name: php
+    apply:
+      tags:
+        - php_integration
+        - apache_php_integration
+        - apache_php_status_page
+        - php_status_page
+  when: apache_php_fpm_integration
+  vars:
+    php_version: "{{ apache_php_fpm_version }}"
+    php_fpm_enabled: true
+    php_status_page: "{{ apache_php_status_page }}"
+  tags:
+    - php_integration
+    - apache_php_integration
+    - apache_php_status_page
+    - php_status_page
+    - php_uninstall
+    - php_install
+    - php_configure_cli
+    - php_set_default_cli_version
+    - php_install_mssql_extension
+    - php_logrotate_cli
+    - php_configure_fpm
+    - php_logrotate_fpm
+
+- name: Include jlira.web_server.apache.php_integration.yml
+  ansible.builtin.include_tasks:
+    file: php_integration.yml
+    apply:
+      tags:
+        - php_integration
+        - apache_php_integration
+        - apache_php_status_page
+        - php_status_page
+  when: apache_php_fpm_integration
+  tags:
+    - php_integration
+    - apache_php_integration
+    - apache_php_status_page
+    - php_status_page
+
+- name: Include jlira.web_server.apache.configure.yml
+  ansible.builtin.include_tasks:
+    file: configure.yml
+    apply:
+      tags:
+        - configure
+        - apache_configure
+  tags:
+    - configure
+    - apache_configure
+
+- name: Include jlira.web_server.apache.add_custom_configs.yml
+  ansible.builtin.include_tasks:
+    file: add_custom_configs.yml
+    apply:
+      tags:
+        - custom_configs
+        - apache_custom_configs
+  when: apache_custom_configs | length > 0
+  tags:
+    - custom_configs
+    - apache_custom_configs
+
+- name: Include jlira.web_server.apache.virtual_hosts.yml
+  ansible.builtin.include_tasks:
+    file: virtual_hosts.yml
+    apply:
+      tags:
+        - virtual_hosts
+        - apache_virtual_hosts
+  when: apache_virtual_hosts | length > 0
+  tags:
+    - virtual_hosts
+    - apache_virtual_hosts
+
+- name: Include jlira.web_server.apache.virtual_hosts_from_templates.yml
+  ansible.builtin.include_tasks:
+    file: virtual_hosts_from_templates.yml
+    apply:
+      tags:
+        - virtual_hosts
+        - apache_virtual_hosts
+        - virtual_hosts_from_templates
+        - apache_virtual_hosts_from_templates
+  when: (apache_vhost_templates | length > 0) or (apache_vhosts_from_templates | length > 0)
+  tags:
+    - virtual_hosts
+    - apache_virtual_hosts
+    - virtual_hosts_from_templates
+    - apache_virtual_hosts_from_templates
+
+- name: Include jlira.web_server.apache.status_page.yml
+  ansible.builtin.include_tasks:
+    file: status_page.yml
+    apply:
+      tags:
+        - status_page
+        - apache_status_page
+  tags:
+    - status_page
+    - apache_status_page
+
+- name: Include jlira.web_server.apache.authentication.yml
+  ansible.builtin.include_tasks:
+    file: authentication.yml
+    apply:
+      tags:
+        - authentication
+        - apache_authentication
+  when: apache_htpasswd_files | length > 0
+  tags:
+    - authentication
+    - apache_authentication

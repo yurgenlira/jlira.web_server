@@ -1,7 +1,51 @@
+# SPDX-License-Identifier: MIT-0
 - name: Verify
   hosts: all
   gather_facts: false
+  vars_files:
+    # Load role defaults
+    - "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/../roles/php/defaults/main.yml"
+    - "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/../roles/php/vars/main.yml"
+    - vars.yml
+  vars:
+    # Test the upgraded version (from side_effect.yml)
+    # After side_effect.yml runs, PHP 8.4 should be installed and 8.2 removed
+    php_version: "8.4"
+    php_old_version: "8.2"
   tasks:
-    - name: Include install tests
+    - name: Include uninstall.yml tests
+      ansible.builtin.include_tasks:
+        file: tests/uninstall.yml
+      when: php_old_version is defined and php_old_version | length > 0
+
+    - name: Include install.yml tests
       ansible.builtin.include_tasks:
         file: tests/install.yml
+
+    - name: Include configure_cli.yml tests
+      ansible.builtin.include_tasks:
+        file: tests/configure_cli.yml
+
+    - name: Include set_default_cli_version.yml tests
+      ansible.builtin.include_tasks:
+        file: tests/set_default_cli_version.yml
+      when: php_cli_set_as_default_version
+
+    - name: Include install_mssql_extension.yml tests
+      ansible.builtin.include_tasks:
+        file: tests/install_mssql_extension.yml
+
+    - name: Include logrotate_cli.yml tests
+      ansible.builtin.include_tasks:
+        file: tests/logrotate_cli.yml
+      when: php_cli_logrotate_enabled
+
+    - name: Include configure_fpm.yml tests
+      ansible.builtin.include_tasks:
+        file: tests/configure_fpm.yml
+      when: php_fpm_enabled
+
+    - name: Include logrotate_fpm.yml tests
+      ansible.builtin.include_tasks:
+        file: tests/logrotate_fpm.yml
+      when: php_fpm_enabled and php_fpm_logrotate_enabled

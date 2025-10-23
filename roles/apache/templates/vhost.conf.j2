@@ -1,0 +1,29 @@
+## ANSIBLE MANAGED FILE ##
+# HTTP Virtual Host: {{ item.name }}
+{% if item.http is defined %}
+<VirtualHost {% for listen in item.http.listen %}{{ listen }}{% if not loop.last %} {% endif %}{% endfor %}>
+{% if item.server_name is defined %}
+    ServerName {{ item.server_name }}
+{% endif %}
+{% if item.server_alias is defined and item.server_alias | length > 0 %}
+    ServerAlias {{ item.server_alias | join(' ') }}
+{% endif %}
+{% if item.server_admin is defined %}
+    ServerAdmin {{ item.server_admin }}
+{% endif %}
+{% if item.document_root is defined %}
+    DocumentRoot {{ item.document_root }}
+{% endif %}
+
+{% if item.http.error_log is defined %}
+    ErrorLog {{ item.http.error_log }}
+{% endif %}
+{% if item.http.access_log is defined %}
+    CustomLog {{ item.http.access_log }}
+{% endif %}
+
+{% if item.http.custom_directives is defined %}
+    {{ item.http.custom_directives | indent(4) }}
+{% endif %}
+</VirtualHost>
+{% endif %}

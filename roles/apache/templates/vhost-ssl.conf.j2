@@ -1,0 +1,35 @@
+## ANSIBLE MANAGED FILE ##
+# HTTPS Virtual Host: {{ item.name }}
+{% if item.https is defined %}
+<VirtualHost {% for listen in item.https.listen %}{{ listen }}{% if not loop.last %} {% endif %}{% endfor %}>
+    ServerName {{ item.server_name }}
+{% if item.server_alias is defined and item.server_alias | length > 0 %}
+    ServerAlias {{ item.server_alias | join(' ') }}
+{% endif %}
+{% if item.server_admin is defined %}
+    ServerAdmin {{ item.server_admin }}
+{% endif %}
+{% if item.document_root is defined %}
+    DocumentRoot {{ item.document_root }}
+{% endif %}
+
+{% if item.https.error_log is defined %}
+    ErrorLog {{ item.https.error_log }}
+{% endif %}
+{% if item.https.access_log is defined %}
+    CustomLog {{ item.https.access_log }}
+{% endif %}
+
+    # SSL Configuration
+    SSLEngine on
+    SSLCertificateFile {{ item.https.certificate_file }}
+    SSLCertificateKeyFile {{ item.https.certificate_key_file }}
+{% if item.https.certificate_chain_file is defined %}
+    SSLCertificateChainFile {{ item.https.certificate_chain_file }}
+{% endif %}
+
+{% if item.https.custom_directives is defined %}
+    {{ item.https.custom_directives | indent(4) }}
+{% endif %}
+</VirtualHost>
+{% endif %}

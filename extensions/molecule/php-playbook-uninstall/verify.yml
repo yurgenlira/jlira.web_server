@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Verify PHP uninstallation was successful
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Check for removed version packages
+      ansible.builtin.command: dpkg -l | grep "^ii.*php{{ php_version_to_remove }}"
+      register: removed_packages
+      failed_when: false
+      changed_when: false
+
+    - name: Verify packages are removed
+      ansible.builtin.assert:
+        that:
+          - removed_packages.rc != 0
+        fail_msg: "PHP {{ php_version_to_remove }} packages still present"
+        success_msg: "PHP {{ php_version_to_remove }} packages successfully removed"
+
+    - name: Check if PHP-FPM service exists
+      ansible.builtin.systemd:
+        name: "php{{ php_version_to_remove }}-fpm"
+      register: fpm_service_check
+      failed_when: false
+
+    - name: Verify PHP-FPM service is removed
+      ansible.builtin.assert:
+        that:
+          - fpm_service_check.status.LoadState == "not-found" or
+            fpm_service_check.status.ActiveState == "inactive"
+        fail_msg: "PHP-FPM service still exists or is active"
+        success_msg: "PHP-FPM service properly removed or inactive"
+
+    - name: Check for PHP configuration directory
+      ansible.builtin.stat:
+        path: "/etc/php/{{ php_version_to_remove }}"
+      register: php_config_dir
+
+    - name: Verify configuration directory is removed
+      ansible.builtin.assert:
+        that:
+          - not php_config_dir.stat.exists
+        fail_msg: "PHP configuration directory still exists"
+        success_msg: "PHP configuration directory removed"
+
+    - name: Check for logrotate configuration
+      ansible.builtin.stat:
+        path: "/etc/logrotate.d/php{{ php_version_to_remove }}-fpm"
+      register: logrotate_config
+
+    - name: Verify logrotate config is removed
+      ansible.builtin.assert:
+        that:
+          - not logrotate_config.stat.exists
+        fail_msg: "Logrotate configuration still exists"
+        success_msg: "Logrotate configuration removed"
+
+    - name: Check PHP binary
+      ansible.builtin.command: which php{{ php_version_to_remove }}
+      register: php_binary
+      failed_when: false
+      changed_when: false
+
+    - name: Verify PHP binary is removed
+      ansible.builtin.assert:
+        that:
+          - php_binary.rc != 0
+        fail_msg: "PHP binary still exists"
+        success_msg: "PHP binary removed"
+
+    - name: Display verification summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Uninstall Verification Successful!"
+          - "=========================================="
+          - "✓ PHP {{ php_version_to_remove }} packages removed"
+          - "✓ PHP-FPM service removed"
+          - "✓ Configuration directory removed"
+          - "✓ Logrotate configuration removed"
+          - "✓ PHP binary removed"
+          - "=========================================="

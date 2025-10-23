@@ -1,0 +1,138 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Verify PHP binary exists
+  ansible.builtin.stat:
+    path: "/usr/bin/php{{ php_version }}"
+  register: php_binary_stat
+  when: php_cli_set_as_default_version
+
+- name: Assert PHP binary exists
+  ansible.builtin.assert:
+    that:
+      - php_binary_stat.stat.exists
+      - php_binary_stat.stat.executable
+    fail_msg: "PHP {{ php_version }} binary does not exist or is not executable at /usr/bin/php{{ php_version }}"
+  when: php_cli_set_as_default_version
+
+- name: Check current default PHP CLI version
+  ansible.builtin.command: php --version
+  register: php_default_version_check
+  changed_when: false
+  failed_when: false
+
+- name: Assert PHP default version is correct
+  ansible.builtin.assert:
+    that:
+      - php_default_version_check.rc == 0
+      - "php_version in php_default_version_check.stdout"
+    fail_msg: "PHP {{ php_version }} is not set as the default CLI version"
+  when: php_cli_set_as_default_version
+
+- name: Verify PHP alternatives is set correctly
+  ansible.builtin.command: update-alternatives --query php
+  register: php_alternatives_check
+  changed_when: false
+  when: php_cli_set_as_default_version
+
+- name: Assert PHP alternatives points to correct version
+  ansible.builtin.assert:
+    that:
+      - "'/usr/bin/php' + php_version in php_alternatives_check.stdout"
+      - >-
+        'Value: /usr/bin/php' + php_version in php_alternatives_check.stdout or
+        'Link currently points to /usr/bin/php' + php_version in php_alternatives_check.stdout
+    fail_msg: "PHP alternatives is not configured to point to /usr/bin/php{{ php_version }}"
+  when: php_cli_set_as_default_version
+
+- name: Check phar alternatives
+  ansible.builtin.command: update-alternatives --query phar
+  register: phar_alternatives_check
+  changed_when: false
+  failed_when: false
+  when: php_cli_set_as_default_version
+
+- name: Assert phar alternatives is set correctly
+  ansible.builtin.assert:
+    that:
+      - phar_alternatives_check.rc == 0
+      - "'/usr/bin/phar' + php_version in phar_alternatives_check.stdout"
+    fail_msg: "phar alternatives is not configured correctly for version {{ php_version }}"
+  when: php_cli_set_as_default_version
+
+- name: Check phar.phar alternatives
+  ansible.builtin.command: update-alternatives --query phar.phar
+  register: phar_phar_alternatives_check
+  changed_when: false
+  failed_when: false
+  when: php_cli_set_as_default_version
+
+- name: Assert phar.phar alternatives is set correctly
+  ansible.builtin.assert:
+    that:
+      - phar_phar_alternatives_check.rc == 0
+      - "'/usr/bin/phar.phar' + php_version in phar_phar_alternatives_check.stdout"
+    fail_msg: "phar.phar alternatives is not configured correctly for version {{ php_version }}"
+  when: php_cli_set_as_default_version
+
+- name: Check phpize alternatives
+  ansible.builtin.command: update-alternatives --query phpize
+  register: phpize_alternatives_check
+  changed_when: false
+  failed_when: false
+  when: php_cli_set_as_default_version
+
+- name: Assert phpize alternatives is set correctly
+  ansible.builtin.assert:
+    that:
+      - phpize_alternatives_check.rc == 0
+      - "'/usr/bin/phpize' + php_version in phpize_alternatives_check.stdout"
+    fail_msg: "phpize alternatives is not configured correctly for version {{ php_version }}"
+  when: php_cli_set_as_default_version
+
+- name: Check php-config alternatives
+  ansible.builtin.command: update-alternatives --query php-config
+  register: php_config_alternatives_check
+  changed_when: false
+  failed_when: false
+  when: php_cli_set_as_default_version
+
+- name: Assert php-config alternatives is set correctly
+  ansible.builtin.assert:
+    that:
+      - php_config_alternatives_check.rc == 0
+      - "'/usr/bin/php-config' + php_version in php_config_alternatives_check.stdout"
+    fail_msg: "php-config alternatives is not configured correctly for version {{ php_version }}"
+  when: php_cli_set_as_default_version
+
+- name: Verify all PHP CLI tools are accessible without version suffix
+  ansible.builtin.command: "{{ item }} --version"
+  loop:
+    - php
+    - phpize
+    - php-config
+  register: php_tools_check
+  changed_when: false
+  when: php_cli_set_as_default_version
+
+- name: Assert all PHP CLI tools return version information
+  ansible.builtin.assert:
+    that:
+      - item.rc == 0
+      - item.stdout | length > 0
+    fail_msg: "PHP CLI tool {{ item.item }} is not accessible or does not return version information"
+  loop: "{{ php_tools_check.results }}"
+  when: php_cli_set_as_default_version
+
+- name: Verify phar (CLI tools) is executable without version suffix
+  ansible.builtin.command: "phar version"
+  register: php_phar_check
+  changed_when: false
+  when: php_cli_set_as_default_version
+
+- name: Assert phar (CLI tools) return version information
+  ansible.builtin.assert:
+    that:
+      - php_phar_check.rc == 0
+      - php_phar_check.stdout | length > 0
+    fail_msg: "PHP CLI tool phar is not accessible or does not return version information"
+  when: php_cli_set_as_default_version

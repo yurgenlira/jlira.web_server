@@ -1,0 +1,600 @@
+---
+# ============================================================================
+# ServerName and Main Settings Tests
+# ============================================================================
+- name: Check apache2.conf exists
+  ansible.builtin.stat:
+    path: /etc/apache2/apache2.conf
+  register: apache2_conf_stat
+
+- name: Assert apache2.conf exists
+  ansible.builtin.assert:
+    that:
+      - apache2_conf_stat.stat.exists
+    fail_msg: "apache2.conf file does not exist."
+
+- name: Check ServerName is configured in apache2.conf
+  ansible.builtin.command:
+    cmd: grep -E "^ServerName\s+" /etc/apache2/apache2.conf
+  register: apache_servername_check
+  changed_when: false
+  failed_when: false
+
+- name: Assert ServerName is configured
+  ansible.builtin.assert:
+    that:
+      - apache_servername_check.rc == 0
+      - apache_servername_check.stdout | length > 0
+    fail_msg: "ServerName is not configured in apache2.conf."
+
+# ============================================================================
+# Ansible Managed Block Tests
+# ============================================================================
+
+- name: Check ANSIBLE MANAGED BLOCK is present in apache2.conf
+  ansible.builtin.shell: |
+    grep -F '## BEGIN ANSIBLE MANAGED BLOCK - Custom settings ##' /etc/apache2/apache2.conf
+  register: apache_managed_block_check
+  changed_when: false
+  failed_when: false
+
+- name: Assert ANSIBLE MANAGED BLOCK exists in apache2.conf
+  ansible.builtin.assert:
+    that:
+      - apache_managed_block_check.rc == 0
+    fail_msg: "ANSIBLE MANAGED BLOCK not found in apache2.conf."
+
+# ============================================================================
+# Apache Main Settings Tests (Custom Settings)
+# ============================================================================
+
+- name: Check LimitRequestLine is configured in apache2.conf
+  ansible.builtin.command:
+    cmd: grep -E "^LimitRequestLine\s+8190" /etc/apache2/apache2.conf
+  register: limit_request_line_check
+  changed_when: false
+  failed_when: false
+  when: apache_main_settings | default([]) | length > 0
+
+- name: Assert LimitRequestLine is configured
+  ansible.builtin.assert:
+    that:
+      - limit_request_line_check.rc == 0
+    fail_msg: "LimitRequestLine is not set to 8190 in apache2.conf."
+  when:
+    - apache_main_settings | default([]) | length > 0
+    - limit_request_line_check is not skipped
+
+- name: Check LimitRequestFieldSize is configured in apache2.conf
+  ansible.builtin.command:
+    cmd: grep -E "^LimitRequestFieldSize\s+8190" /etc/apache2/apache2.conf
+  register: limit_request_field_size_check
+  changed_when: false
+  failed_when: false
+  when: apache_main_settings | default([]) | length > 0
+
+- name: Assert LimitRequestFieldSize is configured
+  ansible.builtin.assert:
+    that:
+      - limit_request_field_size_check.rc == 0
+    fail_msg: "LimitRequestFieldSize is not set to 8190 in apache2.conf."
+  when:
+    - apache_main_settings | default([]) | length > 0
+    - limit_request_field_size_check is not skipped
+
+# ============================================================================
+# Environment Variables Tests
+# ============================================================================
+
+- name: Check envvars file exists
+  ansible.builtin.stat:
+    path: /etc/apache2/envvars
+  register: envvars_stat
+
+- name: Assert envvars file exists
+  ansible.builtin.assert:
+    that:
+      - envvars_stat.stat.exists
+    fail_msg: "envvars file does not exist."
+
+- name: Check ANSIBLE MANAGED BLOCK is present in envvars
+  ansible.builtin.shell: |
+    grep -F '## BEGIN ANSIBLE MANAGED BLOCK - Custom environment variables ##' /etc/apache2/envvars
+  register: envvars_managed_block_check
+  changed_when: false
+  failed_when: false
+  when: apache_envvars | default([]) | length > 0
+
+- name: Assert ANSIBLE MANAGED BLOCK exists in envvars
+  ansible.builtin.assert:
+    that:
+      - envvars_managed_block_check.rc == 0
+    fail_msg: "ANSIBLE MANAGED BLOCK not found in envvars."
+  when:
+    - apache_envvars | default([]) | length > 0
+    - envvars_managed_block_check is defined
+    - envvars_managed_block_check is not skipped
+
+- name: Check custom environment variable CUSTOM_LOG_DIR is configured
+  ansible.builtin.command:
+    cmd: grep -E '^export CUSTOM_LOG_DIR=' /etc/apache2/envvars
+  register: custom_log_dir_check
+  changed_when: false
+  failed_when: false
+  when: apache_envvars | default([]) | length > 0
+
+- name: Assert CUSTOM_LOG_DIR is configured
+  ansible.builtin.assert:
+    that:
+      - custom_log_dir_check.rc == 0
+      - "'CUSTOM_LOG_DIR=/var/log/apache2/custom' in custom_log_dir_check.stdout"
+    fail_msg: "CUSTOM_LOG_DIR is not configured in envvars."
+  when:
+    - apache_envvars | default([]) | length > 0
+    - custom_log_dir_check is defined
+    - custom_log_dir_check is not skipped
+
+# ============================================================================
+# Port Configuration Tests
+# ============================================================================
+
+- name: Check ports.conf exists
+  ansible.builtin.stat:
+    path: /etc/apache2/ports.conf
+  register: ports_conf_stat
+
+- name: Assert ports.conf exists
+  ansible.builtin.assert:
+    that:
+      - ports_conf_stat.stat.exists
+      - ports_conf_stat.stat.mode == '0644'
+    fail_msg: "ports.conf file does not exist or has incorrect permissions."
+
+- name: Check HTTP ports are configured in ports.conf
+  ansible.builtin.command:
+    cmd: grep -E "^Listen\s+80$" /etc/apache2/ports.conf
+  register: http_port_check
+  changed_when: false
+  failed_when: false
+
+- name: Assert HTTP port 80 is configured
+  ansible.builtin.assert:
+    that:
+      - http_port_check.rc == 0
+    fail_msg: "HTTP port 80 is not configured in ports.conf."
+
+- name: Check HTTP port 8080 is configured in ports.conf
+  ansible.builtin.command:
+    cmd: grep -E "^Listen\s+8080$" /etc/apache2/ports.conf
+  register: http_port_8080_check
+  changed_when: false
+  failed_when: false
+
+- name: Assert HTTP port 8080 is configured
+  ansible.builtin.assert:
+    that:
+      - http_port_8080_check.rc == 0
+    fail_msg: "HTTP port 8080 is not configured in ports.conf."
+
+- name: Check ANSIBLE MANAGED FILE marker in ports.conf
+  ansible.builtin.shell: |
+    grep -F '## ANSIBLE MANAGED FILE ##' /etc/apache2/ports.conf
+  register: ports_managed_marker
+  changed_when: false
+  failed_when: false
+
+- name: Assert ANSIBLE MANAGED FILE marker exists in ports.conf
+  ansible.builtin.assert:
+    that:
+      - ports_managed_marker.rc == 0
+    fail_msg: "ANSIBLE MANAGED FILE marker not found in ports.conf."
+
+# ============================================================================
+# SSL Configuration Tests
+# ============================================================================
+
+- name: Check if SSL module is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/mods-enabled/ssl.load
+  register: ssl_module_stat
+
+- name: Assert SSL module is enabled (when apache_ssl_enabled is true)
+  ansible.builtin.assert:
+    that:
+      - ssl_module_stat.stat.exists
+    fail_msg: "SSL module is not enabled."
+  when: apache_ssl_enabled | default(true)
+
+- name: Check HTTPS ports are configured when SSL is enabled
+  ansible.builtin.command:
+    cmd: grep -E "Listen\s+443" /etc/apache2/ports.conf
+  register: https_port_check
+  changed_when: false
+  failed_when: false
+  when: apache_ssl_enabled | default(true)
+
+- name: Assert HTTPS port 443 is configured (when SSL enabled)
+  ansible.builtin.assert:
+    that:
+      - https_port_check.rc == 0
+    fail_msg: "HTTPS port 443 is not configured in ports.conf."
+  when:
+    - apache_ssl_enabled | default(true)
+    - https_port_check is not skipped
+
+- name: Check HTTPS port 8443 is configured when SSL is enabled
+  ansible.builtin.command:
+    cmd: grep -E "Listen\s+8443" /etc/apache2/ports.conf
+  register: https_port_8443_check
+  changed_when: false
+  failed_when: false
+  when: apache_ssl_enabled | default(true)
+
+- name: Assert HTTPS port 8443 is configured (when SSL enabled)
+  ansible.builtin.assert:
+    that:
+      - https_port_8443_check.rc == 0
+    fail_msg: "HTTPS port 8443 is not configured in ports.conf."
+  when:
+    - apache_ssl_enabled | default(true)
+    - https_port_8443_check is not skipped
+
+# ============================================================================
+# Module Enablement Tests
+# ============================================================================
+
+- name: Get list of enabled Apache modules
+  ansible.builtin.command:
+    cmd: apachectl -M
+  register: apache_modules_list
+  changed_when: false
+
+- name: Display enabled Apache modules
+  ansible.builtin.debug:
+    var: apache_modules_list.stdout_lines
+  when: ansible_verbosity >= 2
+
+- name: Check if rewrite module is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/mods-enabled/rewrite.load
+  register: rewrite_module_stat
+  when: apache_modules_enabled | default([]) | length > 0
+
+- name: Assert rewrite module is enabled
+  ansible.builtin.assert:
+    that:
+      - rewrite_module_stat.stat.exists
+    fail_msg: "Rewrite module is not enabled."
+  when:
+    - apache_modules_enabled | default([]) | length > 0
+    - rewrite_module_stat is not skipped
+
+- name: Check if headers module is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/mods-enabled/headers.load
+  register: headers_module_stat
+  when: apache_modules_enabled | default([]) | length > 0
+
+- name: Assert headers module is enabled
+  ansible.builtin.assert:
+    that:
+      - headers_module_stat.stat.exists
+    fail_msg: "Headers module is not enabled."
+  when:
+    - apache_modules_enabled | default([]) | length > 0
+    - headers_module_stat is not skipped
+
+- name: Check if status module is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/mods-enabled/status.load
+  register: status_module_stat
+  when: apache_modules_enabled | default([]) | length > 0
+
+- name: Assert status module is enabled
+  ansible.builtin.assert:
+    that:
+      - status_module_stat.stat.exists
+    fail_msg: "Status module is not enabled."
+  when:
+    - apache_modules_enabled | default([]) | length > 0
+    - status_module_stat is not skipped
+
+- name: Check if http2 module is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/mods-enabled/http2.load
+  register: http2_module_stat
+  when: apache_modules_enabled | default([]) | length > 0
+
+- name: Assert http2 module is enabled
+  ansible.builtin.assert:
+    that:
+      - http2_module_stat.stat.exists
+    fail_msg: "HTTP2 module is not enabled."
+  when:
+    - apache_modules_enabled | default([]) | length > 0
+    - http2_module_stat is not skipped
+
+# ============================================================================
+# Default Virtual Host Tests
+# ============================================================================
+
+- name: Check default HTTP virtual host configuration exists
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-available/000-default.conf
+  register: default_vhost_stat
+
+- name: Assert default HTTP virtual host exists
+  ansible.builtin.assert:
+    that:
+      - default_vhost_stat.stat.exists
+      - default_vhost_stat.stat.mode == '0644'
+    fail_msg: "Default HTTP virtual host configuration does not exist or has incorrect permissions."
+
+- name: Check ANSIBLE MANAGED FILE marker in default vhost
+  ansible.builtin.shell: |
+    grep -F '## ANSIBLE MANAGED FILE ##' /etc/apache2/sites-available/000-default.conf
+  register: default_vhost_marker
+  changed_when: false
+  failed_when: false
+
+- name: Assert ANSIBLE MANAGED FILE marker in default vhost
+  ansible.builtin.assert:
+    that:
+      - default_vhost_marker.rc == 0
+    fail_msg: "ANSIBLE MANAGED FILE marker not found in 000-default.conf."
+
+- name: Check ServerName is configured in default HTTP vhost
+  ansible.builtin.command:
+    cmd: grep -E "^\s*ServerName\s+" /etc/apache2/sites-available/000-default.conf
+  register: vhost_servername_check
+  changed_when: false
+  failed_when: false
+
+- name: Assert ServerName is in default HTTP vhost
+  ansible.builtin.assert:
+    that:
+      - vhost_servername_check.rc == 0
+    fail_msg: "ServerName not found in 000-default.conf."
+
+# ============================================================================
+# Default SSL Virtual Host Tests
+# ============================================================================
+
+- name: Check old default-ssl.conf does not exist
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-available/default-ssl.conf
+  register: old_ssl_vhost_stat
+
+- name: Assert old default-ssl.conf is removed
+  ansible.builtin.assert:
+    that:
+      - not old_ssl_vhost_stat.stat.exists
+    fail_msg: "Old default-ssl.conf still exists and should be removed."
+
+- name: Check new SSL virtual host configuration exists
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-available/000-default-ssl.conf
+  register: ssl_vhost_stat
+  when: apache_ssl_enabled | default(true)
+
+- name: Assert new SSL virtual host exists (when SSL enabled)
+  ansible.builtin.assert:
+    that:
+      - ssl_vhost_stat.stat.exists
+      - ssl_vhost_stat.stat.mode == '0644'
+    fail_msg: "SSL virtual host configuration does not exist or has incorrect permissions."
+  when:
+    - apache_ssl_enabled | default(true)
+    - ssl_vhost_stat is not skipped
+
+- name: Check ANSIBLE MANAGED FILE marker in SSL vhost
+  ansible.builtin.shell: |
+    grep -F '## ANSIBLE MANAGED FILE ##' /etc/apache2/sites-available/000-default-ssl.conf
+  register: ssl_vhost_marker
+  changed_when: false
+  failed_when: false
+  when: apache_ssl_enabled | default(true)
+
+- name: Assert ANSIBLE MANAGED FILE marker in SSL vhost
+  ansible.builtin.assert:
+    that:
+      - ssl_vhost_marker.rc == 0
+    fail_msg: "ANSIBLE MANAGED FILE marker not found in 000-default-ssl.conf."
+  when:
+    - apache_ssl_enabled | default(true)
+    - ssl_vhost_marker is not skipped
+
+- name: Check SSL site is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-enabled/000-default-ssl.conf
+  register: ssl_site_enabled_stat
+  when: apache_ssl_enabled | default(true)
+
+- name: Assert SSL site is enabled (when SSL enabled)
+  ansible.builtin.assert:
+    that:
+      - ssl_site_enabled_stat.stat.exists
+      - ssl_site_enabled_stat.stat.islnk
+    fail_msg: "SSL site is not enabled (symlink does not exist in sites-enabled)."
+  when:
+    - apache_ssl_enabled | default(true)
+    - ssl_site_enabled_stat is not skipped
+
+# ============================================================================
+# Security Configuration Tests
+# ============================================================================
+
+- name: Check security.conf exists
+  ansible.builtin.stat:
+    path: /etc/apache2/conf-available/security.conf
+  register: security_conf_stat
+
+- name: Assert security.conf exists
+  ansible.builtin.assert:
+    that:
+      - security_conf_stat.stat.exists
+    fail_msg: "security.conf file does not exist."
+
+- name: Check ServerTokens is configured in security.conf
+  ansible.builtin.command:
+    cmd: grep -E "^ServerTokens\s+Prod" /etc/apache2/conf-available/security.conf
+  register: server_tokens_check
+  changed_when: false
+  failed_when: false
+
+- name: Assert ServerTokens is set to Prod
+  ansible.builtin.assert:
+    that:
+      - server_tokens_check.rc == 0
+    fail_msg: "ServerTokens is not set to Prod in security.conf."
+
+- name: Check ServerSignature is configured in security.conf
+  ansible.builtin.command:
+    cmd: grep -E "^ServerSignature\s+Off" /etc/apache2/conf-available/security.conf
+  register: server_signature_check
+  changed_when: false
+  failed_when: false
+
+- name: Assert ServerSignature is Off
+  ansible.builtin.assert:
+    that:
+      - server_signature_check.rc == 0
+    fail_msg: "ServerSignature is not set to Off in security.conf."
+
+- name: Check TraceEnable is configured in security.conf
+  ansible.builtin.command:
+    cmd: grep -E "^TraceEnable\s+Off" /etc/apache2/conf-available/security.conf
+  register: trace_enable_check
+  changed_when: false
+  failed_when: false
+
+- name: Assert TraceEnable is Off
+  ansible.builtin.assert:
+    that:
+      - trace_enable_check.rc == 0
+    fail_msg: "TraceEnable is not set to Off in security.conf."
+
+- name: Check security configuration is enabled
+  ansible.builtin.stat:
+    path: /etc/apache2/conf-enabled/security.conf
+  register: security_conf_enabled_stat
+
+- name: Assert security configuration is enabled
+  ansible.builtin.assert:
+    that:
+      - security_conf_enabled_stat.stat.exists
+      - security_conf_enabled_stat.stat.islnk
+    fail_msg: "Security configuration is not enabled (symlink does not exist in conf-enabled)."
+
+# ============================================================================
+# Additional Security Settings Tests (from inventory)
+# ============================================================================
+
+- name: Check FileETag is configured in security.conf
+  ansible.builtin.command:
+    cmd: grep -E "^FileETag\s+None" /etc/apache2/conf-available/security.conf
+  register: file_etag_check
+  changed_when: false
+  failed_when: false
+
+- name: Assert FileETag is set to None
+  ansible.builtin.assert:
+    that:
+      - file_etag_check.rc == 0
+    fail_msg: "FileETag is not set to None in security.conf."
+
+- name: Check X-Powered-By header is unset in security.conf
+  ansible.builtin.command:
+    cmd: grep -E "^Header always unset X-Powered-By" /etc/apache2/conf-available/security.conf
+  register: x_powered_by_check
+  changed_when: false
+  failed_when: false
+
+- name: Assert X-Powered-By header is unset
+  ansible.builtin.assert:
+    that:
+      - x_powered_by_check.rc == 0
+    fail_msg: "X-Powered-By header is not unset in security.conf."
+
+- name: Debug - Show all Header directives in security.conf
+  ansible.builtin.command:
+    cmd: grep -i '^Header' /etc/apache2/conf-available/security.conf
+  register: all_headers_debug
+  changed_when: false
+  failed_when: false
+
+- name: Check X-Content-Type-Options header is configured in security.conf
+  ansible.builtin.command:
+    cmd: grep -E '^Header set X-Content-Type-Options\s+' /etc/apache2/conf-available/security.conf
+  register: x_content_type_options_check
+  changed_when: false
+  failed_when: false
+
+- name: Assert X-Content-Type-Options header is configured
+  ansible.builtin.assert:
+    that:
+      - x_content_type_options_check.rc == 0
+      - '"nosniff" in x_content_type_options_check.stdout'
+    fail_msg: "X-Content-Type-Options header is not configured in security.conf."
+
+# ============================================================================
+# Functional Tests
+# ============================================================================
+- name: Make HTTP request to Apache
+  ansible.builtin.uri:
+    url: http://localhost
+    return_content: true
+  register: http_response
+
+- name: Verify Apache responds on HTTP
+  ansible.builtin.assert:
+    that:
+      - http_response.status == 200
+    fail_msg: "Apache not responding on HTTP port 80"
+
+- name: Verify Server header does not contain version info
+  ansible.builtin.assert:
+    that:
+      - http_response.server is defined
+      - http_response.server == "Apache"
+      - "'/' not in http_response.server"
+    fail_msg: "Server header contains version info: '{{ http_response.server }}'"
+
+- name: Request non-existent page to check error response
+  ansible.builtin.uri:
+    url: http://localhost/nonexistent
+    status_code: 404
+    return_content: true
+  register: error_response
+
+- name: Verify no server signature in error page footer
+  ansible.builtin.assert:
+    that:
+      - "'<address>' not in error_response.content or '<address>Apache' in error_response.content"
+    fail_msg: "Server signature with version appears in error page"
+
+- name: Verify HTTPS is working with SSL
+  ansible.builtin.uri:
+    url: https://localhost
+    validate_certs: false
+    return_content: true
+  register: https_response
+
+- name: Verify Apache responds on HTTPS
+  ansible.builtin.assert:
+    that:
+      - https_response.status == 200
+    fail_msg: "Apache not responding on HTTPS port 443"
+
+- name: Verify HTTPS is working with SSL on custom port
+  ansible.builtin.uri:
+    url: https://localhost:8443
+    validate_certs: false
+    return_content: true
+  register: custom_https_response
+
+- name: Verify Apache responds on HTTPS custom port
+  ansible.builtin.assert:
+    that:
+      - custom_https_response.status == 200
+    fail_msg: "Apache not responding on HTTPS port 8443"

@@ -1,0 +1,61 @@
+---
+dependency:
+  name: galaxy
+  options:
+    ignore-certs: false
+    ignore-errors: false
+    role-file: requirements.yml
+    requirements-file: requirements.yml
+
+driver:
+  name: docker
+
+platforms:
+  - name: ${MOLECULE_SCENARIO_NAME}-instance
+    image: geerlingguy/docker-ubuntu2404-ansible
+    pre_build_image: true
+    groups:
+      - php
+    # --- Systemd requirements ---
+    privileged: true                  # Required to run systemd/init as PID 1
+    command: "/usr/lib/systemd/systemd" # The command to start systemd
+    cgroupns_mode: host               # Necessary for cgroups v2 (modern Docker/OS)
+    volumes:                          # Mount cgroups filesystem to satisfy systemd
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      host_key_checking: false
+      verbosity: 1
+      roles_path: '$MOLECULE_PROJECT_DIRECTORY/../roles'
+    ssh_connection:
+      pipelining: true
+  env:
+    ANSIBLE_FORCE_COLOR: "1"
+    ANSIBLE_LOAD_CALLBACK_PLUGINS: "1"
+  inventory:
+    host_vars:
+      ${MOLECULE_SCENARIO_NAME}-instance:
+        php_version_to_remove: "8.2"
+        php_version: "8.4"
+        php_fpm_enabled: true
+        php_skip_confirm: true
+
+scenario:
+  name: php-playbook-uninstall
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - verify
+    - cleanup
+    - destroy
+
+verifier:
+  name: ansible

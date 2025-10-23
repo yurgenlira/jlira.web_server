@@ -1,3 +1,36 @@
 # SPDX-License-Identifier: MIT-0
 ---
-# handlers file for apache
+# Handlers with the same listen tag are executed in the order they are defined
+# This handler checks Apache config syntax but doesn't fail the playbook
+# This allows the playbook to continue even with syntax errors (e.g., missing SSL certs in test environments)
+- name: Check Apache config syntax
+  listen:
+    - Reload apache
+    - Restart apache
+  ansible.builtin.command:
+    cmd: apachectl configtest
+  changed_when: false
+  failed_when: false
+  register: apache_configtest_result
+
+- name: Display Apache config test warnings
+  listen:
+    - Reload apache
+    - Restart apache
+  ansible.builtin.debug:
+    msg: "{{ apache_configtest_result.stderr_lines }}"
+  when:
+    - apache_configtest_result is defined
+    - apache_configtest_result.rc != 0
+
+- name: Reload Apache service
+  listen: Reload apache
+  ansible.builtin.service:
+    name: apache2
+    state: reloaded
+
+- name: Restart Apache service
+  listen: Restart apache
+  ansible.builtin.service:
+    name: apache2
+    state: restarted

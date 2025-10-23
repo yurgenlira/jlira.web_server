@@ -1,8 +1,49 @@
+# SPDX-License-Identifier: MIT-0
 ---
 - name: Converge
   hosts: all
-  gather_facts: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  vars:
+    # PHP version for initial installation
+    php_version: "8.2"
   tasks:
-    - name: Apply role under test
+    - name: Display initial installation information
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Initial PHP Installation"
+          - "=========================================="
+          - "Installing PHP {{ php_version }}"
+          - "This is the base installation that will be upgraded in side_effect.yml"
+          - "=========================================="
+
+    - name: Apply php role under test
       ansible.builtin.include_role:
         name: php
+      tags:
+        - install
+        - php_install
+        - configure_cli
+        - php_configure_cli
+        - set_default_cli_version
+        - php_set_default_cli_version
+        - php_install_mssql_extension
+        - install_mssql_extension
+        - logrotate_cli
+        - php_logrotate_cli
+        - configure_fpm
+        - php_configure_fpm
+        - logrotate_fpm
+        - php_logrotate_fpm
+
+    - name: Display installation completion
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Initial Installation Completed"
+          - "=========================================="
+          - "PHP {{ php_version }} installed successfully"
+          - "Next: side_effect.yml will upgrade to PHP 8.4"
+          - "=========================================="
