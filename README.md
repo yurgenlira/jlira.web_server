@@ -426,6 +426,34 @@ The collection includes GitHub Actions workflows for automated testing:
 - **Syntax Check**: Ansible syntax validation
 - **Molecule Tests**: Full role testing in containers
 
+## Releasing
+
+This collection supports automated releases to Ansible Galaxy. See [.github/RELEASE.md](.github/RELEASE.md) for detailed release documentation.
+
+### Quick Release Guide
+
+**Semi-Automated Release (Recommended for planned releases):**
+```bash
+# 1. Update CHANGELOG.md with your changes
+# 2. Commit the changelog
+git add CHANGELOG.md
+git commit -m "docs: update changelog for v0.0.2"
+
+# 3. Create and push tag
+git tag v0.0.2
+git push origin v0.0.2
+```
+
+**Fully Automated Release (Conventional commits):**
+```bash
+# Use conventional commit messages
+git commit -m "feat: add new Apache virtual host template"
+git push origin main
+# Release happens automatically!
+```
+
+See [Release Documentation](.github/RELEASE.md) for full details on both methods.
+
 ## Contributing
 
 Contributions are welcome! Please follow these guidelines:
@@ -433,10 +461,11 @@ Contributions are welcome! Please follow these guidelines:
 1. **Fork the Repository**: Create your own fork on GitHub
 2. **Create a Feature Branch**: `git checkout -b feature/your-feature`
 3. **Follow Ansible Best Practices**: See [CLAUDE.md](CLAUDE.md) for project conventions
-4. **Write Tests**: Add Molecule tests for new features
-5. **Run Linters**: Ensure `yamllint` and `ansible-lint` pass
-6. **Update Documentation**: Document new features in role READMEs
-7. **Submit Pull Request**: Provide a clear description of changes
+4. **Use Conventional Commits**: For automated releases (optional but recommended)
+5. **Write Tests**: Add Molecule tests for new features
+6. **Run Linters**: Ensure `yamllint` and `ansible-lint` pass
+7. **Update Documentation**: Document new features in role READMEs
+8. **Submit Pull Request**: Provide a clear description of changes
 
 ### Development Workflow
 
