@@ -194,11 +194,11 @@
 - name: Assert ping_path is configured correctly
   ansible.builtin.assert:
     that:
-      - fpm_pool_config_content is search('pm.ping.path = ' + php_status_page.ping_path)
+      - fpm_pool_config_content is search('ping.path = ' + php_status_page.ping_path)
     fail_msg: >-
-      pm.ping.path = {{ php_status_page.ping_path }}
+      ping.path = {{ php_status_page.ping_path }}
       not found in pool configuration
-    success_msg: pm.ping.path is correctly set to '{{ php_status_page.ping_path }}'
+    success_msg: ping.path is correctly set to '{{ php_status_page.ping_path }}'
   when: php_status_page.enabled
 
 - name: Assert ping_response is configured correctly
@@ -206,12 +206,12 @@
     that:
       - >-
         fpm_pool_config_content is
-        search('pm.ping.response = ' + php_status_page.ping_response)
+        search('ping.response = ' + php_status_page.ping_response)
     fail_msg: >-
-      pm.ping.response = {{ php_status_page.ping_response }}
+      ping.response = {{ php_status_page.ping_response }}
       not found in pool configuration
     success_msg: >-
-      pm.ping.response is correctly set to '{{ php_status_page.ping_response }}'
+      ping.response is correctly set to '{{ php_status_page.ping_response }}'
   when: php_status_page.enabled
 
 - name: Assert additional pool settings are configured correctly

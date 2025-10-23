@@ -4,9 +4,20 @@ This Molecule scenario comprehensively tests the `jlira.web_server.php` role, in
 
 ## Test Flow
 
-The scenario uses Molecule's test sequence to validate different aspects of the PHP role:
+The scenario uses Molecule's test sequence to validate different aspects of the PHP role.
 
-### 1. **converge.yml** - Initial Installation
+### Test Sequence Overview
+
+```
+create → prepare → converge → idempotence → side_effect → verify → destroy
+```
+
+**What gets tested:**
+- **converge.yml**: Installs PHP 8.2
+- **side_effect.yml**: Upgrades from PHP 8.2 to PHP 8.4
+- **verify.yml**: Verifies PHP 8.4 exists and PHP 8.2 is removed
+
+### 1. **converge.yml** - Initial Installation (PHP 8.2)
 - Installs PHP 8.2 with all features enabled
 - Configures PHP-FPM
 - Installs Composer
@@ -17,7 +28,7 @@ The scenario uses Molecule's test sequence to validate different aspects of the 
 - Re-runs converge.yml to ensure no changes occur
 - Validates that the role is truly idempotent
 
-### 3. **side_effect.yml** - Upgrade Scenario
+### 3. **side_effect.yml** - Upgrade Scenario (PHP 8.2 → 8.4)
 - **Tests the `uninstall` functionality**
 - Upgrades from PHP 8.2 (installed in converge.yml) to PHP 8.4
 - Validates that:
@@ -27,7 +38,9 @@ The scenario uses Molecule's test sequence to validate different aspects of the 
   - Alternatives system is updated
   - New PHP 8.4 is installed and configured
 
-### 4. **verify.yml** - Comprehensive Verification
+### 4. **verify.yml** - Comprehensive Verification (PHP 8.4)
+⚠️ **Runs AFTER side_effect.yml** - Tests that PHP 8.4 is installed and PHP 8.2 is removed.
+
 Tests are organized by task file:
 
 #### **uninstall.yml tests**
@@ -80,59 +93,83 @@ molecule test -s php
 
 ### Run Specific Test Phases
 
-**Syntax check only:**
+⚠️ **Important:** The test sequence must be followed in order: `create → converge → side-effect → verify`
+
+**1. Syntax check only:**
 ```bash
 molecule syntax -s php
 ```
 
-**Create and converge:**
+**2. Create container:**
+```bash
+molecule create -s php
+```
+
+**3. Converge (install PHP 8.2):**
 ```bash
 molecule converge -s php
 ```
 
-**Run verification tests:**
-```bash
-molecule verify -s php
-```
-
-**Test upgrade scenario:**
-```bash
-molecule side-effect -s php
-```
-
-**Run idempotence check:**
+**4. Test idempotence:**
 ```bash
 molecule idempotence -s php
 ```
 
-**Clean up and destroy:**
+**5. Side effect (upgrade PHP 8.2 → 8.4):**
+```bash
+molecule side-effect -s php
+```
+⚠️ **This MUST run before verify!** It upgrades from 8.2 to 8.4.
+
+**6. Run verification tests (verify PHP 8.4):**
+```bash
+molecule verify -s php
+```
+This tests that PHP 8.4 is installed and 8.2 is removed.
+
+**7. Clean up and destroy:**
 ```bash
 molecule destroy -s php
 ```
 
 ### Development Workflow
 
-**During role development:**
+**During role development (full sequence):**
 ```bash
 # Create instance
 molecule create -s php
 
-# Apply changes and test
+# Install PHP 8.2
 molecule converge -s php
-molecule verify -s php
 
-# Test upgrade scenario
+# Test idempotency of 8.2 installation
+molecule idempotence -s php
+
+# Upgrade from 8.2 to 8.4
 molecule side-effect -s php
+
+# Verify 8.4 is installed and 8.2 removed
 molecule verify -s php
 
 # Destroy when done
 molecule destroy -s php
 ```
 
-**Quick iteration:**
+**Quick iteration (testing changes to converge.yml):**
 ```bash
-# Skip destroy and re-use container
-molecule converge -s php && molecule verify -s php
+# Re-run installation and upgrade
+molecule destroy -s php
+molecule create -s php
+molecule converge -s php
+molecule side-effect -s php
+molecule verify -s php
+```
+
+**Testing only the upgrade process:**
+```bash
+# Assumes container exists with PHP 8.2 already installed
+molecule side-effect -s php
+molecule verify -s php
 ```
 
 ## Test Variables

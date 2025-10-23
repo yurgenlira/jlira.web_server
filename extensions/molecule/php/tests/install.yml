@@ -1,7 +1,19 @@
 # SPDX-License-Identifier: MIT-0
 ---
+- name: Check if PHP binary exists
+  ansible.builtin.stat:
+    path: /usr/bin/php{{ php_version }}
+  register: php_binary_check
+
+- name: Assert PHP binary exists
+  ansible.builtin.assert:
+    that:
+      - php_binary_check.stat.exists
+      - php_binary_check.stat.executable
+    fail_msg: "PHP {{ php_version }} binary not found at /usr/bin/php{{ php_version }}"
+
 - name: Check PHP version
-  ansible.builtin.command: php{{ php_version }} --version
+  ansible.builtin.command: /usr/bin/php{{ php_version }} --version
   register: php_version_check
   changed_when: false
 
