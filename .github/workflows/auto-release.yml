@@ -1,0 +1,199 @@
+name: Automated Release (Conventional Commits)
+
+# NOTE: This workflow is designed for manual triggering only when main branch is protected.
+# For unprotected branches, you can enable the 'push' trigger.
+on:
+  # push:  # Uncomment if main branch is NOT protected
+  #   branches:
+  #     - main
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type (major, minor, patch, or auto to detect from commits)'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - major
+          - minor
+          - patch
+
+permissions:
+  contents: write  # Required to create releases and push tags
+
+jobs:
+  auto-release:
+    name: Automated Version Bump and Release
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out the codebase
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install ansible-core pyyaml semver gitpython
+
+      - name: Determine version bump type
+        id: bump_type
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            BUMP_TYPE="${{ github.event.inputs.release_type }}"
+          elif echo "${{ github.event.head_commit.message }}" | grep -qE "feat!:|BREAKING CHANGE"; then
+            BUMP_TYPE="major"
+          elif echo "${{ github.event.head_commit.message }}" | grep -q "feat:"; then
+            BUMP_TYPE="minor"
+          else
+            BUMP_TYPE="patch"
+          fi
+          echo "type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+
+      - name: Bump version
+        id: version
+        run: |
+          # Read current version from galaxy.yml
+          CURRENT_VERSION=$(grep '^version:' galaxy.yml | awk '{print $2}')
+          echo "Current version: $CURRENT_VERSION"
+
+          # Parse version components
+          IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+
+          # Bump version based on type
+          case "${{ steps.bump_type.outputs.type }}" in
+            major)
+              NEW_VERSION="$((major + 1)).0.0"
+              ;;
+            minor)
+              NEW_VERSION="${major}.$((minor + 1)).0"
+              ;;
+            patch)
+              NEW_VERSION="${major}.${minor}.$((patch + 1))"
+              ;;
+          esac
+
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog entry
+        id: changelog_entry
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DATE=$(date +%Y-%m-%d)
+
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s" --no-merges)
+          else
+            COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s" --no-merges)
+          fi
+
+          # Categorize commits
+          FEATURES=$(echo "$COMMITS" | grep "^- feat:" | sed 's/^- feat: /- /' || true)
+          FIXES=$(echo "$COMMITS" | grep "^- fix:" | sed 's/^- fix: /- /' || true)
+          BREAKING=$(echo "$COMMITS" | grep -E "^- (feat!|fix!):" | sed 's/^- [^:]*: /- /' || true)
+          OTHERS=$(echo "$COMMITS" | grep -vE "^- (feat|fix):" || true)
+
+          # Build changelog entry
+          ENTRY="## [$VERSION] - $DATE"
+
+          if [ -n "$BREAKING" ]; then
+            ENTRY="$ENTRY\n### BREAKING CHANGES\n$BREAKING\n"
+          fi
+
+          if [ -n "$FEATURES" ]; then
+            ENTRY="$ENTRY\n### Added\n$FEATURES\n"
+          fi
+
+          if [ -n "$FIXES" ]; then
+            ENTRY="$ENTRY\n### Fixed\n$FIXES\n"
+          fi
+
+          if [ -n "$OTHERS" ]; then
+            ENTRY="$ENTRY\n### Changed\n$OTHERS\n"
+          fi
+
+          # Save entry to file
+          echo -e "$ENTRY" > new_changelog_entry.md
+          cat new_changelog_entry.md
+
+      - name: Update CHANGELOG.md
+        run: |
+          # Read the new entry
+          NEW_ENTRY=$(cat new_changelog_entry.md)
+
+          # Create temporary file with updated changelog
+          # Insert new entry after the [Unreleased] section
+          awk -v entry="$NEW_ENTRY" '
+            /## \[Unreleased\]/ {
+              print $0
+              # Skip existing unreleased content (if any) until next version section
+              while (getline > 0) {
+                if (/^## \[/) {
+                  # Found next version, print new entry then this line
+                  print ""
+                  print entry
+                  print ""
+                  print $0
+                  break
+                }
+              }
+              next
+            }
+            { print }
+          ' CHANGELOG.md > CHANGELOG.tmp
+
+          mv CHANGELOG.tmp CHANGELOG.md
+
+      - name: Update galaxy.yml
+        run: |
+          sed -i "s/^version:.*/version: ${{ steps.version.outputs.version }}/" galaxy.yml
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md galaxy.yml
+          git commit -m "chore: release version ${{ steps.version.outputs.version }}"
+          git push
+
+      - name: Create and push tag
+        run: |
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release version ${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Build Ansible Collection
+        run: ansible-galaxy collection build
+
+      - name: Get collection filename
+        id: collection
+        run: |
+          FILENAME=$(ls jlira-web_server-*.tar.gz)
+          echo "filename=$FILENAME" >> $GITHUB_OUTPUT
+
+      - name: Publish to Ansible Galaxy
+        env:
+          GALAXY_API_KEY: ${{ secrets.GALAXY_API_KEY }}
+        run: |
+          ansible-galaxy collection publish ${{ steps.collection.outputs.filename }} --api-key $GALAXY_API_KEY
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          body_path: new_changelog_entry.md
+          files: ${{ steps.collection.outputs.filename }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
