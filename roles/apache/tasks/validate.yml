@@ -535,12 +535,21 @@
     that:
       - listen_port in apache_http_ports
     fail_msg: >-
-      Virtual host '{{ item.0.name }}' HTTP listen port '{{ listen_port }}' is not in apache_http_ports {{ apache_http_ports }}.
+      Virtual host '{{ item.0.name }}' HTTP listen port '{{ listen_port }}'
+      is not in apache_http_ports {{ apache_http_ports }}.
       HTTP listen value: '{{ item.1 }}'.
-      Please ensure the port matches one of the configured apache_http_ports or update apache_http_ports to include this port.
+      Please ensure the port matches one of the configured apache_http_ports
+      or update apache_http_ports to include this port.
     success_msg: "Virtual host '{{ item.0.name }}' HTTP port {{ listen_port }} is valid"
     quiet: true
-  loop: "{{ apache_virtual_hosts | selectattr('http', 'defined') | map('combine', {'_listen': item.http.listen | default(['*:80'])}) | list | subelements('_listen') }}"
+  loop: >-
+    {{
+      apache_virtual_hosts
+      | selectattr('http', 'defined')
+      | map('combine', {'_listen': item.http.listen | default(['*:80'])})
+      | list
+      | subelements('_listen')
+    }}
   loop_control:
     label: "{{ item.0.name | default('unnamed') }} - {{ item.1 }}"
   vars:
@@ -552,12 +561,21 @@
     that:
       - listen_port in apache_https_ports
     fail_msg: >-
-      Virtual host '{{ item.0.name }}' HTTPS listen port '{{ listen_port }}' is not in apache_https_ports {{ apache_https_ports }}.
+      Virtual host '{{ item.0.name }}' HTTPS listen port '{{ listen_port }}'
+      is not in apache_https_ports {{ apache_https_ports }}.
       HTTPS listen value: '{{ item.1 }}'.
-      Please ensure the port matches one of the configured apache_https_ports or update apache_https_ports to include this port.
+      Please ensure the port matches one of the configured apache_https_ports
+      or update apache_https_ports to include this port.
     success_msg: "Virtual host '{{ item.0.name }}' HTTPS port {{ listen_port }} is valid"
     quiet: true
-  loop: "{{ apache_virtual_hosts | selectattr('https', 'defined') | map('combine', {'_listen': item.https.listen | default(['*:443'])}) | list | subelements('_listen') }}"
+  loop: >-
+    {{
+      apache_virtual_hosts
+      | selectattr('https', 'defined')
+      | map('combine', {'_listen': item.https.listen | default(['*:443'])})
+      | list
+      | subelements('_listen')
+    }}
   loop_control:
     label: "{{ item.0.name | default('unnamed') }} - {{ item.1 }}"
   vars:

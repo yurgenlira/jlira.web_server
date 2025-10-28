@@ -57,7 +57,8 @@
     label: "{{ item.line }}"
   notify: Restart PHP-FPM service
   register: php_fpm_ini_changed
-  when: "('/etc/php/' ~ php_version ~ '/fpm/php.ini' is file) | bool" # Don't fail in check_mode if php.ini not added yet
+  # Don't fail in check_mode if php.ini not added yet
+  when: "('/etc/php/' ~ php_version ~ '/fpm/php.ini' is file) | bool"
 
 - name: Check if backup of FPM pool configuration already exists
   ansible.builtin.stat:

@@ -55,4 +55,5 @@
   loop: "{{ php_cli_settings_list }}"
   loop_control:
     label: "{{ item.line }}"
-  when: "('/etc/php/' ~ php_version ~ '/cli/php.ini' is file) | bool" # Don't fail in check_mode if php.ini not added yet
+  # Don't fail in check_mode if php.ini not added yet
+  when: "('/etc/php/' ~ php_version ~ '/cli/php.ini' is file) | bool"
