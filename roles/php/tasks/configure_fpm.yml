@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT-0
 ---
-- name: Check if backup of php.ini already exists
+- name: Check if backup of php.ini.original already exists
   ansible.builtin.stat:
     path: "/etc/php/{{ php_version }}/fpm/php.ini.original"
   register: php_ini_backup_stat
@@ -47,6 +47,11 @@
   ansible.builtin.debug:
     var: php_fpm_settings_list
 
+- name: Check if PHP FPM php.ini exists
+  ansible.builtin.stat:
+    path: "/etc/php/{{ php_version }}/fpm/php.ini"
+  register: php_fpm_ini_stat
+
 - name: Configure PHP FPM settings in php.ini
   ansible.builtin.lineinfile:
     path: "/etc/php/{{ php_version }}/fpm/php.ini"
@@ -58,7 +63,7 @@
   notify: Restart PHP-FPM service
   register: php_fpm_ini_changed
   # Don't fail in check_mode if php.ini not added yet
-  when: "('/etc/php/' ~ php_version ~ '/fpm/php.ini' is file) | bool"
+  when: php_fpm_ini_stat.stat.exists
 
 - name: Check if backup of FPM pool configuration already exists
   ansible.builtin.stat:
