@@ -9,6 +9,8 @@
     prepend_newline: true
     state: present
   notify: Reload apache
+  when:
+    - exists /etc/apache2/apache2.conf
 
 - name: Configure custom environment variables in envvars
   ansible.builtin.blockinfile:
@@ -90,6 +92,7 @@
     state: present
   loop: "{{ apache_security_settings }}"
   notify: Reload apache
+  when: not ansible_check_mode
 
 - name: Enable security configuration
   ansible.builtin.command:

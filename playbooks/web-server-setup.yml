@@ -44,7 +44,7 @@
 #     -e "web_server_skip_confirm=true"
 
 - name: Setup Web Server with Apache and PHP
-  hosts: webservers
+  hosts: all
   become: true
 
   pre_tasks:
@@ -95,15 +95,19 @@
       ansible.builtin.command: apache2 -v
       register: apache_version_check
       changed_when: false
+      # when: not ansible_check_mode
 
     - name: Verify PHP installation
       ansible.builtin.command: php --version
       register: php_version_check
       changed_when: false
-      when: php_fpm_enabled | default(true)
+      when:
+        - php_fpm_enabled | default(true)
+        # - not ansible_check_mode
 
     - name: Check Apache service status
       ansible.builtin.service_facts:
+      # when: not ansible_check_mode
 
     - name: Display installation summary
       ansible.builtin.debug:
@@ -124,7 +128,7 @@
           - "PHP:"
           - >-
             {{ php_version_check.stdout_lines[0]
-            if php_version_check is defined and php_version_check.stdout_lines | length > 0
+            if php_version_check is not skipped and php_version_check.stdout_lines | default([]) | length > 0
             else 'PHP not installed (disabled)' }}
           - "  • PHP-FPM Enabled: {{ 'Yes' if php_fpm_enabled | default(true) else 'No' }}"
           - "  • PHP-FPM Integration: {{ 'Yes' if apache_php_fpm_integration | default(true) else 'No' }}"

@@ -490,6 +490,80 @@
     label: "{{ item.name | default('unnamed') }}"
   when: apache_virtual_hosts | length > 0
 
+- name: Validate HTTP virtual host listen is a list
+  ansible.builtin.assert:
+    that:
+      - item.http.listen is iterable
+      - item.http.listen is not string
+      - item.http.listen is not mapping
+      - item.http.listen | length > 0
+    fail_msg: >-
+      Virtual host '{{ item.name }}' has 'http.listen' defined but it's not a valid list.
+      Please define 'http.listen' as a list of address:port or port values (e.g., ['*:80']).
+    success_msg: "Virtual host '{{ item.name }}' HTTP listen is a valid list"
+    quiet: true
+  loop: "{{ apache_virtual_hosts }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed') }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.http is defined
+    - item.http.listen is defined
+
+- name: Validate HTTPS virtual host listen is a list
+  ansible.builtin.assert:
+    that:
+      - item.https.listen is iterable
+      - item.https.listen is not string
+      - item.https.listen is not mapping
+      - item.https.listen | length > 0
+    fail_msg: >-
+      Virtual host '{{ item.name }}' has 'https.listen' defined but it's not a valid list.
+      Please define 'https.listen' as a list of address:port or port values (e.g., ['*:443']).
+    success_msg: "Virtual host '{{ item.name }}' HTTPS listen is a valid list"
+    quiet: true
+  loop: "{{ apache_virtual_hosts }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed') }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.https is defined
+    - item.https.listen is defined
+
+- name: Validate HTTP listen ports match apache_http_ports
+  ansible.builtin.assert:
+    that:
+      - listen_port in apache_http_ports
+    fail_msg: >-
+      Virtual host '{{ item.0.name }}' HTTP listen port '{{ listen_port }}' is not in apache_http_ports {{ apache_http_ports }}.
+      HTTP listen value: '{{ item.1 }}'.
+      Please ensure the port matches one of the configured apache_http_ports or update apache_http_ports to include this port.
+    success_msg: "Virtual host '{{ item.0.name }}' HTTP port {{ listen_port }} is valid"
+    quiet: true
+  loop: "{{ apache_virtual_hosts | selectattr('http', 'defined') | map('combine', {'_listen': item.http.listen | default(['*:80'])}) | list | subelements('_listen') }}"
+  loop_control:
+    label: "{{ item.0.name | default('unnamed') }} - {{ item.1 }}"
+  vars:
+    listen_port: "{{ item.1 | regex_replace('^.*:', '') | int }}"
+  when: apache_virtual_hosts | length > 0
+
+- name: Validate HTTPS listen ports match apache_https_ports
+  ansible.builtin.assert:
+    that:
+      - listen_port in apache_https_ports
+    fail_msg: >-
+      Virtual host '{{ item.0.name }}' HTTPS listen port '{{ listen_port }}' is not in apache_https_ports {{ apache_https_ports }}.
+      HTTPS listen value: '{{ item.1 }}'.
+      Please ensure the port matches one of the configured apache_https_ports or update apache_https_ports to include this port.
+    success_msg: "Virtual host '{{ item.0.name }}' HTTPS port {{ listen_port }} is valid"
+    quiet: true
+  loop: "{{ apache_virtual_hosts | selectattr('https', 'defined') | map('combine', {'_listen': item.https.listen | default(['*:443'])}) | list | subelements('_listen') }}"
+  loop_control:
+    label: "{{ item.0.name | default('unnamed') }} - {{ item.1 }}"
+  vars:
+    listen_port: "{{ item.1 | regex_replace('^.*:', '') | int }}"
+  when: apache_virtual_hosts | length > 0
+
 # =============================================================================
 # 10. Authentication Configuration Validation
 # =============================================================================

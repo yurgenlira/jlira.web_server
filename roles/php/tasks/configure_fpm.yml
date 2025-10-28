@@ -11,7 +11,9 @@
     dest: "/etc/php/{{ php_version }}/fpm/php.ini.original"
     remote_src: true
     mode: "0644"
-  when: not php_ini_backup_stat.stat.exists
+  when:
+    - not php_ini_backup_stat.stat.exists
+    - not ansible_check_mode
 
 - name: Create PHP FPM error log directory if error_log is defined
   ansible.builtin.file:
@@ -55,6 +57,7 @@
     label: "{{ item.line }}"
   notify: Restart PHP-FPM service
   register: php_fpm_ini_changed
+  when: "('/etc/php/' ~ php_version ~ '/fpm/php.ini' is file) | bool" # Don't fail in check_mode if php.ini not added yet
 
 - name: Check if backup of FPM pool configuration already exists
   ansible.builtin.stat:
@@ -71,6 +74,7 @@
   when:
     - php_pool_settings is defined
     - not php_fpm_pool_backup_stat.stat.exists
+    - not ansible_check_mode
 
 - name: Configure PHP-FPM pool settings from template
   ansible.builtin.template:

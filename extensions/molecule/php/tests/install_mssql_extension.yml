@@ -40,7 +40,6 @@
         cmd: '$(which php{{ php_version }}) -r "echo ini_get(''extension_dir'');"'
       register: php_extension_dir_output
       changed_when: false
-      check_mode: false
 
     - name: Check for sqlsrv.so
       ansible.builtin.stat:

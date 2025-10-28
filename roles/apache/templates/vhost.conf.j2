@@ -1,7 +1,7 @@
 ## ANSIBLE MANAGED FILE ##
 # HTTP Virtual Host: {{ item.name }}
 {% if item.http is defined %}
-<VirtualHost {% for listen in item.http.listen %}{{ listen }}{% if not loop.last %} {% endif %}{% endfor %}>
+<VirtualHost {% for listen in item.http.listen | default(['*:80']) %}{{ listen }}{% if not loop.last %} {% endif %}{% endfor %}>
 {% if item.server_name is defined %}
     ServerName {{ item.server_name }}
 {% endif %}

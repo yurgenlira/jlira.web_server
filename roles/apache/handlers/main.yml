@@ -12,6 +12,7 @@
   changed_when: false
   failed_when: false
   register: apache_configtest_result
+  when: not ansible_check_mode
 
 - name: Display Apache config test warnings
   listen:
@@ -20,7 +21,9 @@
   ansible.builtin.debug:
     msg: "{{ apache_configtest_result.stderr_lines }}"
   when:
+    - not ansible_check_mode
     - apache_configtest_result is defined
+    - apache_configtest_result.rc is defined
     - apache_configtest_result.rc != 0
 
 - name: Reload Apache service
@@ -28,9 +31,11 @@
   ansible.builtin.service:
     name: apache2
     state: reloaded
+  when: not ansible_check_mode
 
 - name: Restart Apache service
   listen: Restart apache
   ansible.builtin.service:
     name: apache2
     state: restarted
+  when: not ansible_check_mode

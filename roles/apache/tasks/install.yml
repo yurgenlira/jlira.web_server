@@ -13,3 +13,4 @@
     name: apache2
     state: started
     enabled: true
+  when: not ansible_check_mode # Don't start service in check_mode if not installed yet

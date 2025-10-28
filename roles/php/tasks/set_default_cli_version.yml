@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: MIT-0
 ---
-- name: Verify PHP binary exist
+- name: Verify PHP binary exists
   ansible.builtin.stat:
     path: "/usr/bin/php{{ php_version }}"
   register: php_binary_check
   failed_when: not php_binary_check.stat.exists
+  when: not ansible_check_mode
 
 - name: Check current default PHP CLI version
   ansible.builtin.command: php --version
@@ -26,4 +27,5 @@
   when: >
     php_cli_set_as_default_version and
     (php_current_version.stdout is not defined or
-     php_version not in php_current_version.stdout)
+    php_version not in php_current_version.stdout) and
+    (('/usr/bin/php' ~ php_version is file) | bool)
