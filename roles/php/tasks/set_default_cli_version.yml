@@ -13,6 +13,11 @@
   changed_when: false
   failed_when: false
 
+- name: Check if PHP CLI php.ini exists
+  ansible.builtin.stat:
+    path: "/etc/php/{{ php_version }}/cli/php.ini"
+  register: php_cli_ini_stat
+
 - name: Set all PHP CLI tools as default for version {{ php_version }}
   community.general.alternatives:
     name: "{{ item }}"
@@ -24,8 +29,9 @@
     - phar.phar
     - phpize
     - php-config
+  # Don't fail in check_mode if php.ini not added yet
   when: >
     php_cli_set_as_default_version and
     (php_current_version.stdout is not defined or
     php_version not in php_current_version.stdout) and
-    (('/usr/bin/php' ~ php_version is file) | bool)
+    php_cli_ini_stat.stat.exists
