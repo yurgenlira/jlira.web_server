@@ -11,7 +11,9 @@
     dest: "/etc/php/{{ php_version }}/cli/php.ini.original"
     remote_src: true
     mode: "0644"
-  when: not php_ini_backup_stat.stat.exists
+  when:
+    - not php_ini_backup_stat.stat.exists
+    - not ansible_check_mode
 
 - name: Create PHP CLI error log directory if error_log is defined
   ansible.builtin.file:
@@ -45,6 +47,11 @@
   ansible.builtin.debug:
     var: php_cli_settings_list
 
+- name: Check if PHP CLI php.ini exists
+  ansible.builtin.stat:
+    path: "/etc/php/{{ php_version }}/cli/php.ini"
+  register: php_cli_ini_stat
+
 - name: Configure PHP CLI settings in php.ini
   ansible.builtin.lineinfile:
     path: "/etc/php/{{ php_version }}/cli/php.ini"
@@ -53,3 +60,5 @@
   loop: "{{ php_cli_settings_list }}"
   loop_control:
     label: "{{ item.line }}"
+  # Don't fail in check_mode if php.ini not added yet
+  when: php_cli_ini_stat.stat.exists

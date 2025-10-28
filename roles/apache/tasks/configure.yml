@@ -1,102 +1,111 @@
 # SPDX-License-Identifier: MIT-0
 ---
-- name: Configure ServerName and main settings in apache2.conf
-  ansible.builtin.blockinfile:
-    path: /etc/apache2/apache2.conf
-    block: "{{ lookup('template', 'apache2.conf.j2') }}"
-    marker: "## {mark} ANSIBLE MANAGED BLOCK - Custom settings ##"
-    append_newline: false
-    prepend_newline: true
-    state: present
-  notify: Reload apache
+- name: Get packages facts
+  ansible.builtin.package_facts:
+    manager: auto
+  no_log: true
 
-- name: Configure custom environment variables in envvars
-  ansible.builtin.blockinfile:
-    path: /etc/apache2/envvars
-    block: "{{ lookup('template', 'envvars.j2') }}"
-    marker: "## {mark} ANSIBLE MANAGED BLOCK - Custom environment variables ##"
-    append_newline: false
-    prepend_newline: true
-    state: present
-  when: apache_envvars | length > 0
-  notify: Reload apache
+- name: Configure apache
+  when: "'apache2' in ansible_facts.packages"
+  block:
+    - name: Configure ServerName and main settings in apache2.conf
+      ansible.builtin.blockinfile:
+        path: /etc/apache2/apache2.conf
+        block: "{{ lookup('template', 'apache2.conf.j2') }}"
+        marker: "## {mark} ANSIBLE MANAGED BLOCK - Custom settings ##"
+        append_newline: false
+        prepend_newline: true
+        state: present
+      notify: Reload apache
 
-- name: Configure ports in ports.conf
-  ansible.builtin.template:
-    src: ports.conf.j2
-    dest: /etc/apache2/ports.conf
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Reload apache
+    - name: Configure custom environment variables in envvars
+      ansible.builtin.blockinfile:
+        path: /etc/apache2/envvars
+        block: "{{ lookup('template', 'envvars.j2') }}"
+        marker: "## {mark} ANSIBLE MANAGED BLOCK - Custom environment variables ##"
+        append_newline: false
+        prepend_newline: true
+        state: present
+      when: apache_envvars | length > 0
+      notify: Reload apache
 
-- name: Enable SSL module
-  ansible.builtin.command:
-    cmd: a2enmod ssl
-  register: apache_enable_ssl_module_result
-  changed_when: "'Enabling module' in apache_enable_ssl_module_result.stdout"
-  when: apache_ssl_enabled
-  notify: Reload apache
+    - name: Configure ports in ports.conf
+      ansible.builtin.template:
+        src: ports.conf.j2
+        dest: /etc/apache2/ports.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reload apache
 
-- name: Enable Apache modules
-  ansible.builtin.command:
-    cmd: "a2enmod {{ item }}"
-  register: apache_enable_module_result
-  changed_when: "'Enabling module' in apache_enable_module_result.stdout"
-  loop: "{{ apache_modules_enabled }}"
-  notify: Reload apache
+    - name: Enable SSL module
+      ansible.builtin.command:
+        cmd: a2enmod ssl
+      register: apache_enable_ssl_module_result
+      changed_when: "'Enabling module' in apache_enable_ssl_module_result.stdout"
+      when: apache_ssl_enabled
+      notify: Reload apache
 
-- name: Configure default HTTP virtual host
-  ansible.builtin.template:
-    src: 000-default.conf.j2
-    dest: /etc/apache2/sites-available/000-default.conf
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Reload apache
+    - name: Enable Apache modules
+      ansible.builtin.command:
+        cmd: "a2enmod {{ item }}"
+      register: apache_enable_module_result
+      changed_when: "'Enabling module' in apache_enable_module_result.stdout"
+      loop: "{{ apache_modules_enabled }}"
+      notify: Reload apache
 
-- name: Rename default SSL virtual host configuration
-  ansible.builtin.command:
-    cmd: rm /etc/apache2/sites-available/default-ssl.conf
-  args:
-    removes: /etc/apache2/sites-available/default-ssl.conf
-  notify: Reload apache
+    - name: Configure default HTTP virtual host
+      ansible.builtin.template:
+        src: 000-default.conf.j2
+        dest: /etc/apache2/sites-available/000-default.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reload apache
 
-- name: Configure default SSL virtual host
-  ansible.builtin.template:
-    src: 000-default-ssl.conf.j2
-    dest: /etc/apache2/sites-available/000-default-ssl.conf
-    owner: root
-    group: root
-    mode: "0644"
-  when: apache_ssl_enabled
-  notify: Reload apache
+    - name: Rename default SSL virtual host configuration
+      ansible.builtin.command:
+        cmd: rm /etc/apache2/sites-available/default-ssl.conf
+      args:
+        removes: /etc/apache2/sites-available/default-ssl.conf
+      notify: Reload apache
 
-- name: Enable default SSL site
-  ansible.builtin.command:
-    cmd: a2ensite 000-default-ssl
-  args:
-    creates: /etc/apache2/sites-enabled/000-default-ssl.conf
-  register: apache_enable_ssl_result
-  changed_when: "'Enabling site' in apache_enable_ssl_result.stdout"
-  when: apache_ssl_enabled
-  notify: Reload apache
+    - name: Configure default SSL virtual host
+      ansible.builtin.template:
+        src: 000-default-ssl.conf.j2
+        dest: /etc/apache2/sites-available/000-default-ssl.conf
+        owner: root
+        group: root
+        mode: "0644"
+      when: apache_ssl_enabled
+      notify: Reload apache
 
-- name: Configure Apache security settings
-  ansible.builtin.lineinfile:
-    path: /etc/apache2/conf-available/security.conf
-    regexp: '^{{ item.name }}'
-    line: '{{ item.name }} {{ item.value }}'
-    state: present
-  loop: "{{ apache_security_settings }}"
-  notify: Reload apache
+    - name: Enable default SSL site
+      ansible.builtin.command:
+        cmd: a2ensite 000-default-ssl
+      args:
+        creates: /etc/apache2/sites-enabled/000-default-ssl.conf
+      register: apache_enable_ssl_result
+      changed_when: "'Enabling site' in apache_enable_ssl_result.stdout"
+      when: apache_ssl_enabled
+      notify: Reload apache
 
-- name: Enable security configuration
-  ansible.builtin.command:
-    cmd: a2enconf security
-  args:
-    creates: /etc/apache2/conf-enabled/security.conf
-  notify: Reload apache
+    - name: Configure Apache security settings
+      ansible.builtin.lineinfile:
+        path: /etc/apache2/conf-available/security.conf
+        regexp: '^{{ item.name }}'
+        line: '{{ item.name }} {{ item.value }}'
+        state: present
+      loop: "{{ apache_security_settings }}"
+      notify: Reload apache
+      when: not ansible_check_mode
+
+    - name: Enable security configuration
+      ansible.builtin.command:
+        cmd: a2enconf security
+      args:
+        creates: /etc/apache2/conf-enabled/security.conf
+      notify: Reload apache
 
 # - name: Flush handlers
 #   ansible.builtin.meta: flush_handlers

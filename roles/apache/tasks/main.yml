@@ -108,7 +108,7 @@
         - apache_virtual_hosts
         - virtual_hosts_from_templates
         - apache_virtual_hosts_from_templates
-  when: (apache_vhost_templates | length > 0) or (apache_vhosts_from_templates | length > 0)
+  when: (apache_vhost_templates | length > 0) or (apache_vhosts_from_template | length > 0)
   tags:
     - virtual_hosts
     - apache_virtual_hosts

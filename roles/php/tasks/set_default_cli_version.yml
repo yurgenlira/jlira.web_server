@@ -1,16 +1,22 @@
 # SPDX-License-Identifier: MIT-0
 ---
-- name: Verify PHP binary exist
+- name: Verify PHP binary exists
   ansible.builtin.stat:
     path: "/usr/bin/php{{ php_version }}"
   register: php_binary_check
   failed_when: not php_binary_check.stat.exists
+  when: not ansible_check_mode
 
 - name: Check current default PHP CLI version
   ansible.builtin.command: php --version
   register: php_current_version
   changed_when: false
   failed_when: false
+
+- name: Check if PHP CLI php.ini exists
+  ansible.builtin.stat:
+    path: "/etc/php/{{ php_version }}/cli/php.ini"
+  register: php_cli_ini_stat
 
 - name: Set all PHP CLI tools as default for version {{ php_version }}
   community.general.alternatives:
@@ -23,7 +29,9 @@
     - phar.phar
     - phpize
     - php-config
+  # Don't fail in check_mode if php.ini not added yet
   when: >
     php_cli_set_as_default_version and
     (php_current_version.stdout is not defined or
-     php_version not in php_current_version.stdout)
+    php_version not in php_current_version.stdout) and
+    php_cli_ini_stat.stat.exists

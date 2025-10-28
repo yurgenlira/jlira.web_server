@@ -15,25 +15,35 @@
     state: present
     update_cache: true
 
+- name: Check for PPA file existence
+  ansible.builtin.stat:
+    path: /etc/apt/sources.list.d/ppa_ondrej_php_noble.list
+  register: php_ppa_file_stat
+
 - name: Install PHP CLI and packages for version {{ php_version }}
   ansible.builtin.apt:
     name: "{{ ['php' ~ php_version ~ '-cli'] + php_packages }}"
     state: present
     update_cache: true
     cache_valid_time: 3600
+  when: php_ppa_file_stat.stat.exists # Don't fail in check_mode if PPA not added yet
 
 - name: Install PHP-FPM for version {{ php_version }}
   ansible.builtin.apt:
     name: "php{{ php_version }}-fpm"
     state: present
-  when: php_fpm_enabled
+  when:
+    - php_fpm_enabled
+    - php_ppa_file_stat.stat.exists # Don't fail in check_mode if PPA not added yet
 
 - name: Ensure PHP-FPM service is started and enabled
   ansible.builtin.service:
     name: "php{{ php_version }}-fpm"
     state: started
     enabled: true
-  when: php_fpm_enabled
+  when:
+    - php_fpm_enabled
+    - not ansible_check_mode # Don't start service in check_mode if not installed yet
 
 - name: Download and install Composer globally
   ansible.builtin.shell: |
@@ -43,4 +53,5 @@
   args:
     creates: /usr/local/bin/composer
     executable: /bin/bash
-  when: php_composer_enabled
+  when:
+    - php_composer_enabled

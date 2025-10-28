@@ -1,7 +1,7 @@
 ## ANSIBLE MANAGED FILE ##
 # HTTPS Virtual Host: {{ item.name }}
 {% if item.https is defined %}
-<VirtualHost {% for listen in item.https.listen %}{{ listen }}{% if not loop.last %} {% endif %}{% endfor %}>
+<VirtualHost {% for listen in item.https.listen | default(['*:443']) %}{{ listen }}{% if not loop.last %} {% endif %}{% endfor %}>
     ServerName {{ item.server_name }}
 {% if item.server_alias is defined and item.server_alias | length > 0 %}
     ServerAlias {{ item.server_alias | join(' ') }}
