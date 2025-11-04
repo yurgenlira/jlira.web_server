@@ -1,0 +1,229 @@
+# SPDX-License-Identifier: MIT-0
+---
+# =============================================================================
+# SSL Certificate Management for Virtual Hosts
+# =============================================================================
+# This file contains reusable SSL certificate management logic that can be
+# included by both virtual_hosts.yml and virtual_hosts_from_templates.yml
+#
+# Required input variables:
+# - apache_ssl_cert_list: List of dicts with 'name', 'certificate_file', 'certificate_key_file'
+# - apache_ssl_vhost_type: String describing the vhost type (e.g., 'standard', 'template-based')
+# =============================================================================
+
+- name: Check if virtual host SSL certificate files exist
+  ansible.builtin.stat:
+    path: "{{ item.certificate_file }}"
+  register: apache_ssl_cert_stat
+  loop: "{{ apache_ssl_cert_list | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - apache_ssl_cert_list | default([]) | length > 0
+    - item.certificate_file is defined
+    - item.certificate_file | length > 0
+
+- name: Check if virtual host SSL key files exist
+  ansible.builtin.stat:
+    path: "{{ item.certificate_key_file }}"
+  register: apache_ssl_key_stat
+  loop: "{{ apache_ssl_cert_list | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - apache_ssl_cert_list | default([]) | length > 0
+    - item.certificate_key_file is defined
+    - item.certificate_key_file | length > 0
+
+- name: Fail if SSL certificates are missing and fallback is 'fail'
+  ansible.builtin.fail:
+    msg: |
+      SSL certificates are missing for {{ apache_ssl_vhost_type }} virtual host '{{ item.item.name }}'
+      and apache_ssl_certificate_fallback is set to 'fail'.
+
+      Missing certificate: {{ item.item.certificate_file }}
+      Certificate exists: {{ item.stat.exists }}
+
+      To resolve this issue, you can:
+      1. Generate certificates and place them at the path above
+      2. Use a certificate management role (e.g., jlira.web_server.certificates)
+      3. Change apache_ssl_certificate_fallback to 'generate' (auto-generate self-signed)
+      4. Change apache_ssl_certificate_fallback to 'disable' (skip HTTPS for this vhost)
+  loop: "{{ apache_ssl_cert_stat.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name | default('unnamed') }}"
+  when:
+    - item.skipped is not defined
+    - not item.stat.exists
+    - apache_ssl_certificate_fallback == 'fail'
+
+- name: Fail if SSL private keys are missing and fallback is 'fail'
+  ansible.builtin.fail:
+    msg: |
+      SSL private key is missing for {{ apache_ssl_vhost_type }} virtual host '{{ item.item.name }}'
+      and apache_ssl_certificate_fallback is set to 'fail'.
+
+      Missing private key: {{ item.item.certificate_key_file }}
+      Private key exists: {{ item.stat.exists }}
+
+      To resolve this issue, you can:
+      1. Generate certificates and place them at the path above
+      2. Use a certificate management role (e.g., jlira.web_server.certificates)
+      3. Change apache_ssl_certificate_fallback to 'generate' (auto-generate self-signed)
+      4. Change apache_ssl_certificate_fallback to 'disable' (skip HTTPS for this vhost)
+  loop: "{{ apache_ssl_key_stat.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name | default('unnamed') }}"
+  when:
+    - item.skipped is not defined
+    - not item.stat.exists
+    - apache_ssl_certificate_fallback == 'fail'
+
+- name: Build list of virtual hosts to skip HTTPS (disable mode)
+  ansible.builtin.set_fact:
+    "{{ apache_ssl_skip_list_var }}": >-
+      {{
+        lookup('vars', apache_ssl_skip_list_var, default=[]) +
+        [item.item.name]
+      }}
+  loop: "{{ apache_ssl_cert_stat.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name | default('unnamed') }}"
+  when:
+    - item.skipped is not defined
+    - not item.stat.exists
+    - apache_ssl_certificate_fallback == 'disable'
+
+- name: Add virtual hosts with missing keys to skip list (disable mode)
+  ansible.builtin.set_fact:
+    "{{ apache_ssl_skip_list_var }}": >-
+      {{
+        lookup('vars', apache_ssl_skip_list_var, default=[]) +
+        [item.item.name]
+      }}
+  loop: "{{ apache_ssl_key_stat.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name | default('unnamed') }}"
+  when:
+    - item.skipped is not defined
+    - not item.stat.exists
+    - apache_ssl_certificate_fallback == 'disable'
+    - item.item.name not in lookup('vars', apache_ssl_skip_list_var, default=[])
+
+- name: Display warning for virtual hosts with disabled HTTPS
+  ansible.builtin.debug:
+    msg: |
+      WARNING: SSL certificates are missing for {{ apache_ssl_vhost_type }} virtual host '{{ item }}'
+      and apache_ssl_certificate_fallback is set to 'disable'.
+
+      HTTPS configuration for this virtual host will be SKIPPED.
+      The virtual host will run in HTTP-only mode.
+  loop: "{{ lookup('vars', apache_ssl_skip_list_var, default=[]) }}"
+  when:
+    - lookup('vars', apache_ssl_skip_list_var, default=[]) | length > 0
+
+- name: Ensure parent directories exist for SSL certificates (generate mode)
+  ansible.builtin.file:
+    path: "{{ item.item.certificate_file | dirname }}"
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  loop: "{{ apache_ssl_cert_stat.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - item.skipped is not defined
+    - not item.stat.exists
+    - apache_ssl_certificate_fallback == 'generate'
+
+- name: Ensure parent directories exist for SSL private keys (generate mode)
+  ansible.builtin.file:
+    path: "{{ item.item.certificate_key_file | dirname }}"
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+  loop: "{{ apache_ssl_key_stat.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - item.skipped is not defined
+    - not item.stat.exists
+    - apache_ssl_certificate_fallback == 'generate'
+
+- name: Ensure OpenSSL is installed for certificate generation
+  ansible.builtin.apt:
+    name: openssl
+    state: present
+    update_cache: false
+  when:
+    - apache_ssl_cert_stat.results | default([])
+      | selectattr('skipped', 'undefined')
+      | selectattr('stat.exists', 'equalto', false)
+      | list | length > 0
+    - apache_ssl_certificate_fallback == 'generate'
+
+- name: Generate self-signed SSL certificates for virtual hosts
+  ansible.builtin.command:
+    cmd: >
+      openssl req -x509 -nodes -days {{ apache_ssl_selfsigned_days }}
+      -newkey rsa:4096
+      -keyout {{ item.item.certificate_key_file }}
+      -out {{ item.item.certificate_file }}
+      -subj "/O={{ apache_ssl_selfsigned_organization }}/CN={{ item.item.name }}"
+    creates: "{{ item.item.certificate_file }}"
+  loop: "{{ apache_ssl_cert_stat.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - item.skipped is not defined
+    - not item.stat.exists
+    - apache_ssl_certificate_fallback == 'generate'
+  notify: Reload apache
+
+- name: Set permissions on generated SSL certificates
+  ansible.builtin.file:
+    path: "{{ item.item.certificate_file }}"
+    mode: "0644"
+    owner: root
+    group: root
+  loop: "{{ apache_ssl_cert_stat.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - item.skipped is not defined
+    - not item.stat.exists
+    - apache_ssl_certificate_fallback == 'generate'
+
+- name: Set permissions on generated SSL private keys
+  ansible.builtin.file:
+    path: "{{ item.item.certificate_key_file }}"
+    mode: "0600"
+    owner: root
+    group: root
+  loop: "{{ apache_ssl_key_stat.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - item.skipped is not defined
+    - not item.stat.exists
+    - apache_ssl_certificate_fallback == 'generate'
+
+- name: Display generated certificates summary
+  ansible.builtin.debug:
+    msg: |
+      Generated self-signed SSL certificate for {{ apache_ssl_vhost_type }} virtual host '{{ item.item.name }}'
+      Certificate: {{ item.item.certificate_file }}
+      Private Key: {{ item.item.certificate_key_file }}
+      Valid for: {{ apache_ssl_selfsigned_days }} days
+
+      NOTE: This is a self-signed certificate for development/testing purposes.
+      For production, use certificates from a trusted Certificate Authority.
+  loop: "{{ apache_ssl_cert_stat.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - item.skipped is not defined
+    - not item.stat.exists
+    - apache_ssl_certificate_fallback == 'generate'

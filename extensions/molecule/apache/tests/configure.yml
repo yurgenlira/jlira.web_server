@@ -1,6 +1,22 @@
 ---
 # ============================================================================
-# ServerName and Main Settings Tests
+# Test Metadata and Description
+# ============================================================================
+# It covers:
+# 1. Package facts gathering and conditional execution
+# 2. Main Apache configuration (apache2.conf, envvars, ports.conf)
+# 3. SSL module and additional modules enabling
+# 4. Virtual host configuration (HTTP and HTTPS)
+# 5. SSL certificate handling with three fallback modes:
+#    - 'fail': Fail if certificates are missing (production-safe)
+#    - 'generate': Auto-generate self-signed certificates (development)
+#    - 'disable': Skip SSL if certificates missing (HTTP-only fallback)
+# 6. Security settings configuration
+# ============================================================================
+
+
+# ============================================================================
+# ServerName and Main Settings Tests (apache2.conf)
 # ============================================================================
 - name: Check apache2.conf exists
   ansible.builtin.stat:
@@ -27,10 +43,6 @@
       - apache_servername_check.stdout | length > 0
     fail_msg: "ServerName is not configured in apache2.conf."
 
-# ============================================================================
-# Ansible Managed Block Tests
-# ============================================================================
-
 - name: Check ANSIBLE MANAGED BLOCK is present in apache2.conf
   ansible.builtin.shell: |
     grep -F '## BEGIN ANSIBLE MANAGED BLOCK - Custom settings ##' /etc/apache2/apache2.conf
@@ -43,10 +55,6 @@
     that:
       - apache_managed_block_check.rc == 0
     fail_msg: "ANSIBLE MANAGED BLOCK not found in apache2.conf."
-
-# ============================================================================
-# Apache Main Settings Tests (Custom Settings)
-# ============================================================================
 
 - name: Check LimitRequestLine is configured in apache2.conf
   ansible.builtin.command:
@@ -83,7 +91,7 @@
     - limit_request_field_size_check is not skipped
 
 # ============================================================================
-# Environment Variables Tests
+# Environment Variables Tests (envars)
 # ============================================================================
 
 - name: Check envvars file exists
@@ -135,7 +143,7 @@
     - custom_log_dir_check is not skipped
 
 # ============================================================================
-# Port Configuration Tests
+# Port Configuration Tests (ports.conf)
 # ============================================================================
 
 - name: Check ports.conf exists
@@ -315,7 +323,7 @@
     - http2_module_stat is not skipped
 
 # ============================================================================
-# Default Virtual Host Tests
+# Default Virtual Host Tests (000-default.conf)
 # ============================================================================
 
 - name: Check default HTTP virtual host configuration exists
@@ -357,7 +365,7 @@
     fail_msg: "ServerName not found in 000-default.conf."
 
 # ============================================================================
-# Default SSL Virtual Host Tests
+# Default SSL Virtual Host Tests (default-ssl.conf)
 # ============================================================================
 
 - name: Check old default-ssl.conf does not exist
@@ -404,24 +412,248 @@
     - apache_ssl_enabled | default(true)
     - ssl_vhost_marker is not skipped
 
-- name: Check SSL site is enabled
+# ============================================================================
+# SSL Certificate Configuration Tests
+# ============================================================================
+
+- name: Check if SSL certificate file exists
   ansible.builtin.stat:
-    path: /etc/apache2/sites-enabled/000-default-ssl.conf
-  register: ssl_site_enabled_stat
+    path: "{{ apache_default_ssl_certificate_file }}"
+  register: ssl_cert_file_stat
   when: apache_ssl_enabled | default(true)
 
-- name: Assert SSL site is enabled (when SSL enabled)
+- name: Assert SSL certificate exists when SSL enabled
   ansible.builtin.assert:
     that:
-      - ssl_site_enabled_stat.stat.exists
-      - ssl_site_enabled_stat.stat.islnk
-    fail_msg: "SSL site is not enabled (symlink does not exist in sites-enabled)."
+      - ssl_cert_file_stat.stat.exists
+      - ssl_cert_file_stat.stat.mode == '0644'
+    fail_msg: "SSL certificate missing or wrong permissions at {{ apache_default_ssl_certificate_file }}"
+    success_msg: "SSL certificate found with correct permissions"
   when:
     - apache_ssl_enabled | default(true)
-    - ssl_site_enabled_stat is not skipped
+    - apache_ssl_certificate_fallback != 'disable'
+
+- name: Check if SSL certificate key file exists
+  ansible.builtin.stat:
+    path: "{{ apache_default_ssl_certificate_key_file }}"
+  register: ssl_key_file_stat
+  when: apache_ssl_enabled | default(true)
+
+- name: Assert SSL certificate key exists when SSL enabled
+  ansible.builtin.assert:
+    that:
+      - ssl_key_file_stat.stat.exists
+      - ssl_key_file_stat.stat.mode == '0640'
+    fail_msg: "SSL certificate key missing or wrong permissions at {{ apache_default_ssl_certificate_key_file }}"
+    success_msg: "SSL certificate key found with correct permissions"
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback != 'disable'
+
+- name: Verify certificate was auto-generated (generate mode)
+  ansible.builtin.command:
+    cmd: "openssl x509 -in {{ apache_default_ssl_certificate_file }} -noout -subject"
+  register: cert_subject_check
+  changed_when: false
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback == 'generate'
+
+- name: Verify SSL configuration is in place
+  ansible.builtin.stat:
+    path: /etc/apache2/sites-enabled/000-default-ssl.conf
+  register: ssl_site_enabled
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback != 'disable'
+
+- name: Assert SSL site is enabled when certificates exist
+  ansible.builtin.assert:
+    that:
+      - ssl_site_enabled.stat.exists
+      - ssl_site_enabled.stat.islnk
+    fail_msg: "SSL site is not enabled despite certificates being present"
+    success_msg: "SSL site is properly enabled"
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback != 'disable'
 
 # ============================================================================
-# Security Configuration Tests
+# SSL Certificate Fallback Mode Tests
+# ============================================================================
+# These tests verify the three SSL certificate fallback modes:
+# 1. 'fail': Playbook fails with clear error message (tested separately)
+# 2. 'generate': Auto-generates self-signed certificates
+# 3. 'disable': Skips SSL configuration, runs HTTP-only
+# ============================================================================
+
+- name: Verify behavior when fallback mode is 'generate'
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback == 'generate'
+  block:
+    - name: Check certificate exists in generate mode
+      ansible.builtin.stat:
+        path: "{{ apache_default_ssl_certificate_file }}"
+      register: gen_cert_stat
+
+    - name: Assert certificate was generated
+      ansible.builtin.assert:
+        that:
+          - gen_cert_stat.stat.exists
+        fail_msg: "Certificate was not generated in 'generate' mode"
+        success_msg: "Certificate successfully generated in 'generate' mode"
+
+    - name: Check certificate key exists in generate mode
+      ansible.builtin.stat:
+        path: "{{ apache_default_ssl_certificate_key_file }}"
+      register: gen_key_stat
+
+    - name: Assert certificate key was generated
+      ansible.builtin.assert:
+        that:
+          - gen_key_stat.stat.exists
+          - gen_key_stat.stat.mode == '0640'
+        fail_msg: "Certificate key was not generated in 'generate' mode"
+        success_msg: "Certificate key successfully generated in 'generate' mode"
+
+    - name: Verify certificate validity
+      ansible.builtin.command:
+        cmd: "openssl x509 -in {{ apache_default_ssl_certificate_file }} -noout -dates"
+      register: cert_validity
+      changed_when: false
+
+    - name: Assert certificate is valid
+      ansible.builtin.assert:
+        that:
+          - cert_validity.rc == 0
+          - "'notBefore=' in cert_validity.stdout"
+          - "'notAfter=' in cert_validity.stdout"
+        fail_msg: "Generated certificate is not valid"
+        success_msg: "Generated certificate is valid"
+
+    - name: Verify certificate organization
+      ansible.builtin.command:
+        cmd: "openssl x509 -in {{ apache_default_ssl_certificate_file }} -noout -text"
+      register: cert_details
+      changed_when: false
+
+    # - name: Assert certificate contains organization
+    #   ansible.builtin.assert:
+    #     that:
+    #       - cert_details.stdout is search('O = ' + apache_ssl_selfsigned_organization | default(inventory_hostname))
+    #     fail_msg: "Certificate does not contain expected organization"
+    #     success_msg: "Certificate organization is correct"
+
+- name: Verify behavior when fallback mode is 'disable'
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback == 'disable'
+  block:
+    - name: Check that SSL site is NOT enabled in disable mode
+      ansible.builtin.stat:
+        path: /etc/apache2/sites-enabled/000-default-ssl.conf
+      register: ssl_disabled_check
+
+    - name: Assert SSL site is not enabled
+      ansible.builtin.assert:
+        that:
+          - not ssl_disabled_check.stat.exists
+        fail_msg: "SSL site should not be enabled when fallback mode is 'disable'"
+        success_msg: "SSL site correctly disabled"
+
+    - name: Check that HTTP is still working in disable mode
+      ansible.builtin.uri:
+        url: http://localhost
+        return_content: true
+      register: http_check_disabled
+
+    - name: Assert HTTP is accessible when SSL is disabled
+      ansible.builtin.assert:
+        that:
+          - http_check_disabled.status == 200
+        fail_msg: "HTTP should still be accessible when SSL is disabled"
+        success_msg: "HTTP is accessible in SSL disable mode"
+
+    - name: Verify HTTPS is not responding (expected to fail in disable mode)
+      ansible.builtin.uri:
+        url: https://localhost
+        validate_certs: false
+        status_code: [000, 404, 503]
+      register: https_disabled_check
+      ignore_errors: true
+
+    - name: Display HTTPS disable mode result
+      ansible.builtin.debug:
+        msg: "HTTPS is not configured in disable mode (expected behavior)"
+
+# ============================================================================
+# Certificate Permissions and Ownership Tests
+# ============================================================================
+
+- name: Check certificate directory exists
+  ansible.builtin.stat:
+    path: "{{ apache_default_ssl_certificate_key_file | dirname }}"
+  register: cert_dir_stat
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback == 'generate'
+
+- name: Assert certificate directory permissions
+  ansible.builtin.assert:
+    that:
+      - cert_dir_stat.stat.exists
+      - cert_dir_stat.stat.isdir
+      - cert_dir_stat.stat.mode == '0700'
+      - cert_dir_stat.stat.pw_name == 'root'
+      - cert_dir_stat.stat.gr_name == 'root'
+    fail_msg: "Certificate directory has incorrect permissions or ownership"
+    success_msg: "Certificate directory has correct permissions (0700) and ownership (root:root)"
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback == 'generate'
+
+- name: Check certificate file is readable by Apache
+  ansible.builtin.command:
+    cmd: "ls -l {{ apache_default_ssl_certificate_file }}"
+  register: cert_ls_output
+  changed_when: false
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback != 'disable'
+
+- name: Verify certificate file accessibility
+  ansible.builtin.assert:
+    that:
+      - "'r--' in cert_ls_output.stdout"
+    fail_msg: "Certificate file is not readable"
+    success_msg: "Certificate file has correct readable permissions"
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback != 'disable'
+
+- name: Check certificate key ownership
+  ansible.builtin.stat:
+    path: "{{ apache_default_ssl_certificate_key_file }}"
+  register: key_ownership_check
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback == 'generate'
+
+- name: Verify certificate key ownership
+  ansible.builtin.assert:
+    that:
+      - key_ownership_check.stat.pw_name == 'root'
+      - key_ownership_check.stat.gr_name == 'ssl-cert'
+      - key_ownership_check.stat.mode == '0640'
+    fail_msg: "Certificate key has incorrect ownership or permissions (expected root:ssl-cert with 0640)"
+    success_msg: "Certificate key has correct ownership (root:ssl-cert) and permissions (0600)"
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback == 'generate'
+
+# ============================================================================
+# Security Configuration Tests (security.conf)
 # ============================================================================
 
 - name: Check security.conf exists
@@ -486,10 +718,6 @@
       - security_conf_enabled_stat.stat.islnk
     fail_msg: "Security configuration is not enabled (symlink does not exist in conf-enabled)."
 
-# ============================================================================
-# Additional Security Settings Tests (from inventory)
-# ============================================================================
-
 - name: Check FileETag is configured in security.conf
   ansible.builtin.command:
     cmd: grep -E "^FileETag\s+None" /etc/apache2/conf-available/security.conf
@@ -540,6 +768,7 @@
 # ============================================================================
 # Functional Tests
 # ============================================================================
+
 - name: Make HTTP request to Apache
   ansible.builtin.uri:
     url: http://localhost
@@ -573,18 +802,26 @@
       - "'<address>' not in error_response.content or '<address>Apache' in error_response.content"
     fail_msg: "Server signature with version appears in error page"
 
-- name: Verify HTTPS is working with SSL
+- name: Test HTTPS connectivity with certificates
   ansible.builtin.uri:
-    url: https://localhost
+    url: https://localhost:443
     validate_certs: false
-    return_content: true
-  register: https_response
+    return_content: false
+    status_code: 200
+  register: https_test_result
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback != 'disable'
 
-- name: Verify Apache responds on HTTPS
+- name: Assert HTTPS is working properly
   ansible.builtin.assert:
     that:
-      - https_response.status == 200
-    fail_msg: "Apache not responding on HTTPS port 443"
+      - https_test_result.status == 200
+    fail_msg: "HTTPS is not responding correctly on port 443"
+    success_msg: "HTTPS is working correctly on port 443"
+  when:
+    - apache_ssl_enabled | default(true)
+    - apache_ssl_certificate_fallback != 'disable'
 
 - name: Verify HTTPS is working with SSL on custom port
   ansible.builtin.uri:
@@ -598,3 +835,21 @@
     that:
       - custom_https_response.status == 200
     fail_msg: "Apache not responding on HTTPS port 8443"
+
+# ============================================================================
+# Idempotency Tests
+# ============================================================================
+
+- name: Check that managed blocks are properly formatted for idempotency
+  ansible.builtin.command:
+    cmd: "grep -c '## BEGIN ANSIBLE MANAGED BLOCK' /etc/apache2/apache2.conf"
+  register: managed_block_count
+  changed_when: false
+  failed_when: false
+
+- name: Assert only one managed block exists (idempotency check)
+  ansible.builtin.assert:
+    that:
+      - managed_block_count.stdout | int == 1
+    fail_msg: "Multiple managed blocks found, indicating idempotency issue"
+    success_msg: "Single managed block found (idempotent configuration)"

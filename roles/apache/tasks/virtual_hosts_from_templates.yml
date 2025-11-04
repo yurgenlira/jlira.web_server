@@ -32,6 +32,119 @@
     - item.https is defined
   notify: Reload apache
 
+# =============================================================================
+# Virtual Host SSL Certificate Management (Template-based)
+# =============================================================================
+
+- name: Extract SSL certificate paths from template definitions
+  ansible.builtin.set_fact:
+    apache_vhost_template_ssl_paths: >-
+      {{
+        apache_vhost_template_ssl_paths | default({}) | combine({
+          item.name: {
+            'certificate_file': (item.https.content
+              | default('')
+              | regex_findall('(?:^|\n)(?!\s*#)\s*SSLCertificateFile\s+(\S+)')
+              | first
+              | default('')
+            ),
+            'certificate_key_file': (item.https.content
+              | default('')
+              | regex_findall('(?:^|\n)(?!\s*#)\s*SSLCertificateKeyFile\s+(\S+)')
+              | first
+              | default('')
+            )
+          }
+        })
+      }}
+  loop: "{{ apache_vhost_templates | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - apache_vhost_templates | length > 0
+    - item.https is defined
+    - item.https.content is defined
+
+- name: Build certificate paths for virtual host instances
+  ansible.builtin.set_fact:
+    apache_vhost_template_cert_paths: >-
+      {{
+        apache_vhost_template_cert_paths | default([]) +
+        [{
+          'name': item.name,
+          'template': item.template,
+          'vars': item.vars | default([]),
+          'certificate_file': apache_vhost_template_ssl_paths[item.template].certificate_file,
+          'certificate_key_file': apache_vhost_template_ssl_paths[item.template].certificate_key_file
+        }]
+      }}
+  loop: "{{ apache_vhosts_from_template | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - apache_vhosts_from_template | length > 0
+    - item.https_enabled | default(true)
+    - apache_vhost_template_ssl_paths is defined
+    - item.template in apache_vhost_template_ssl_paths
+
+- name: Expand variables in SSL certificate paths
+  ansible.builtin.shell: |
+    set -o pipefail
+    source /etc/apache2/envvars
+    {% for envvar in apache_envvars | default([]) %}
+    export {{ envvar.name }}="{{ envvar.value }}"
+    {% endfor %}
+    {% for var in item.vars | default([]) %}
+    export {{ var.name }}="{{ var.value | replace('${', '$') | replace('}', '') }}"
+    {% endfor %}
+
+    cert_path="{{ item.certificate_file }}"
+    key_path="{{ item.certificate_key_file }}"
+
+    expanded_cert=$(echo "$cert_path" | envsubst)
+    expanded_key=$(echo "$key_path" | envsubst)
+
+    echo "CERT:$expanded_cert"
+    echo "KEY:$expanded_key"
+  args:
+    executable: /bin/bash
+  loop: "{{ apache_vhost_template_cert_paths | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: apache_vhost_template_expanded_paths
+  changed_when: false
+  when:
+    - apache_vhost_template_cert_paths | default([]) | length > 0
+
+- name: Build final certificate path list with expanded variables
+  ansible.builtin.set_fact:
+    apache_vhost_template_final_certs: >-
+      {{
+        apache_vhost_template_final_certs | default([]) +
+        [{
+          'name': item.item.name,
+          'certificate_file': (item.stdout_lines | select('match', '^CERT:') | first | regex_replace('^CERT:', '')),
+          'certificate_key_file': (item.stdout_lines | select('match', '^KEY:') | first | regex_replace('^KEY:', ''))
+        }]
+      }}
+  loop: "{{ apache_vhost_template_expanded_paths.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - apache_vhost_template_expanded_paths.results | default([]) | length > 0
+
+- name: Include common SSL certificate management tasks
+  ansible.builtin.include_tasks: ssl_certificate_management.yml
+  vars:
+    apache_ssl_cert_list: "{{ apache_vhost_template_final_certs | default([]) }}"
+    apache_ssl_vhost_type: "template-based"
+    apache_ssl_skip_list_var: "apache_vhost_template_https_skip"
+  when: apache_vhost_template_final_certs | default([]) | length > 0
+
+# =============================================================================
+# HTTPS Virtual Host Configuration (Template-based)
+# =============================================================================
+
 - name: Create HTTP virtual host configuration files from template
   ansible.builtin.template:
     src: vhost_from_template.conf.j2
@@ -163,6 +276,7 @@
   when:
     - apache_vhosts_from_template | length > 0
     - item.https_enabled | default(true)
+    - item.name not in apache_vhost_template_https_skip | default([])
   notify: Reload apache
 
 - name: Disable HTTPS virtual hosts from template

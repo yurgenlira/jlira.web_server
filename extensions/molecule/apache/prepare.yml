@@ -1,0 +1,19 @@
+---
+# Prepare playbook runs before converge to set up test prerequisites
+- name: Prepare
+  hosts: web_server
+  gather_facts: false
+  tasks:
+    - name: Check if test hostname already exists in /etc/hosts
+      ansible.builtin.command:
+        cmd: grep -q "secure.example.local" /etc/hosts
+      register: hosts_check
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: Add test hostnames to /etc/hosts for local DNS resolution
+      ansible.builtin.shell:
+        cmd: echo "127.0.0.1 secure.example.local www.secure.example.local www3.secure.example.local" >> /etc/hosts
+      when: hosts_check.rc != 0
+      become: true

@@ -13,6 +13,41 @@
     - item.http is defined
   notify: Reload apache
 
+# =============================================================================
+# Virtual Host SSL Certificate Management
+# =============================================================================
+
+- name: Build SSL certificate list for standard virtual hosts
+  ansible.builtin.set_fact:
+    apache_ssl_cert_list: >-
+      {{
+        apache_ssl_cert_list | default([]) +
+        [{
+          'name': item.name,
+          'certificate_file': item.https.certificate_file,
+          'certificate_key_file': item.https.certificate_key_file
+        }]
+      }}
+  loop: "{{ apache_virtual_hosts }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - apache_virtual_hosts | length > 0
+    - item.https is defined
+    - item.https.certificate_file is defined
+    - item.https.certificate_key_file is defined
+
+- name: Include common SSL certificate management tasks
+  ansible.builtin.include_tasks: ssl_certificate_management.yml
+  vars:
+    apache_ssl_vhost_type: "standard"
+    apache_ssl_skip_list_var: "apache_vhost_https_skip"
+  when: apache_ssl_cert_list | default([]) | length > 0
+
+# =============================================================================
+# HTTPS Virtual Host Configuration
+# =============================================================================
+
 - name: Create HTTPS virtual host configuration files
   ansible.builtin.template:
     src: vhost-ssl.conf.j2
@@ -158,6 +193,7 @@
     - apache_virtual_hosts | length > 0
     - item.https is defined
     - item.https.enabled | default(true)
+    - item.name not in apache_vhost_https_skip | default([])
   notify: Reload apache
 
 - name: Disable HTTPS virtual hosts

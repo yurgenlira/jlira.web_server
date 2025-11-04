@@ -70,6 +70,102 @@
         removes: /etc/apache2/sites-available/default-ssl.conf
       notify: Reload apache
 
+    - name: Check if default SSL certificate file exists
+      ansible.builtin.stat:
+        path: "{{ apache_default_ssl_certificate_file }}"
+      register: apache_default_ssl_cert_stat
+      when: apache_ssl_enabled
+
+    - name: Check if default SSL certificate key file exists
+      ansible.builtin.stat:
+        path: "{{ apache_default_ssl_certificate_key_file }}"
+      register: apache_default_ssl_key_stat
+      when: apache_ssl_enabled
+
+    - name: Set fact for SSL certificate status
+      ansible.builtin.set_fact:
+        apache_ssl_certificates_exist: >-
+          {{ apache_default_ssl_cert_stat.stat.exists | default(false) and
+             apache_default_ssl_key_stat.stat.exists | default(false) }}
+      when: apache_ssl_enabled
+
+    - name: Handle missing SSL certificates - Fail
+      ansible.builtin.fail:
+        msg: |
+          SSL is enabled but certificate files are missing:
+          - Certificate: {{ apache_default_ssl_certificate_file }} (exists: {{ apache_default_ssl_cert_stat.stat.exists | default(false) }})
+          - Key: {{ apache_default_ssl_certificate_key_file }} (exists: {{ apache_default_ssl_key_stat.stat.exists | default(false) }})
+
+          Options to fix:
+          1. Set apache_ssl_certificate_fallback: 'disable' to skip SSL
+          2. Set apache_ssl_certificate_fallback: 'generate' to auto-generate self-signed certs
+          3. Provide valid certificate paths via apache_default_ssl_certificate_file/apache_default_ssl_certificate_key_file
+          4. Generate certificates using jlira.web_server.certificates role
+      when:
+        - apache_ssl_enabled
+        - not apache_ssl_certificates_exist
+        - apache_ssl_certificate_fallback == 'fail'
+
+    - name: Handle missing SSL certificates - Generate self-signed
+      when:
+        - apache_ssl_enabled
+        - not apache_ssl_certificates_exist
+        - apache_ssl_certificate_fallback == 'generate'
+      block:
+        - name: Install OpenSSL for certificate generation
+          ansible.builtin.apt:
+            name: openssl
+            state: present
+            update_cache: true
+
+        - name: Create directory for default SSL certificate
+          ansible.builtin.file:
+            path: "{{ apache_default_ssl_certificate_key_file | dirname }}"
+            state: directory
+            mode: '0700'
+            owner: root
+            group: root
+
+        - name: Generate self-signed SSL certificate
+          ansible.builtin.command:
+            cmd: >
+              openssl req -x509 -nodes -days {{ apache_ssl_selfsigned_days }}
+              -newkey rsa:4096
+              -keyout {{ apache_default_ssl_certificate_key_file }}
+              -out {{ apache_default_ssl_certificate_file }}
+              -subj "/CN={{ inventory_hostname }}/O={{ apache_ssl_selfsigned_organization }}"
+            creates: "{{ apache_default_ssl_certificate_file }}"
+
+        - name: Set certificate file permissions
+          ansible.builtin.file:
+            path: "{{ apache_default_ssl_certificate_file }}"
+            mode: '0644'
+            owner: root
+            group: root
+
+        - name: Set key file permissions
+          ansible.builtin.file:
+            path: "{{ apache_default_ssl_certificate_key_file }}"
+            mode: '0640'
+            owner: root
+            group: root
+
+        - name: Update certificate status fact
+          ansible.builtin.set_fact:
+            apache_ssl_certificates_exist: true
+
+    - name: Display warning for disabled SSL
+      ansible.builtin.debug:
+        msg: |
+          WARNING: SSL was requested but certificates are missing.
+          SSL configuration will be skipped. Apache will run HTTP-only.
+          Certificate: {{ apache_default_ssl_certificate_file }} (missing)
+          Key: {{ apache_default_ssl_certificate_key_file }} (missing)
+      when:
+        - apache_ssl_enabled
+        - not apache_ssl_certificates_exist
+        - apache_ssl_certificate_fallback == 'disable'
+
     - name: Configure default SSL virtual host
       ansible.builtin.template:
         src: 000-default-ssl.conf.j2
@@ -77,7 +173,9 @@
         owner: root
         group: root
         mode: "0644"
-      when: apache_ssl_enabled
+      when:
+        - apache_ssl_enabled
+        - apache_ssl_certificates_exist | default(false)
       notify: Reload apache
 
     - name: Enable default SSL site
@@ -87,7 +185,9 @@
         creates: /etc/apache2/sites-enabled/000-default-ssl.conf
       register: apache_enable_ssl_result
       changed_when: "'Enabling site' in apache_enable_ssl_result.stdout"
-      when: apache_ssl_enabled
+      when:
+        - apache_ssl_enabled
+        - apache_ssl_certificates_exist | default(false)
       notify: Reload apache
 
     - name: Configure Apache security settings

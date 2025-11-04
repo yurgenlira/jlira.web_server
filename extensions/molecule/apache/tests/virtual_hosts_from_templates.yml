@@ -254,6 +254,84 @@
       - apache_landing2_https_config_check.stat.mode == "0644"
     fail_msg: "landing2 HTTPS configuration file does not exist"
 
+# =============================================================================
+# SSL Certificate Management Tests (Template-based)
+# =============================================================================
+
+- name: Read landing_site SSL template content
+  ansible.builtin.slurp:
+    path: /etc/apache2/templates/landing_site-ssl.template.conf
+  register: landing_site_ssl_template_content
+
+- name: Extract SSL certificate path from template
+  ansible.builtin.set_fact:
+    landing_template_cert_path: >-
+      {{
+        (landing_site_ssl_template_content.content | b64decode)
+        | regex_findall('(?:^|\n)(?!\s*#)\s*SSLCertificateFile\s+(\S+)')
+        | first
+        | default('')
+        | trim
+      }}
+
+- name: Extract SSL certificate key path from template
+  ansible.builtin.set_fact:
+    landing_template_key_path: >-
+      {{
+        (landing_site_ssl_template_content.content | b64decode)
+        | regex_findall('(?:^|\n)(?!\s*#)\s*SSLCertificateKeyFile\s+(\S+)')
+        | first
+        | default('')
+        | trim
+      }}
+
+- name: Display extracted certificate paths from template
+  ansible.builtin.debug:
+    msg:
+      - "Certificate path from template: {{ landing_template_cert_path }}"
+      - "Key path from template: {{ landing_template_key_path }}"
+
+- name: Expand variables in certificate paths for landing1
+  ansible.builtin.shell: |
+    set -o pipefail
+    source /etc/apache2/envvars
+    export CUSTOM_LOG_DIR="{{ apache_envvars | selectattr('name', 'equalto', 'CUSTOM_LOG_DIR') | map(attribute='value') | first }}"
+    export DEFAULT_DOMAIN="{{ apache_envvars | selectattr('name', 'equalto', 'DEFAULT_DOMAIN') | map(attribute='value') | first }}"
+    export SUBDOMAIN="landing1"
+    export DOMAIN="$DEFAULT_DOMAIN"
+
+    cert_path="{{ landing_template_cert_path }}"
+    key_path="{{ landing_template_key_path }}"
+
+    expanded_cert=$(echo "$cert_path" | envsubst)
+    expanded_key=$(echo "$key_path" | envsubst)
+
+    echo "CERT:$expanded_cert"
+    echo "KEY:$expanded_key"
+  args:
+    executable: /bin/bash
+  register: landing1_expanded_paths
+  changed_when: false
+
+- name: Set expanded certificate paths for landing1
+  ansible.builtin.set_fact:
+    landing1_cert_file: "{{ landing1_expanded_paths.stdout_lines | select('match', '^CERT:') | first | regex_replace('^CERT:', '') }}"
+    landing1_key_file: "{{ landing1_expanded_paths.stdout_lines | select('match', '^KEY:') | first | regex_replace('^KEY:', '') }}"
+
+- name: Display expanded certificate paths for landing1
+  ansible.builtin.debug:
+    msg:
+      - "Expanded certificate path: {{ landing1_cert_file }}"
+      - "Expanded key path: {{ landing1_key_file }}"
+
+- name: Include common SSL certificate tests for landing1
+  ansible.builtin.include_tasks: common_ssl_certificate_tests.yml
+  vars:
+    ssl_test_cert_file: "{{ landing1_cert_file }}"
+    ssl_test_key_file: "{{ landing1_key_file }}"
+    ssl_test_vhost_name: "landing1.example.local"
+    ssl_test_context: "template-based landing1"
+
 # Verify Apache config syntax is OK
 - name: Run Apache config test
   ansible.builtin.command:

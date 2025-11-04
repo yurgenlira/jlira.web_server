@@ -49,6 +49,60 @@
     quiet: true
 
 # =============================================================================
+# 1.1 SSL Certificate Configuration Validation
+# =============================================================================
+
+- name: Validate apache_ssl_certificate_fallback value
+  ansible.builtin.assert:
+    that:
+      - apache_ssl_certificate_fallback in ['fail', 'disable', 'generate']
+    fail_msg: >-
+      apache_ssl_certificate_fallback must be one of: 'fail', 'disable', 'generate'.
+      Current value: '{{ apache_ssl_certificate_fallback }}'
+    success_msg: >-
+      apache_ssl_certificate_fallback is valid: '{{ apache_ssl_certificate_fallback }}'
+    quiet: true
+
+- name: Validate apache_default_ssl_certificate_file is an absolute path
+  ansible.builtin.assert:
+    that:
+      - apache_default_ssl_certificate_file is match('^/')
+    fail_msg: >-
+      apache_default_ssl_certificate_file must be an absolute path.
+      Current value: '{{ apache_default_ssl_certificate_file }}'
+    success_msg: >-
+      apache_default_ssl_certificate_file path is valid
+    quiet: true
+  when: apache_ssl_enabled
+
+- name: Validate apache_default_ssl_certificate_key_file is an absolute path
+  ansible.builtin.assert:
+    that:
+      - apache_default_ssl_certificate_key_file is match('^/')
+    fail_msg: >-
+      apache_default_ssl_certificate_key_file must be an absolute path.
+      Current value: '{{ apache_default_ssl_certificate_key_file }}'
+    success_msg: >-
+      apache_default_ssl_certificate_key_file path is valid
+    quiet: true
+  when: apache_ssl_enabled
+
+- name: Validate apache_ssl_selfsigned_days is positive integer
+  ansible.builtin.assert:
+    that:
+      - apache_ssl_selfsigned_days | int > 0
+      - apache_ssl_selfsigned_days | int == apache_ssl_selfsigned_days
+    fail_msg: >-
+      apache_ssl_selfsigned_days must be a positive integer.
+      Current value: '{{ apache_ssl_selfsigned_days }}'
+    success_msg: >-
+      apache_ssl_selfsigned_days is valid
+    quiet: true
+  when:
+    - apache_ssl_enabled
+    - apache_ssl_certificate_fallback == 'generate'
+
+# =============================================================================
 # 2. PHP-FPM Integration Validation
 # =============================================================================
 

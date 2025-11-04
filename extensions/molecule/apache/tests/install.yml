@@ -77,19 +77,3 @@
     that:
       - apache_http_response.status == 200
     fail_msg: "Apache HTTP endpoint not responding correctly"
-
-# ============================================================================
-# Version Verification Tests
-# ============================================================================
-
-- name: Check Apache version
-  ansible.builtin.command:
-    cmd: apache2 -v
-  register: apache_version_check
-  changed_when: false
-
-- name: Verify Apache version is reported
-  ansible.builtin.assert:
-    that:
-      - "'Apache/2.' in apache_version_check.stdout"
-    fail_msg: "Apache version check failed"

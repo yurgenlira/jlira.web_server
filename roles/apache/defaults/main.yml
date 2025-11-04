@@ -14,6 +14,36 @@ apache_server_name: "{{ ansible_hostname }}"
 apache_ssl_enabled: true
 
 # ============================================================================
+# SSL Certificate Configuration
+# ============================================================================
+
+# Path to the SSL certificate file for the default SSL virtual host.
+# Type: String
+apache_default_ssl_certificate_file: /etc/ssl/certs/ssl-cert-snakeoil.pem
+
+# Path to the SSL certificate key file for the default SSL virtual host.
+# Type: String
+apache_default_ssl_certificate_key_file: /etc/ssl/private/ssl-cert-snakeoil.key
+
+# Behavior when SSL is enabled but certificates don't exist.
+# Options:
+#   - 'fail': Fail the playbook with clear error message (recommended for production)
+#   - 'disable': Skip SSL configuration, run HTTP-only (fallback mode)
+#   - 'generate': Auto-generate self-signed certificates (good for development)
+# Type: String
+apache_ssl_certificate_fallback: fail
+
+# Organization name for auto-generated self-signed certificates.
+# Only used when apache_ssl_certificate_fallback is 'generate'.
+# Type: String
+apache_ssl_selfsigned_organization: "{{ inventory_hostname }}"
+
+# Number of days the self-signed certificate is valid.
+# Only used when apache_ssl_certificate_fallback is 'generate'.
+# Type: Integer
+apache_ssl_selfsigned_days: 365
+
+# ============================================================================
 # PHP-FPM Integration Configuration
 # ============================================================================
 
@@ -221,14 +251,21 @@ apache_custom_configs: []
 #
 # HTTPS Configuration:
 # - `https`: HTTPS-specific configuration (optional)
-#   - `enabled`: Whether to enable the HTTP virtual host. Default: true
-#   - `listen`: List of the address:port or port to listen on. Default: "*:80"
+#   - `enabled`: Whether to enable the HTTPS virtual host. Default: true
+#   - `listen`: List of the address:port or port to listen on. Default: "*:443"
 #   - `error_log`: Path to the error log file. Default: ${APACHE_LOG_DIR}/<name>-error.log
 #   - `access_log`: Path to the access log file. Default: ${APACHE_LOG_DIR}/<name>-access.log combined
 #   - `certificate_file`: Path to the SSL certificate file (required for HTTPS).
 #   - `certificate_key_file`: Path to the SSL certificate key file (required for HTTPS).
 #   - `certificate_chain_file`: Path to the SSL certificate chain file (optional).
-#   - `custom_directives`: Additional Apache directives for HTTP only (optional).
+#   - `custom_directives`: Additional Apache directives for HTTPS only (optional).
+#
+# SSL Certificate Fallback Behavior:
+# When HTTPS is enabled but certificate files don't exist, the role uses
+# apache_ssl_certificate_fallback to determine behavior:
+#   - 'fail': Fails the playbook with a clear error message (recommended for production)
+#   - 'disable': Skips HTTPS configuration, runs HTTP-only mode
+#   - 'generate': Auto-generates self-signed certificates at the specified paths (good for development)
 #
 # Example - Simple HTTP virtual host:
 # apache_virtual_hosts:

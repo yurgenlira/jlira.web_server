@@ -250,10 +250,8 @@
 
 - name: Test HTTP virtual host responds on port 80
   ansible.builtin.uri:
-    url: http://127.0.0.1:80/
+    url: http://secure.example.local:80/
     method: GET
-    headers:
-      Host: secure.example.local
     follow_redirects: none
     status_code: 301
     validate_certs: false
@@ -268,10 +266,8 @@
 
 - name: Test HTTP virtual host responds on port 8080
   ansible.builtin.uri:
-    url: http://127.0.0.1:8080/
+    url: http://secure.example.local:8080/
     method: GET
-    headers:
-      Host: secure.example.local
     follow_redirects: none
     status_code: 301
     validate_certs: false
@@ -286,10 +282,8 @@
 
 - name: Test HTTPS virtual host responds on port 443 (with authentication)
   ansible.builtin.uri:
-    url: https://127.0.0.1:443/
+    url: https://secure.example.local:443/
     method: GET
-    headers:
-      Host: secure.example.local
     url_username: admin
     url_password: adminpass123
     force_basic_auth: true
@@ -310,10 +304,8 @@
 
 - name: Test HTTPS virtual host responds on port 8443 (with authentication)
   ansible.builtin.uri:
-    url: https://127.0.0.1:8443/
+    url: https://secure.example.local:8443/
     method: GET
-    headers:
-      Host: secure.example.local
     url_username: admin
     url_password: adminpass123
     force_basic_auth: true
@@ -334,10 +326,8 @@
 
 - name: Test server aliases work correctly (with authentication)
   ansible.builtin.uri:
-    url: https://127.0.0.1:443/
+    url: https://www.secure.example.local:443/
     method: GET
-    headers:
-      Host: www.secure.example.local
     url_username: admin
     url_password: adminpass123
     force_basic_auth: true
@@ -365,10 +355,8 @@
 
 - name: Request PHP file through virtual host (with authentication)
   ansible.builtin.uri:
-    url: https://127.0.0.1:443/info.php
+    url: https://secure.example.local:443/info.php
     method: GET
-    headers:
-      Host: secure.example.local
     url_username: admin
     url_password: adminpass123
     force_basic_auth: true
