@@ -579,7 +579,7 @@
       ansible.builtin.uri:
         url: https://localhost
         validate_certs: false
-        status_code: [000, 404, 503]
+        status_code: [000, 404, 503] # noqa: yaml[octal-values]
       register: https_disabled_check
       ignore_errors: true
 

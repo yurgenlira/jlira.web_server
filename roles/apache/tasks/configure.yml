@@ -93,13 +93,15 @@
       ansible.builtin.fail:
         msg: |
           SSL is enabled but certificate files are missing:
-          - Certificate: {{ apache_default_ssl_certificate_file }} (exists: {{ apache_default_ssl_cert_stat.stat.exists | default(false) }})
-          - Key: {{ apache_default_ssl_certificate_key_file }} (exists: {{ apache_default_ssl_key_stat.stat.exists | default(false) }})
+          - Certificate: {{ apache_default_ssl_certificate_file }}
+            (exists: {{ apache_default_ssl_cert_stat.stat.exists | default(false) }})
+          - Key: {{ apache_default_ssl_certificate_key_file }}
+            (exists: {{ apache_default_ssl_key_stat.stat.exists | default(false) }})
 
           Options to fix:
           1. Set apache_ssl_certificate_fallback: 'disable' to skip SSL
           2. Set apache_ssl_certificate_fallback: 'generate' to auto-generate self-signed certs
-          3. Provide valid certificate paths via apache_default_ssl_certificate_file/apache_default_ssl_certificate_key_file
+          3. Provide valid certificate paths via apache_default_ssl_certificate_* variables
           4. Generate certificates using jlira.web_server.certificates role
       when:
         - apache_ssl_enabled

@@ -295,8 +295,10 @@
   ansible.builtin.shell: |
     set -o pipefail
     source /etc/apache2/envvars
-    export CUSTOM_LOG_DIR="{{ apache_envvars | selectattr('name', 'equalto', 'CUSTOM_LOG_DIR') | map(attribute='value') | first }}"
-    export DEFAULT_DOMAIN="{{ apache_envvars | selectattr('name', 'equalto', 'DEFAULT_DOMAIN') | map(attribute='value') | first }}"
+    export CUSTOM_LOG_DIR="{{ apache_envvars | selectattr('name', 'equalto', 'CUSTOM_LOG_DIR') |
+      map(attribute='value') | first }}"
+    export DEFAULT_DOMAIN="{{ apache_envvars | selectattr('name', 'equalto', 'DEFAULT_DOMAIN') |
+      map(attribute='value') | first }}"
     export SUBDOMAIN="landing1"
     export DOMAIN="$DEFAULT_DOMAIN"
 
@@ -315,8 +317,10 @@
 
 - name: Set expanded certificate paths for landing1
   ansible.builtin.set_fact:
-    landing1_cert_file: "{{ landing1_expanded_paths.stdout_lines | select('match', '^CERT:') | first | regex_replace('^CERT:', '') }}"
-    landing1_key_file: "{{ landing1_expanded_paths.stdout_lines | select('match', '^KEY:') | first | regex_replace('^KEY:', '') }}"
+    landing1_cert_file: >-
+      {{ landing1_expanded_paths.stdout_lines | select('match', '^CERT:') | first | regex_replace('^CERT:', '') }}
+    landing1_key_file: >-
+      {{ landing1_expanded_paths.stdout_lines | select('match', '^KEY:') | first | regex_replace('^KEY:', '') }}
 
 - name: Display expanded certificate paths for landing1
   ansible.builtin.debug:

@@ -15,5 +15,7 @@
     - name: Add test hostnames to /etc/hosts for local DNS resolution
       ansible.builtin.shell:
         cmd: echo "127.0.0.1 secure.example.local www.secure.example.local www3.secure.example.local" >> /etc/hosts
+      register: hosts_add
+      changed_when: hosts_add.rc == 0
       when: hosts_check.rc != 0
       become: true
