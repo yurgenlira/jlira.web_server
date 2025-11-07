@@ -294,7 +294,7 @@ php_fpm_logrotate_enabled: true
 #### `php_mssql_extension_enabled`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Install Microsoft SQL Server PHP extension
+- **Description**: Install Microsoft SQL Server PHP extension. When enabled, automatically installs the PHP development package (`php-dev`) which includes `phpize` and `php-config` tools required for compiling PECL extensions.
 
 ```yaml
 php_mssql_extension_enabled: true
@@ -309,14 +309,22 @@ php_mssql_extension_enabled: true
 php_mssql_package_version: 18
 ```
 
+**Note**: Enabling MSSQL extension will install:
+- `unixodbc-dev` - ODBC development libraries
+- `php-pear` - PHP Extension and Application Repository
+- `php{{ php_version }}-dev` - PHP development files (includes `phpize` and `php-config`)
+- `php{{ php_version }}-xml` - XML support for PHP
+
 ### Version Management
 
 The role uses Debian alternatives to manage multiple PHP versions. When `php_cli_set_as_default_version: true`, the specified version becomes the default for:
-- `php`
-- `phar`
-- `phar.phar`
-- `phpize`
-- `php-config`
+- `php` - PHP CLI interpreter
+- `phar` - PHP Archive tool
+- `phar.phar` - PHP Archive tool (alternative name)
+- `phpize` - Tool to prepare PHP extensions (only when `php-dev` package is installed)
+- `php-config` - Tool to get PHP build configuration (only when `php-dev` package is installed)
+
+**Note**: The `phpize` and `php-config` alternatives are only configured when the PHP development package (`php{{ php_version }}-dev`) is installed. This package is automatically installed when `php_mssql_extension_enabled: true`, or can be manually added to `php_packages`.
 
 ## Dependencies
 
@@ -475,14 +483,14 @@ To install multiple PHP versions, run the role multiple times with different ver
 
 The role supports the following tags for selective execution:
 
-- `php_install`: Installation tasks only
-- `php_configure_cli`: CLI configuration only
-- `php_configure_fpm`: FPM configuration only
-- `php_set_default_cli`: Set default CLI version only
-- `php_logrotate_cli`: CLI log rotation configuration
-- `php_logrotate_fpm`: FPM log rotation configuration
-- `php_mssql_extension`: MSSQL extension installation
-- `php_uninstall`: Uninstall old PHP version
+- `php_install` / `install`: Installation tasks only
+- `php_configure_cli` / `configure_cli`: CLI configuration only
+- `php_configure_fpm` / `configure_fpm`: FPM configuration only
+- `php_set_default_cli_version` / `set_default_cli_version`: Set default CLI version only
+- `php_logrotate_cli` / `logrotate_cli`: CLI log rotation configuration
+- `php_logrotate_fpm` / `logrotate_fpm`: FPM log rotation configuration
+- `php_install_mssql_extension` / `install_mssql_extension`: MSSQL extension installation (includes php-dev installation and setting phpize/php-config as default)
+- `php_uninstall` / `uninstall`: Uninstall old PHP version
 - `always`: Validation tasks (always run)
 
 **Examples:**
@@ -494,8 +502,11 @@ ansible-playbook playbook.yml --tags php_install
 # Only configure PHP-FPM
 ansible-playbook playbook.yml --tags php_configure_fpm
 
+# Install MSSQL extension and dev tools
+ansible-playbook playbook.yml --tags install_mssql_extension
+
 # Configure everything except MSSQL extension
-ansible-playbook playbook.yml --skip-tags php_mssql_extension
+ansible-playbook playbook.yml --skip-tags php_install_mssql_extension
 ```
 
 ## Handlers
