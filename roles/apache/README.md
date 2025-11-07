@@ -84,6 +84,66 @@ apache_server_name: "example.com"
 apache_ssl_enabled: true
 ```
 
+### SSL Certificate Configuration
+
+#### `apache_default_ssl_certificate_file`
+- **Type**: String
+- **Default**: `/etc/ssl/certs/ssl-cert-snakeoil.pem`
+- **Description**: Path to the SSL certificate file for the default SSL virtual host
+
+```yaml
+apache_default_ssl_certificate_file: /etc/ssl/certs/example.com.crt
+```
+
+#### `apache_default_ssl_certificate_key_file`
+- **Type**: String
+- **Default**: `/etc/ssl/private/ssl-cert-snakeoil.key`
+- **Description**: Path to the SSL certificate key file for the default SSL virtual host
+
+```yaml
+apache_default_ssl_certificate_key_file: /etc/ssl/private/example.com.key
+```
+
+#### `apache_ssl_certificate_fallback`
+- **Type**: String
+- **Default**: `fail`
+- **Options**: `fail`, `disable`, `generate`
+- **Description**: Behavior when SSL is enabled but certificates don't exist
+
+**Options:**
+- `fail`: Fail the playbook with clear error message (recommended for production)
+- `disable`: Skip SSL configuration, run HTTP-only (fallback mode)
+- `generate`: Auto-generate self-signed certificates (good for development)
+
+```yaml
+# For production - fail if certificates missing
+apache_ssl_certificate_fallback: fail
+
+# For development - auto-generate self-signed
+apache_ssl_certificate_fallback: generate
+
+# For graceful degradation - disable SSL if certificates missing
+apache_ssl_certificate_fallback: disable
+```
+
+#### `apache_ssl_selfsigned_organization`
+- **Type**: String
+- **Default**: `{{ inventory_hostname }}`
+- **Description**: Organization name for auto-generated self-signed certificates (only used when `apache_ssl_certificate_fallback` is `generate`)
+
+```yaml
+apache_ssl_selfsigned_organization: "My Company"
+```
+
+#### `apache_ssl_selfsigned_days`
+- **Type**: Integer
+- **Default**: `365`
+- **Description**: Number of days the auto-generated self-signed certificate is valid
+
+```yaml
+apache_ssl_selfsigned_days: 730  # 2 years
+```
+
 #### `apache_main_settings`
 - **Type**: List of Dictionaries
 - **Default**: `[]`
@@ -394,6 +454,80 @@ apache_custom_configs:
       vars:
         apache_php_fpm_integration: true
         apache_php_fpm_version: "8.4"
+```
+
+### Apache with Custom SSL Certificates
+
+```yaml
+---
+- name: Apache with custom SSL certificates
+  hosts: webservers
+  become: true
+  roles:
+    - role: jlira.web_server.apache
+      vars:
+        apache_ssl_enabled: true
+        apache_default_ssl_certificate_file: /etc/ssl/certs/mysite.crt
+        apache_default_ssl_certificate_key_file: /etc/ssl/private/mysite.key
+        apache_ssl_certificate_fallback: fail  # Fail if certs missing
+```
+
+### Apache with Auto-Generated Self-Signed Certificate (Development)
+
+```yaml
+---
+- name: Apache with auto-generated self-signed certificate
+  hosts: devservers
+  become: true
+  roles:
+    - role: jlira.web_server.apache
+      vars:
+        apache_ssl_enabled: true
+        apache_ssl_certificate_fallback: generate  # Auto-generate if missing
+        apache_ssl_selfsigned_organization: "Development Test"
+        apache_ssl_selfsigned_days: 365
+```
+
+### Apache with SSL Fallback to HTTP
+
+```yaml
+---
+- name: Apache with SSL fallback to HTTP
+  hosts: webservers
+  become: true
+  roles:
+    - role: jlira.web_server.apache
+      vars:
+        apache_ssl_enabled: true
+        apache_ssl_certificate_fallback: disable  # Skip SSL if certs missing
+```
+
+### Apache with Certificate Role Integration
+
+```yaml
+---
+- name: Apache with jlira.web_server.certificates role
+  hosts: webservers
+  become: true
+  tasks:
+    - name: Generate self-signed certificates
+      ansible.builtin.include_role:
+        name: jlira.web_server.certificates
+      vars:
+        certificates_mode: selfsigned
+        certificates_list:
+          - name: "{{ inventory_hostname }}"
+            common_name: "{{ inventory_hostname }}"
+            organization: "My Organization"
+            days: 365
+
+    - name: Configure Apache with generated certificates
+      ansible.builtin.include_role:
+        name: jlira.web_server.apache
+      vars:
+        apache_ssl_enabled: true
+        apache_default_ssl_certificate_file: "/etc/ssl/certs/{{ inventory_hostname }}.crt"
+        apache_default_ssl_certificate_key_file: "/etc/ssl/private/{{ inventory_hostname }}.key"
 ```
 
 ### Complete Configuration

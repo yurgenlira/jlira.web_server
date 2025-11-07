@@ -1,0 +1,71 @@
+---
+# =============================================================================
+# Common SSL Certificate Tests
+# =============================================================================
+# This file contains reusable SSL certificate test logic that can be
+# included by multiple test files.
+#
+# Required input variables:
+# - ssl_test_cert_file: Path to the SSL certificate file
+# - ssl_test_key_file: Path to the SSL certificate key file
+# - ssl_test_vhost_name: Name of the virtual host being tested
+# - ssl_test_context: Description of the test context (e.g., "default", "vhost-certgen")
+#
+# Expected permissions:
+# - Certificate files: 0640
+# - Certificate key files: 0600
+# =============================================================================
+
+- name: Check if SSL certificate file exists ({{ ssl_test_context }})
+  ansible.builtin.stat:
+    path: "{{ ssl_test_cert_file }}"
+  register: ssl_test_cert_check
+
+- name: Check if SSL certificate key file exists ({{ ssl_test_context }})
+  ansible.builtin.stat:
+    path: "{{ ssl_test_key_file }}"
+  register: ssl_test_key_check
+
+- name: Verify SSL certificate exists ({{ ssl_test_context }})
+  ansible.builtin.assert:
+    that:
+      - ssl_test_cert_check.stat.exists
+      - ssl_test_cert_check.stat.mode == '0644'
+    fail_msg: >-
+      SSL certificate not found or has incorrect permissions at {{ ssl_test_cert_file }}
+      (expected 0644, got {{ ssl_test_cert_check.stat.mode | default('N/A') }})
+    success_msg: "SSL certificate exists with correct permissions at {{ ssl_test_cert_file }}"
+  when: apache_ssl_certificate_fallback != 'disable'
+
+- name: Verify SSL certificate key exists ({{ ssl_test_context }})
+  ansible.builtin.assert:
+    that:
+      - ssl_test_key_check.stat.exists
+      - ssl_test_key_check.stat.mode == '0640'
+    fail_msg: >-
+      SSL certificate key not found or has incorrect permissions at {{ ssl_test_key_file }}
+      (expected 0640, got {{ ssl_test_key_check.stat.mode | default('N/A') }})
+    success_msg: "SSL certificate key exists with correct permissions at {{ ssl_test_key_file }}"
+  when: apache_ssl_certificate_fallback != 'disable'
+
+- name: Verify certificate validity using openssl ({{ ssl_test_context }})
+  ansible.builtin.command:
+    cmd: "openssl x509 -in {{ ssl_test_cert_file }} -noout -dates"
+  register: ssl_test_cert_validity
+  changed_when: false
+  when:
+    - apache_ssl_certificate_fallback != 'disable'
+    - ssl_test_cert_check.stat.exists
+
+- name: Assert certificate is valid ({{ ssl_test_context }})
+  ansible.builtin.assert:
+    that:
+      - ssl_test_cert_validity.rc == 0
+      - "'notBefore=' in ssl_test_cert_validity.stdout"
+      - "'notAfter=' in ssl_test_cert_validity.stdout"
+    fail_msg: "Certificate at {{ ssl_test_cert_file }} is not valid"
+    success_msg: "Certificate at {{ ssl_test_cert_file }} is valid ({{ ssl_test_vhost_name }})"
+  when:
+    - apache_ssl_certificate_fallback != 'disable'
+    - ssl_test_cert_validity is defined
+    - ssl_test_cert_validity.rc is defined

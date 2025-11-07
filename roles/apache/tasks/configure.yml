@@ -70,6 +70,29 @@
         removes: /etc/apache2/sites-available/default-ssl.conf
       notify: Reload apache
 
+    - name: Build SSL certificate list for default virtual host
+      ansible.builtin.set_fact:
+        apache_default_ssl_cert_list:
+          - name: default
+            certificate_file: "{{ apache_default_ssl_certificate_file }}"
+            certificate_key_file: "{{ apache_default_ssl_certificate_key_file }}"
+            server_name: "{{ apache_server_name }}"
+            server_alias: []
+      when: apache_ssl_enabled
+
+    - name: Include common SSL certificate management tasks for default certificate
+      ansible.builtin.include_tasks: ssl_certificate_management.yml
+      vars:
+        apache_ssl_cert_list: "{{ apache_default_ssl_cert_list }}"
+        apache_ssl_vhost_type: "default"
+        apache_ssl_skip_list_var: "apache_default_ssl_skip_list"
+      when: apache_ssl_enabled
+
+    - name: Set fact for SSL certificate status from certificate management results
+      ansible.builtin.set_fact:
+        apache_ssl_certificates_exist: "{{ apache_ssl_cert_existence_status['default'] | default(false) }}"
+      when: apache_ssl_enabled
+
     - name: Configure default SSL virtual host
       ansible.builtin.template:
         src: 000-default-ssl.conf.j2
@@ -77,7 +100,8 @@
         owner: root
         group: root
         mode: "0644"
-      when: apache_ssl_enabled
+      when:
+        - apache_ssl_enabled
       notify: Reload apache
 
     - name: Enable default SSL site
@@ -87,7 +111,9 @@
         creates: /etc/apache2/sites-enabled/000-default-ssl.conf
       register: apache_enable_ssl_result
       changed_when: "'Enabling site' in apache_enable_ssl_result.stdout"
-      when: apache_ssl_enabled
+      when:
+        - apache_ssl_enabled
+        - apache_ssl_certificates_exist | default(false)
       notify: Reload apache
 
     - name: Configure Apache security settings

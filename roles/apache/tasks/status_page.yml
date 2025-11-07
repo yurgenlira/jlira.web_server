@@ -24,6 +24,12 @@
   when: apache_status_page.enabled
   notify: Reload apache
 
+- name: Check if status page configuration exists
+  ansible.builtin.stat:
+    path: /etc/apache2/conf-available/status.conf
+  register: apache_status_conf_stat
+  when: not apache_status_page.enabled
+
 - name: Disable status page configuration
   ansible.builtin.command:
     cmd: a2disconf status
@@ -31,7 +37,9 @@
   changed_when:
     - "'Conf' in apache_disable_status_conf_result.stdout"
     - "'disabled' in apache_disable_status_conf_result.stdout"
-  when: not apache_status_page.enabled
+  when:
+    - not apache_status_page.enabled
+    - apache_status_conf_stat.stat.exists
   notify: Reload apache
 
 - name: Remove status page configuration

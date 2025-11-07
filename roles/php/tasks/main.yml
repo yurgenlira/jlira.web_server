@@ -31,6 +31,8 @@
   tags:
     - install
     - php_install
+    - install_mssql_extension
+    - php_install_mssql_extension
 
 - name: Include jlira.web_server.php.configure_cli.yml
   ansible.builtin.include_tasks:
@@ -53,6 +55,8 @@
   tags:
     - set_default_cli_version
     - php_set_default_cli_version
+    - install_mssql_extension
+    - php_install_mssql_extension
   when: php_cli_set_as_default_version
 
 - name: Include jlira.web_server.php.install_mssql_extension.yml
