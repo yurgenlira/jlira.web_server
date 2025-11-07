@@ -87,16 +87,45 @@
     quiet: true
   when: apache_ssl_enabled
 
-- name: Validate apache_ssl_selfsigned_days is positive integer
+- name: Validate apache_ssl_selfsigned dictionary
   ansible.builtin.assert:
     that:
-      - apache_ssl_selfsigned_days | int > 0
-      - apache_ssl_selfsigned_days | int == apache_ssl_selfsigned_days
+      - apache_ssl_selfsigned is defined
+      - apache_ssl_selfsigned is mapping
+    fail_msg: "apache_ssl_selfsigned must be defined as a dictionary"
+    success_msg: "apache_ssl_selfsigned is defined and is a dictionary"
+    quiet: true
+  when:
+    - apache_ssl_enabled
+    - apache_ssl_certificate_fallback == 'generate'
+
+- name: Validate apache_ssl_selfsigned.days is positive integer
+  ansible.builtin.assert:
+    that:
+      - apache_ssl_selfsigned.days is defined
+      - apache_ssl_selfsigned.days | int > 0
+      - apache_ssl_selfsigned.days | int == apache_ssl_selfsigned.days
     fail_msg: >-
-      apache_ssl_selfsigned_days must be a positive integer.
-      Current value: '{{ apache_ssl_selfsigned_days }}'
+      apache_ssl_selfsigned.days must be a positive integer.
+      Current value: '{{ apache_ssl_selfsigned.days | default("undefined") }}'
     success_msg: >-
-      apache_ssl_selfsigned_days is valid
+      apache_ssl_selfsigned.days is valid: {{ apache_ssl_selfsigned.days }}
+    quiet: true
+  when:
+    - apache_ssl_enabled
+    - apache_ssl_certificate_fallback == 'generate'
+
+- name: Validate apache_ssl_selfsigned.organization is non-empty string
+  ansible.builtin.assert:
+    that:
+      - apache_ssl_selfsigned.organization is defined
+      - apache_ssl_selfsigned.organization is string
+      - apache_ssl_selfsigned.organization | length > 0
+    fail_msg: >-
+      apache_ssl_selfsigned.organization must be a non-empty string.
+      Current value: '{{ apache_ssl_selfsigned.organization | default("undefined") }}'
+    success_msg: >-
+      apache_ssl_selfsigned.organization is valid
     quiet: true
   when:
     - apache_ssl_enabled

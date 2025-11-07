@@ -36,6 +36,22 @@
     - php_fpm_enabled
     - php_ppa_file_stat.stat.exists # Don't fail in check_mode if PPA not added yet
 
+- name: Install PHP development package for version {{ php_version }}
+  ansible.builtin.apt:
+    name:
+      - unixodbc-dev
+      - php-pear
+      - php{{ php_version }}-dev
+      - php{{ php_version }}-xml
+    state: present
+    update_cache: true
+  when:
+    - php_mssql_extension_enabled
+    - php_ppa_file_stat.stat.exists # Don't fail in check_mode if PPA not added yet
+  tags:
+    - install_mssql_extension
+    - php_install_mssql_extension
+
 - name: Ensure PHP-FPM service is started and enabled
   ansible.builtin.service:
     name: "php{{ php_version }}-fpm"

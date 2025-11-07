@@ -7,16 +7,6 @@
       - os_family
       - distribution
 
-- name: Install development packages
-  ansible.builtin.apt:
-    name:
-      - unixodbc-dev
-      - php-pear
-      - php{{ php_version }}-dev
-      - php{{ php_version }}-xml
-    state: present
-    update_cache: true
-
 # /etc/apt/trusted.gpg.d/ is the old dir so use /usr/share/keyrings
 - name: Add Microsoft GPG key
   ansible.builtin.apt_key:

@@ -25,7 +25,9 @@
         [{
           'name': item.name,
           'certificate_file': item.https.certificate_file,
-          'certificate_key_file': item.https.certificate_key_file
+          'certificate_key_file': item.https.certificate_key_file,
+          'server_name': item.server_name | default(item.name),
+          'server_alias': item.server_alias | default([])
         }]
       }}
   loop: "{{ apache_virtual_hosts }}"

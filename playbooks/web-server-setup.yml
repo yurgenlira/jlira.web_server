@@ -85,9 +85,6 @@
       tags: always
 
   roles:
-    - role: jlira.web_server.php
-      when: php_fpm_enabled | default(true)
-
     - role: jlira.web_server.apache
 
   post_tasks:

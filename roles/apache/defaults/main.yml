@@ -33,15 +33,36 @@ apache_default_ssl_certificate_key_file: /etc/ssl/private/ssl-cert-snakeoil.key
 # Type: String
 apache_ssl_certificate_fallback: fail
 
-# Organization name for auto-generated self-signed certificates.
+# Self-signed certificate generation settings.
 # Only used when apache_ssl_certificate_fallback is 'generate'.
-# Type: String
-apache_ssl_selfsigned_organization: "{{ inventory_hostname }}"
-
-# Number of days the self-signed certificate is valid.
-# Only used when apache_ssl_certificate_fallback is 'generate'.
-# Type: Integer
-apache_ssl_selfsigned_days: 365
+# Type: Dictionary
+#
+# Available settings:
+#   - organization: Organization name (default: inventory_hostname)
+#   - organizational_unit: Department or division name (e.g., "IT Department") - optional
+#   - days: Number of days the certificate is valid (default: 365)
+#   - country: 2-letter country code (e.g., "US") - optional, leave empty to omit
+#   - state: State or province name - optional, leave empty to omit
+#   - locality: City or locality name - optional, leave empty to omit
+#   - email: Email address - optional, leave empty to omit
+#
+# Example:
+#   apache_ssl_selfsigned:
+#     organization: "My Company"
+#     organizational_unit: "IT Department"
+#     country: "US"
+#     state: "California"
+#     locality: "San Francisco"
+#     email: "admin@example.com"
+#     days: 365
+apache_ssl_selfsigned:
+  organization: "{{ inventory_hostname }}"
+  organizational_unit: ""
+  days: 365
+  country: ""
+  state: ""
+  locality: ""
+  email: ""
 
 # ============================================================================
 # PHP-FPM Integration Configuration
