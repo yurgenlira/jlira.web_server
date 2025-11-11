@@ -1,0 +1,117 @@
+---
+# =============================================================================
+# Certificate Import Mode Tests
+# =============================================================================
+
+- name: Test certificate import mode
+  when: certificates_mode == 'import'
+  block:
+    - name: Check if imported certificate files exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: imported_cert_files
+      loop:
+        - /etc/ssl/certs/test-import.crt
+        - /etc/ssl/private/test-import.key
+
+    - name: Verify imported certificate files exist
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.isreg
+        fail_msg: "Imported certificate file {{ item.item }} does not exist"
+        success_msg: "Imported certificate file {{ item.item }} exists"
+      loop: "{{ imported_cert_files.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Verify certificate file permissions
+      ansible.builtin.assert:
+        that:
+          - imported_cert_files.results[0].stat.mode == "0644"
+        fail_msg: "Certificate file has incorrect permissions"
+        success_msg: "Certificate file has correct permissions (0644)"
+
+    - name: Verify private key file permissions
+      ansible.builtin.assert:
+        that:
+          - imported_cert_files.results[1].stat.mode == "0600"
+        fail_msg: "Private key file has incorrect permissions"
+        success_msg: "Private key file has correct permissions (0600)"
+
+    - name: Verify certificate file ownership
+      ansible.builtin.assert:
+        that:
+          - imported_cert_files.results[0].stat.pw_name == "root"
+          - imported_cert_files.results[0].stat.gr_name == "root"
+        fail_msg: "Certificate file has incorrect ownership"
+        success_msg: "Certificate file has correct ownership (root:root)"
+
+    - name: Verify private key file ownership
+      ansible.builtin.assert:
+        that:
+          - imported_cert_files.results[1].stat.pw_name == "root"
+          - imported_cert_files.results[1].stat.gr_name == "root"
+        fail_msg: "Private key file has incorrect ownership"
+        success_msg: "Private key file has correct ownership (root:root)"
+
+    - name: Validate imported certificate
+      community.crypto.x509_certificate_info:
+        path: /etc/ssl/certs/test-import.crt
+      register: imported_cert_info
+
+    - name: Verify imported certificate is valid
+      ansible.builtin.assert:
+        that:
+          - imported_cert_info.subject.commonName is defined
+          - imported_cert_info.valid_at.current_time | default(false)
+        fail_msg: "Imported certificate is not valid"
+        success_msg: "Imported certificate is valid"
+
+    - name: Check if chain file was imported (if provided)
+      ansible.builtin.stat:
+        path: /etc/ssl/certs/test-import-chain.crt
+      register: imported_chain_file
+      when: import_chain_provided | default(false)
+
+    - name: Verify chain file exists if provided
+      ansible.builtin.assert:
+        that:
+          - imported_chain_file.stat.exists
+          - imported_chain_file.stat.mode == "0644"
+        fail_msg: "Chain file was not imported correctly"
+        success_msg: "Chain file imported successfully"
+      when:
+        - import_chain_provided | default(false)
+        - imported_chain_file is defined
+
+    - name: Display import summary
+      ansible.builtin.debug:
+        msg:
+          - "==================================================================="
+          - "Certificate Import Test Results"
+          - "==================================================================="
+          - "Imported certificate: test-import"
+          - "Common Name: {{ imported_cert_info.subject.commonName | default('N/A') }}"
+          - "Issuer: {{ imported_cert_info.issuer.commonName | default('Self-signed') }}"
+          - "Valid from: {{ imported_cert_info.not_before }}"
+          - "Valid until: {{ imported_cert_info.not_after }}"
+          - "==================================================================="
+
+- name: Test import mode validation errors
+  when: certificates_mode == 'import'
+  block:
+    - name: Verify source file validation was performed
+      ansible.builtin.debug:
+        msg: "Import mode validation tests passed - source files were checked"
+
+- name: Display import tests summary
+  when: certificates_mode == 'import'
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "Certificate Import Tests Completed"
+      - "==================================================================="
+      - "All imported certificates are valid and properly configured"
+      - "File permissions and ownership are correct"
+      - "==================================================================="

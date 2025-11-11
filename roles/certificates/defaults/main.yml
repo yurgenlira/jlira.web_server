@@ -1,0 +1,204 @@
+# SPDX-License-Identifier: MIT-0
+---
+# ============================================================================
+# Certificate Management Configuration
+# ============================================================================
+
+# Certificate operation mode
+# Options:
+#   - 'selfsigned': Generate self-signed certificates
+#   - 'import': Import existing certificates from source files
+#   - 'letsencrypt': Obtain certificates from Let's Encrypt
+# Type: String
+certificates_mode: selfsigned
+
+# Output directory for certificates
+# Type: String
+certificates_cert_dir: /etc/ssl/certs
+
+# Output directory for private keys
+# Type: String
+certificates_key_dir: /etc/ssl/private
+
+# List of certificates to manage
+# Each certificate is defined as a dictionary with the following keys:
+#
+# Common fields (all modes):
+#   - name: Unique identifier for the certificate (required)
+#
+# Fields for 'selfsigned' mode:
+#   - common_name: Common Name (CN) for the certificate (required)
+#   - organization: Organization Name (O) (optional)
+#   - organizational_unit: Organizational Unit (OU) (optional)
+#   - country: Country Code (C) - 2 letter code (optional)
+#   - state: State or Province (ST) (optional)
+#   - locality: Locality or City (L) (optional)
+#   - email: Email Address (optional)
+#   - days: Certificate validity in days (default: 365)
+#   - key_size: RSA key size in bits (default: 4096)
+#   - san: Subject Alternative Names list (optional)
+#          Format: ['DNS:example.com', 'DNS:www.example.com', 'IP:192.168.1.1']
+#
+# Fields for 'import' mode:
+#   - cert_src: Source path to certificate file on control machine (required)
+#   - key_src: Source path to private key file on control machine (required)
+#   - chain_src: Source path to certificate chain file (optional)
+#
+# Example for selfsigned mode:
+# certificates_list:
+#   - name: example.com
+#     common_name: example.com
+#     organization: "My Company"
+#     organizational_unit: "IT Department"
+#     country: "US"
+#     state: "California"
+#     locality: "San Francisco"
+#     email: "admin@example.com"
+#     days: 730
+#     key_size: 4096
+#     san:
+#       - DNS:www.example.com
+#       - DNS:api.example.com
+#       - IP:192.168.1.1
+#
+# Example for import mode:
+# certificates_list:
+#   - name: example.com
+#     cert_src: files/example.com.crt
+#     key_src: files/example.com.key
+#     chain_src: files/example.com-chain.crt
+#
+# Type: List of Dictionaries
+certificates_list: []
+
+# Default certificate validity in days (for selfsigned mode)
+# Type: Integer
+certificates_default_days: 365
+
+# Default RSA key size in bits (for selfsigned mode)
+# Type: Integer
+certificates_default_key_size: 4096
+
+# Certificate file permissions
+# Type: String (octal)
+certificates_cert_mode: "0644"
+
+# Private key file permissions
+# Type: String (octal)
+certificates_key_mode: "0600"
+
+# Owner for certificate files
+# Type: String
+certificates_owner: root
+
+# Group for certificate files
+# Type: String
+certificates_group: root
+
+# ============================================================================
+# Let's Encrypt Configuration
+# ============================================================================
+
+# Let's Encrypt ACME directory URL
+# Options:
+#   - 'https://acme-v02.api.letsencrypt.org/directory' (production)
+#   - 'https://acme-staging-v02.api.letsencrypt.org/directory' (staging/testing)
+# Type: String
+certificates_acme_directory: https://acme-v02.api.letsencrypt.org/directory
+
+# Email address for Let's Encrypt account registration and notifications
+# Type: String
+certificates_acme_email: ""
+
+# ACME challenge type
+# Options:
+#   - 'http-01': HTTP challenge (requires port 80 accessible)
+#   - 'dns-01': DNS challenge (requires DNS provider API access)
+# Type: String
+certificates_acme_challenge_type: http-01
+
+# Web server document root for HTTP-01 challenge
+# The .well-known/acme-challenge directory will be created here
+# Type: String
+certificates_acme_webroot: /var/www/html
+
+# Agreement to Let's Encrypt Terms of Service
+# Must be set to true to use Let's Encrypt
+# Type: Boolean
+certificates_acme_agree_tos: false
+
+# Directory for ACME account keys
+# Type: String
+certificates_acme_account_key_dir: /etc/letsencrypt/accounts
+
+# Enable automatic certificate renewal
+# Type: Boolean
+certificates_acme_auto_renew: true
+
+# Days before expiry to attempt renewal
+# Type: Integer
+certificates_acme_renew_days_before_expiry: 30
+
+# DNS provider for DNS-01 challenge (if using dns-01)
+# Examples: 'cloudflare', 'route53', 'digitalocean', 'gcp'
+# Type: String
+certificates_acme_dns_provider: ""
+
+# DNS provider credentials (varies by provider)
+# Type: Dictionary
+certificates_acme_dns_credentials: {}
+
+# Additional fields for 'letsencrypt' mode in certificates_list:
+#   - domains: List of domain names for the certificate (required)
+#              The first domain will be the certificate name
+#   - challenge_type: Override global challenge type for this cert (optional)
+#   - webroot: Override global webroot for HTTP-01 challenge (optional)
+#
+# Example for letsencrypt mode:
+# certificates_list:
+#   - name: example.com
+#     domains:
+#       - example.com
+#       - www.example.com
+#     challenge_type: http-01
+#     webroot: /var/www/example.com
+
+# ============================================================================
+# Certificate Expiration Monitoring
+# ============================================================================
+
+# Enable certificate expiration monitoring
+# Type: Boolean
+certificates_monitor_expiration: false
+
+# Warning threshold in days before expiry
+# Type: Integer
+certificates_expiration_warning_days: 30
+
+# Critical threshold in days before expiry
+# Type: Integer
+certificates_expiration_critical_days: 7
+
+# Action to take when certificate is expiring
+# Options:
+#   - 'log': Log warning message only
+#   - 'fail': Fail the playbook execution
+#   - 'notify': Send notification (requires notification handler)
+# Type: String
+certificates_expiration_action: log
+
+# ============================================================================
+# Automatic Renewal Configuration
+# ============================================================================
+
+# Path to the playbook used for renewal
+# Type: String
+certificates_renewal_playbook_path: /etc/ansible/playbooks/cert-renewal.yml
+
+# Path to the inventory file for renewal
+# Type: String
+certificates_renewal_inventory_path: /etc/ansible/inventory/hosts
+
+# Service to reload after renewal (e.g., apache2, nginx)
+# Type: String
+certificates_renewal_service_to_reload: apache2

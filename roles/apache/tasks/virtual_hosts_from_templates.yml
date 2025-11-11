@@ -143,7 +143,7 @@
       {{
         apache_vhost_template_final_certs | default([]) +
         [{
-          'name': item.item.name,
+          'name': (item.stdout_lines | select('match', '^CERT:') | first | regex_replace('^CERT:', '') | basename | regex_replace('\\.crt$', '')),
           'certificate_file': (item.stdout_lines | select('match', '^CERT:') | first | regex_replace('^CERT:', '')),
           'certificate_key_file': (item.stdout_lines | select('match', '^KEY:') | first | regex_replace('^KEY:', '')),
           'server_name': (item.stdout_lines | select('match', '^SERVERNAME:') | first | regex_replace('^SERVERNAME:', '')),

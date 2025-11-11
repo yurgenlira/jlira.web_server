@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Copy certificate files to destination
+  ansible.builtin.copy:
+    src: "{{ item.cert_src }}"
+    dest: "{{ certificates_cert_dir }}/{{ item.name }}.crt"
+    mode: "{{ certificates_cert_mode }}"
+    owner: "{{ certificates_owner }}"
+    group: "{{ certificates_group }}"
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Copy private key files to destination
+  ansible.builtin.copy:
+    src: "{{ item.key_src }}"
+    dest: "{{ certificates_key_dir }}/{{ item.name }}.key"
+    mode: "{{ certificates_key_mode }}"
+    owner: "{{ certificates_owner }}"
+    group: "{{ certificates_group }}"
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Copy certificate chain files to destination (if provided)
+  ansible.builtin.copy:
+    src: "{{ item.chain_src }}"
+    dest: "{{ certificates_cert_dir }}/{{ item.name }}-chain.crt"
+    mode: "{{ certificates_cert_mode }}"
+    owner: "{{ certificates_owner }}"
+    group: "{{ certificates_group }}"
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.chain_src is defined
+
+- name: Validate imported certificate format
+  community.crypto.x509_certificate_info:
+    path: "{{ certificates_cert_dir }}/{{ item.name }}.crt"
+  register: certificates_cert_info
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Display imported certificate information
+  ansible.builtin.debug:
+    msg:
+      - "Certificate imported successfully"
+      - "  Name: {{ item.item.name }}"
+      - "  Certificate: {{ certificates_cert_dir }}/{{ item.item.name }}.crt"
+      - "  Private Key: {{ certificates_key_dir }}/{{ item.item.name }}.key"
+      - >-
+        {% if item.item.chain_src is defined %}
+        Chain: {{ certificates_cert_dir }}/{{ item.item.name }}-chain.crt
+        {% endif %}
+      - "  Subject: {{ item.subject }}"
+      - "  Issuer: {{ item.issuer }}"
+      - "  Valid From: {{ item.not_before }}"
+      - "  Valid Until: {{ item.not_after }}"
+      - "  Serial Number: {{ item.serial_number }}"
+  loop: "{{ certificates_cert_info.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"

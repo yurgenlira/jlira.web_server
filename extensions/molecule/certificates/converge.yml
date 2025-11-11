@@ -1,0 +1,14 @@
+---
+- name: Converge
+  hosts: certificates_test
+  gather_facts: true
+  tasks:
+    - name: Apply certificates role under test
+      ansible.builtin.include_role:
+        name: certificates
+      tags:
+        - certificates
+        - certificates_install
+        - certificates_selfsigned
+        - certificates_import
+        - certificates_validate

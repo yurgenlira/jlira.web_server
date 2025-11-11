@@ -184,12 +184,29 @@
   ansible.builtin.assert:
     that:
       - >-
-        'SSLCertificateFile /etc/ssl/certs/ssl-cert-snakeoil.pem'
+        'SSLCertificateFile /etc/ssl/certs/secure.example.local.crt'
         in (apache_https_vhost_config_content.content | b64decode)
       - >-
-        'SSLCertificateKeyFile /etc/ssl/private/ssl-cert-snakeoil.key'
+        'SSLCertificateKeyFile /etc/ssl/private/secure.example.local.key'
         in (apache_https_vhost_config_content.content | b64decode)
     fail_msg: "HTTPS virtual host does not contain SSL certificate configuration"
+
+- name: Get SSL certificate information for secure.example.local
+  community.crypto.x509_certificate_info:
+    path: /etc/ssl/certs/secure.example.local.crt
+  register: secure_example_local_cert_info
+
+- name: Verify secure.example.local certificate details
+  ansible.builtin.assert:
+    that:
+      - secure_example_local_cert_info.subject.commonName == 'secure.example.local'
+      - secure_example_local_cert_info.subject.organizationName == 'Molecule Test'
+      - secure_example_local_cert_info.subject.organizationalUnitName == 'Testing Department'
+      - secure_example_local_cert_info.subject.emailAddress == 'test@molecule.local'
+      - "'DNS:secure.example.local' in secure_example_local_cert_info.subject_alt_name"
+      - "'DNS:www.secure.example.local' in secure_example_local_cert_info.subject_alt_name"
+      - "'DNS:www3.secure.example.local' in secure_example_local_cert_info.subject_alt_name"
+    fail_msg: "secure.example.local certificate details are incorrect"
 
 - name: Verify HTTPS virtual host has custom error log
   ansible.builtin.assert:

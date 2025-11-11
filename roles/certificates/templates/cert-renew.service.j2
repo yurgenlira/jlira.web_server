@@ -1,0 +1,40 @@
+## {{ ansible_managed }}
+# SPDX-License-Identifier: MIT-0
+#
+# Systemd service for automatic certificate renewal
+# This service is triggered by cert-renew.timer
+
+[Unit]
+Description=Certificate Renewal Service
+Documentation=https://github.com/yourusername/jlira.web_server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+
+# Run the Ansible playbook for certificate renewal
+ExecStart=/usr/bin/ansible-playbook {{ certificates_renewal_playbook_path }} \
+          --inventory={{ certificates_renewal_inventory_path }} \
+          --extra-vars="certificates_mode=letsencrypt" \
+          --tags=certificates_letsencrypt
+
+# Reload web server after successful renewal
+ExecStartPost=/bin/systemctl reload {{ certificates_renewal_service_to_reload | default('apache2') }}
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cert-renew
+
+# Security settings
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths={{ certificates_cert_dir }} {{ certificates_key_dir }} {{ certificates_acme_account_key_dir }}
+
+[Install]
+WantedBy=multi-user.target

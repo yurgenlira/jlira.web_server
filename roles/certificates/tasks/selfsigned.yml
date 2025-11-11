@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Generate private keys for self-signed certificates
+  community.crypto.openssl_privatekey:
+    path: "{{ certificates_key_dir }}/{{ item.name }}.key"
+    size: "{{ item.key_size | default(certificates_default_key_size) }}"
+    type: RSA
+    mode: "{{ certificates_key_mode }}"
+    owner: "{{ certificates_owner }}"
+    group: "{{ certificates_group }}"
+    state: present
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Generate Certificate Signing Requests (CSRs)
+  community.crypto.openssl_csr:
+    path: "{{ certificates_cert_dir }}/{{ item.name }}.csr"
+    privatekey_path: "{{ certificates_key_dir }}/{{ item.name }}.key"
+    common_name: "{{ item.common_name }}"
+    country_name: "{{ item.country | default(omit) }}"
+    state_or_province_name: "{{ item.state | default(omit) }}"
+    locality_name: "{{ item.locality | default(omit) }}"
+    organization_name: "{{ item.organization | default(omit) }}"
+    organizational_unit_name: "{{ item.organizational_unit | default(omit) }}"
+    email_address: "{{ item.email | default(omit) }}"
+    subject_alt_name: "{{ item.san | default(omit) }}"
+    mode: "{{ certificates_cert_mode }}"
+    owner: "{{ certificates_owner }}"
+    group: "{{ certificates_group }}"
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Generate self-signed certificates
+  community.crypto.x509_certificate:
+    path: "{{ certificates_cert_dir }}/{{ item.name }}.crt"
+    privatekey_path: "{{ certificates_key_dir }}/{{ item.name }}.key"
+    csr_path: "{{ certificates_cert_dir }}/{{ item.name }}.csr"
+    provider: selfsigned
+    selfsigned_not_after: "+{{ item.days | default(certificates_default_days) }}d"
+    mode: "{{ certificates_cert_mode }}"
+    owner: "{{ certificates_owner }}"
+    group: "{{ certificates_group }}"
+    state: present
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Remove CSR files (cleanup)
+  ansible.builtin.file:
+    path: "{{ certificates_cert_dir }}/{{ item.name }}.csr"
+    state: absent
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Display generated certificate information
+  ansible.builtin.debug:
+    msg:
+      - "Self-signed certificate generated successfully"
+      - "  Name: {{ item.name }}"
+      - "  Common Name: {{ item.common_name }}"
+      - "  Certificate: {{ certificates_cert_dir }}/{{ item.name }}.crt"
+      - "  Private Key: {{ certificates_key_dir }}/{{ item.name }}.key"
+      - "  Validity: {{ item.days | default(certificates_default_days) }} days"
+      - "  Key Size: {{ item.key_size | default(certificates_default_key_size) }} bits"
+      - "{% if item.san is defined %}  SAN: {{ item.san | join(', ') }}{% endif %}"
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"

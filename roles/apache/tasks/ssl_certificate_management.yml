@@ -127,168 +127,69 @@
   when:
     - lookup('vars', apache_ssl_skip_list_var, default=[]) | length > 0
 
-- name: Ensure parent directories exist for SSL certificates (generate mode)
-  ansible.builtin.file:
-    path: "{{ item.item.certificate_file | dirname }}"
-    state: directory
-    mode: "0755"
-    owner: root
-    group: root
-  loop: "{{ apache_ssl_cert_stat.results | default([]) }}"
-  loop_control:
-    label: "{{ item.item.name }}"
-  when:
-    - item.skipped is not defined
-    - not item.stat.exists
-    - apache_ssl_certificate_fallback == 'generate'
-
-- name: Ensure parent directories exist for SSL private keys (generate mode)
-  ansible.builtin.file:
-    path: "{{ item.item.certificate_key_file | dirname }}"
-    state: directory
-    mode: "0700"
-    owner: root
-    group: root
-  loop: "{{ apache_ssl_key_stat.results | default([]) }}"
-  loop_control:
-    label: "{{ item.item.name }}"
-  when:
-    - item.skipped is not defined
-    - not item.stat.exists
-    - apache_ssl_certificate_fallback == 'generate'
-
-- name: Ensure OpenSSL is installed for certificate generation
-  ansible.builtin.apt:
-    name: openssl
-    state: present
-    update_cache: false
-  when:
-    - apache_ssl_cert_stat.results | default([])
-      | selectattr('skipped', 'undefined')
-      | selectattr('stat.exists', 'equalto', false)
-      | list | length > 0
-    - apache_ssl_certificate_fallback == 'generate'
-
-- name: Build subject string for certificate generation
+- name: Build list of certificates to generate
   ansible.builtin.set_fact:
-    apache_ssl_cert_subjects: >-
-      {{
-        apache_ssl_cert_subjects | default({}) | combine({
-          item.item.name: (
-            ('/C=' + apache_ssl_selfsigned.country if apache_ssl_selfsigned.country else '') +
-            ('/ST=' + apache_ssl_selfsigned.state if apache_ssl_selfsigned.state else '') +
-            ('/L=' + apache_ssl_selfsigned.locality if apache_ssl_selfsigned.locality else '') +
-            ('/O=' + apache_ssl_selfsigned.organization) +
-            ('/OU=' + apache_ssl_selfsigned.organizational_unit if apache_ssl_selfsigned.organizational_unit else '') +
-            ('/CN=' + (item.item.server_name | default(item.item.name))) +
-            ('/emailAddress=' + apache_ssl_selfsigned.email if apache_ssl_selfsigned.email else '')
-          )
-        })
-      }}
+    certificates_list_to_generate: "{{ (certificates_list_to_generate | default([])) + [cert_item] }}"
   loop: "{{ apache_ssl_cert_stat.results | default([]) }}"
   loop_control:
-    label: "{{ item.item.name }}"
+    label: "{{ cert_stat_item.item.name }}"
+    loop_var: cert_stat_item
+  vars:
+    cert_item:
+      name: "{{ cert_stat_item.item.name }}"
+      common_name: "{{ cert_stat_item.item.server_name | default(cert_stat_item.item.name) }}"
+      country: "{{ apache_ssl_selfsigned.country | default(omit) }}"
+      state: "{{ apache_ssl_selfsigned.state | default(omit) }}"
+      locality: "{{ apache_ssl_selfsigned.locality | default(omit) }}"
+      organization: "{{ apache_ssl_selfsigned.organization | default(omit) }}"
+      organizational_unit: "{{ apache_ssl_selfsigned.organizational_unit | default(omit) }}"
+      email: "{{ apache_ssl_selfsigned.email | default(omit) }}"
+      san: "{{ ['DNS:' + (cert_stat_item.item.server_name | default(cert_stat_item.item.name))] + (cert_stat_item.item.server_alias | default([]) | map('regex_replace', '^', 'DNS:') | list) }}"
+      days: "{{ apache_ssl_selfsigned.days | default(365) }}"
   when:
-    - item.skipped is not defined
-    - not item.stat.exists
+    - cert_stat_item.skipped is not defined
+    - not cert_stat_item.stat.exists
     - apache_ssl_certificate_fallback == 'generate'
 
-- name: Build SAN (Subject Alternative Names) list for certificates
-  ansible.builtin.set_fact:
-    apache_ssl_cert_sans: >-
-      {{
-        apache_ssl_cert_sans | default({}) | combine({
-          item.item.name: (
-            ['DNS:' + (item.item.server_name | default(item.item.name))] +
-            (item.item.server_alias | default([]) | map('regex_replace', '^', 'DNS:') | list)
-          )
-        })
-      }}
-  loop: "{{ apache_ssl_cert_stat.results | default([]) }}"
+- name: Generate missing SSL certificates using the 'certificates' role
+  ansible.builtin.include_role:
+    name: certificates
+  vars:
+    certificates_mode: selfsigned
+    certificates_list: "{{ certificates_list_to_generate }}"
+    certificates_cert_dir: "{{ apache_ssl_selfsigned.cert_dir | default('/etc/ssl/certs') }}"
+    certificates_key_dir: "{{ apache_ssl_selfsigned.key_dir | default('/etc/ssl/private') }}"
+    certificates_owner: root
+    certificates_group: root
+    certificates_cert_mode: '0644'
+    certificates_key_mode: '0600'
+  when:
+    - certificates_list_to_generate is defined
+    - certificates_list_to_generate | length > 0
+
+- name: Re-check if virtual host SSL certificate files exist
+  ansible.builtin.stat:
+    path: "{{ item.certificate_file }}"
+  register: apache_ssl_cert_stat_after
+  loop: "{{ apache_ssl_cert_list | default([]) }}"
   loop_control:
-    label: "{{ item.item.name }}"
+    label: "{{ item.name }}"
   when:
-    - item.skipped is not defined
-    - not item.stat.exists
-    - apache_ssl_certificate_fallback == 'generate'
+    - apache_ssl_cert_list | default([]) | length > 0
+    - item.certificate_file is defined
+    - item.certificate_file | length > 0
 
-- name: Generate self-signed SSL certificates for virtual hosts
-  ansible.builtin.shell: |
-    set -o pipefail
-    openssl req -x509 -nodes \
-      -days {{ apache_ssl_selfsigned.days }} \
-      -newkey rsa:4096 \
-      -keyout {{ item.item.certificate_key_file }} \
-      -out {{ item.item.certificate_file }} \
-      -subj "{{ apache_ssl_cert_subjects[item.item.name] }}" \
-      -addext "subjectAltName={{ apache_ssl_cert_sans[item.item.name] | join(',') }}"
-  args:
-    executable: /bin/bash
-    creates: "{{ item.item.certificate_file }}"
-  loop: "{{ apache_ssl_cert_stat.results | default([]) }}"
+- name: Re-check if virtual host SSL key files exist
+  ansible.builtin.stat:
+    path: "{{ item.certificate_key_file }}"
+  register: apache_ssl_key_stat_after
+  loop: "{{ apache_ssl_cert_list | default([]) }}"
   loop_control:
-    label: "{{ item.item.name }}"
+    label: "{{ item.name }}"
   when:
-    - item.skipped is not defined
-    - not item.stat.exists
-    - apache_ssl_certificate_fallback == 'generate'
-  notify: Reload apache
-
-- name: Set permissions on generated SSL certificates
-  ansible.builtin.file:
-    path: "{{ item.item.certificate_file }}"
-    mode: "0644"
-    owner: root
-    group: root
-  loop: "{{ apache_ssl_cert_stat.results | default([]) }}"
-  loop_control:
-    label: "{{ item.item.name }}"
-  when:
-    - item.skipped is not defined
-    - not item.stat.exists
-    - apache_ssl_certificate_fallback == 'generate'
-
-- name: Set permissions on generated SSL private keys
-  ansible.builtin.file:
-    path: "{{ item.item.certificate_key_file }}"
-    mode: "0600"
-    owner: root
-    group: root
-  loop: "{{ apache_ssl_key_stat.results | default([]) }}"
-  loop_control:
-    label: "{{ item.item.name }}"
-  when:
-    - item.skipped is not defined
-    - not item.stat.exists
-    - apache_ssl_certificate_fallback == 'generate'
-
-- name: Display generated certificates summary
-  ansible.builtin.debug:
-    msg: |
-      Generated self-signed SSL certificate for {{ apache_ssl_vhost_type }} virtual host '{{ item.item.name }}'
-
-      Certificate Details:
-        - Certificate File: {{ item.item.certificate_file }}
-        - Private Key File: {{ item.item.certificate_key_file }}
-        - Valid for: {{ apache_ssl_selfsigned.days }} days
-        - Common Name (CN): {{ item.item.server_name | default(item.item.name) }}
-        - Subject Alternative Names (SAN): {{ apache_ssl_cert_sans[item.item.name] | join(', ') }}
-        - Organization (O): {{ apache_ssl_selfsigned.organization }}
-        {% if apache_ssl_selfsigned.organizational_unit %}- Organizational Unit (OU): {{ apache_ssl_selfsigned.organizational_unit }}{% endif %}
-        {% if apache_ssl_selfsigned.country %}- Country (C): {{ apache_ssl_selfsigned.country }}{% endif %}
-        {% if apache_ssl_selfsigned.state %}- State (ST): {{ apache_ssl_selfsigned.state }}{% endif %}
-        {% if apache_ssl_selfsigned.locality %}- Locality (L): {{ apache_ssl_selfsigned.locality }}{% endif %}
-        {% if apache_ssl_selfsigned.email %}- Email: {{ apache_ssl_selfsigned.email }}{% endif %}
-
-      NOTE: This is a self-signed certificate for development/testing purposes.
-      For production, use certificates from a trusted Certificate Authority.
-  loop: "{{ apache_ssl_cert_stat.results | default([]) }}"
-  loop_control:
-    label: "{{ item.item.name }}"
-  when:
-    - item.skipped is not defined
-    - not item.stat.exists
-    - apache_ssl_certificate_fallback == 'generate'
+    - apache_ssl_cert_list | default([]) | length > 0
+    - item.certificate_key_file is defined
+    - item.certificate_key_file | length > 0
 
 - name: Determine final certificate existence status for each virtual host
   ansible.builtin.set_fact:
@@ -296,15 +197,10 @@
       {{
         apache_ssl_cert_existence_status | default({}) | combine({
           item.name: (
-            (apache_ssl_cert_stat.results |
+            (apache_ssl_cert_stat_after.results |
               selectattr('item.name', 'equalto', item.name) |
               map(attribute='stat.exists') | first | default(false)) and
-            (apache_ssl_key_stat.results |
-              selectattr('item.name', 'equalto', item.name) |
-              map(attribute='stat.exists') | first | default(false))
-          ) or (
-            apache_ssl_certificate_fallback == 'generate' and
-            not (apache_ssl_cert_stat.results |
+            (apache_ssl_key_stat_after.results |
               selectattr('item.name', 'equalto', item.name) |
               map(attribute='stat.exists') | first | default(false))
           )

@@ -1,0 +1,270 @@
+# SPDX-License-Identifier: MIT-0
+---
+# =============================================================================
+# Let's Encrypt Certificate Management
+# =============================================================================
+
+- name: Ensure ACME account key directory exists
+  ansible.builtin.file:
+    path: "{{ certificates_acme_account_key_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Generate ACME account key
+  community.crypto.openssl_privatekey:
+    path: "{{ certificates_acme_account_key_dir }}/account.key"
+    size: 4096
+    type: RSA
+    mode: "0600"
+    owner: root
+    group: root
+
+- name: Create ACME account with Let's Encrypt
+  community.crypto.acme_account:
+    account_key_src: "{{ certificates_acme_account_key_dir }}/account.key"
+    acme_directory: "{{ certificates_acme_directory }}"
+    acme_version: 2
+    terms_agreed: "{{ certificates_acme_agree_tos }}"
+    contact:
+      - "mailto:{{ certificates_acme_email }}"
+    state: present
+  register: certificates_acme_account
+
+- name: Display ACME account status
+  ansible.builtin.debug:
+    msg:
+      - "ACME account status: {{ certificates_acme_account.account_uri | default('Created') }}"
+      - "ACME directory: {{ certificates_acme_directory }}"
+
+# =============================================================================
+# HTTP-01 Challenge
+# =============================================================================
+
+- name: Setup HTTP-01 challenge (if using http-01)
+  when: certificates_acme_challenge_type == 'http-01'
+  block:
+    - name: Ensure webroot .well-known/acme-challenge directory exists
+      ansible.builtin.file:
+        path: "{{ item.webroot | default(certificates_acme_webroot) }}/.well-known/acme-challenge"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: "0755"
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Generate private keys for certificates
+      community.crypto.openssl_privatekey:
+        path: "{{ certificates_key_dir }}/{{ item.name }}.key"
+        size: "{{ item.key_size | default(certificates_default_key_size) }}"
+        type: RSA
+        mode: "{{ certificates_key_mode }}"
+        owner: "{{ certificates_owner }}"
+        group: "{{ certificates_group }}"
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Generate CSRs for certificates
+      community.crypto.openssl_csr:
+        path: "{{ certificates_cert_dir }}/{{ item.name }}.csr"
+        privatekey_path: "{{ certificates_key_dir }}/{{ item.name }}.key"
+        common_name: "{{ item.domains[0] }}"
+        subject_alt_name: "{{ item.domains | map('regex_replace', '^', 'DNS:') | list }}"
+        owner: "{{ certificates_owner }}"
+        group: "{{ certificates_group }}"
+        mode: "0644"
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Create Let's Encrypt challenge for HTTP-01
+      community.crypto.acme_certificate:
+        account_key_src: "{{ certificates_acme_account_key_dir }}/account.key"
+        account_email: "{{ certificates_acme_email }}"
+        src: "{{ certificates_cert_dir }}/{{ item.name }}.csr"
+        cert: "{{ certificates_cert_dir }}/{{ item.name }}.crt"
+        fullchain: "{{ certificates_cert_dir }}/{{ item.name }}-fullchain.crt"
+        chain: "{{ certificates_cert_dir }}/{{ item.name }}-chain.crt"
+        challenge: http-01
+        acme_directory: "{{ certificates_acme_directory }}"
+        acme_version: 2
+        terms_agreed: "{{ certificates_acme_agree_tos }}"
+        remaining_days: "{{ certificates_acme_renew_days_before_expiry }}"
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: certificates_acme_challenge
+
+    - name: Copy challenge data to webroot
+      ansible.builtin.copy:
+        dest: "{{ item.0.webroot | default(certificates_acme_webroot) }}/.well-known/acme-challenge/{{ item.1.key }}"
+        content: "{{ item.1.value }}"
+        owner: www-data
+        group: www-data
+        mode: "0644"
+      loop: "{{ certificates_acme_challenge.results | subelements('challenge_data_dns', skip_missing=True) | default([]) }}"
+      loop_control:
+        label: "{{ item.0.item.name }}"
+      when:
+        - item.0.challenge_data is defined
+        - item.0.challenge_data | length > 0
+
+    - name: Complete Let's Encrypt challenge for HTTP-01
+      community.crypto.acme_certificate:
+        account_key_src: "{{ certificates_acme_account_key_dir }}/account.key"
+        account_email: "{{ certificates_acme_email }}"
+        src: "{{ certificates_cert_dir }}/{{ item.item.name }}.csr"
+        cert: "{{ certificates_cert_dir }}/{{ item.item.name }}.crt"
+        fullchain: "{{ certificates_cert_dir }}/{{ item.item.name }}-fullchain.crt"
+        chain: "{{ certificates_cert_dir }}/{{ item.item.name }}-chain.crt"
+        challenge: http-01
+        acme_directory: "{{ certificates_acme_directory }}"
+        acme_version: 2
+        terms_agreed: "{{ certificates_acme_agree_tos }}"
+        remaining_days: "{{ certificates_acme_renew_days_before_expiry }}"
+        data: "{{ item }}"
+      loop: "{{ certificates_acme_challenge.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when:
+        - item.challenge_data is defined
+        - item.challenge_data | length > 0
+
+    - name: Set certificate file permissions
+      ansible.builtin.file:
+        path: "{{ item }}"
+        owner: "{{ certificates_owner }}"
+        group: "{{ certificates_group }}"
+        mode: "{{ certificates_cert_mode }}"
+      loop:
+        - "{{ certificates_cert_dir }}/{{ item.name }}.crt"
+        - "{{ certificates_cert_dir }}/{{ item.name }}-fullchain.crt"
+        - "{{ certificates_cert_dir }}/{{ item.name }}-chain.crt"
+      loop_control:
+        label: "{{ item }}"
+      with_items: "{{ certificates_list }}"
+
+# =============================================================================
+# DNS-01 Challenge
+# =============================================================================
+
+- name: Setup DNS-01 challenge (if using dns-01)
+  when: certificates_acme_challenge_type == 'dns-01'
+  block:
+    - name: Generate private keys for certificates
+      community.crypto.openssl_privatekey:
+        path: "{{ certificates_key_dir }}/{{ item.name }}.key"
+        size: "{{ item.key_size | default(certificates_default_key_size) }}"
+        type: RSA
+        mode: "{{ certificates_key_mode }}"
+        owner: "{{ certificates_owner }}"
+        group: "{{ certificates_group }}"
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Generate CSRs for certificates
+      community.crypto.openssl_csr:
+        path: "{{ certificates_cert_dir }}/{{ item.name }}.csr"
+        privatekey_path: "{{ certificates_key_dir }}/{{ item.name }}.key"
+        common_name: "{{ item.domains[0] }}"
+        subject_alt_name: "{{ item.domains | map('regex_replace', '^', 'DNS:') | list }}"
+        owner: "{{ certificates_owner }}"
+        group: "{{ certificates_group }}"
+        mode: "0644"
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Create Let's Encrypt challenge for DNS-01
+      community.crypto.acme_certificate:
+        account_key_src: "{{ certificates_acme_account_key_dir }}/account.key"
+        account_email: "{{ certificates_acme_email }}"
+        src: "{{ certificates_cert_dir }}/{{ item.name }}.csr"
+        cert: "{{ certificates_cert_dir }}/{{ item.name }}.crt"
+        fullchain: "{{ certificates_cert_dir }}/{{ item.name }}-fullchain.crt"
+        chain: "{{ certificates_cert_dir }}/{{ item.name }}-chain.crt"
+        challenge: dns-01
+        acme_directory: "{{ certificates_acme_directory }}"
+        acme_version: 2
+        terms_agreed: "{{ certificates_acme_agree_tos }}"
+        remaining_days: "{{ certificates_acme_renew_days_before_expiry }}"
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: certificates_acme_challenge_dns
+
+    - name: Display DNS challenge records (manual setup required)
+      ansible.builtin.debug:
+        msg:
+          - "========================================================================="
+          - "DNS-01 Challenge Records for {{ item.item.name }}"
+          - "========================================================================="
+          - "Please create the following DNS TXT records:"
+          - "{{ item.challenge_data_dns | default({}) | dict2items | map(attribute='key') | list }}"
+          - "Values:"
+          - "{{ item.challenge_data_dns | default({}) | dict2items | map(attribute='value') | list }}"
+          - "========================================================================="
+      loop: "{{ certificates_acme_challenge_dns.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when:
+        - item.challenge_data_dns is defined
+        - item.challenge_data_dns | length > 0
+
+    - name: Wait for user confirmation to continue
+      ansible.builtin.pause:
+        prompt: |
+          Please create the DNS TXT records shown above and press Enter when ready to continue.
+          The DNS records must be propagated before continuing.
+      when:
+        - certificates_acme_challenge_dns.results | selectattr('challenge_data_dns', 'defined') | list | length > 0
+
+    - name: Complete Let's Encrypt challenge for DNS-01
+      community.crypto.acme_certificate:
+        account_key_src: "{{ certificates_acme_account_key_dir }}/account.key"
+        account_email: "{{ certificates_acme_email }}"
+        src: "{{ certificates_cert_dir }}/{{ item.item.name }}.csr"
+        cert: "{{ certificates_cert_dir }}/{{ item.item.name }}.crt"
+        fullchain: "{{ certificates_cert_dir }}/{{ item.item.name }}-fullchain.crt"
+        chain: "{{ certificates_cert_dir }}/{{ item.item.name }}-chain.crt"
+        challenge: dns-01
+        acme_directory: "{{ certificates_acme_directory }}"
+        acme_version: 2
+        terms_agreed: "{{ certificates_acme_agree_tos }}"
+        remaining_days: "{{ certificates_acme_renew_days_before_expiry }}"
+        data: "{{ item }}"
+      loop: "{{ certificates_acme_challenge_dns.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when:
+        - item.challenge_data_dns is defined
+        - item.challenge_data_dns | length > 0
+
+    - name: Set certificate file permissions
+      ansible.builtin.file:
+        path: "{{ item.1 }}"
+        owner: "{{ certificates_owner }}"
+        group: "{{ certificates_group }}"
+        mode: "{{ certificates_cert_mode }}"
+      loop: "{{ certificates_list | product(['.crt', '-fullchain.crt', '-chain.crt']) | list }}"
+      loop_control:
+        label: "{{ certificates_cert_dir }}/{{ item.0.name }}{{ item.1 }}"
+      vars:
+        item_path: "{{ certificates_cert_dir }}/{{ item.0.name }}{{ item.1 }}"
+
+- name: Display Let's Encrypt certificate generation summary
+  ansible.builtin.debug:
+    msg:
+      - "========================================================================="
+      - "Let's Encrypt Certificates Generated Successfully"
+      - "========================================================================="
+      - "Challenge type: {{ certificates_acme_challenge_type }}"
+      - "Certificates created: {{ certificates_list | length }}"
+      - "Certificate directory: {{ certificates_cert_dir }}"
+      - "Private key directory: {{ certificates_key_dir }}"
+      - "========================================================================="

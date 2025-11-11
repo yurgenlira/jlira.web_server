@@ -1,0 +1,35 @@
+---
+- name: Verify
+  hosts: certificates_test
+  gather_facts: true
+  tasks:
+    - name: Include installation tests
+      ansible.builtin.include_tasks:
+        file: tests/install.yml
+
+    - name: Include self-signed certificate tests
+      ansible.builtin.include_tasks:
+        file: tests/selfsigned.yml
+      when: certificates_mode == 'selfsigned'
+
+    - name: Include import certificate tests
+      ansible.builtin.include_tasks:
+        file: tests/import.yml
+      when: certificates_mode == 'import'
+
+    - name: Include Let's Encrypt tests
+      ansible.builtin.include_tasks:
+        file: tests/letsencrypt.yml
+      when: certificates_mode == 'letsencrypt'
+
+    - name: Include certificate expiration monitoring tests
+      ansible.builtin.include_tasks:
+        file: tests/monitoring.yml
+      when: certificates_monitor_expiration | default(false)
+
+    - name: Include automatic renewal tests
+      ansible.builtin.include_tasks:
+        file: tests/renewal.yml
+      when:
+        - certificates_mode == 'letsencrypt'
+        - certificates_acme_auto_renew | default(false)

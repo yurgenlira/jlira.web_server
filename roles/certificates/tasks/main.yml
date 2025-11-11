@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Include jlira.web_server.certificates.validate.yml
+  ansible.builtin.include_tasks: validate.yml
+  tags:
+    - always
+    - certificates_validate
+
+- name: Include jlira.web_server.certificates.install.yml
+  ansible.builtin.include_tasks: install.yml
+  tags:
+    - certificates_install
+    - certificates
+
+- name: Include jlira.web_server.certificates.selfsigned.yml
+  ansible.builtin.include_tasks: selfsigned.yml
+  when:
+    - certificates_mode == 'selfsigned'
+    - certificates_list | length > 0
+  tags:
+    - certificates_selfsigned
+    - certificates
+
+- name: Include jlira.web_server.certificates.import.yml
+  ansible.builtin.include_tasks: import.yml
+  when:
+    - certificates_mode == 'import'
+    - certificates_list | length > 0
+  tags:
+    - certificates_import
+    - certificates
+
+- name: Include jlira.web_server.certificates.letsencrypt.yml
+  ansible.builtin.include_tasks: letsencrypt.yml
+  when:
+    - certificates_mode == 'letsencrypt'
+    - certificates_list | length > 0
+  tags:
+    - certificates_letsencrypt
+    - certificates
+
+- name: Include jlira.web_server.certificates.renewal.yml
+  ansible.builtin.include_tasks: renewal.yml
+  when:
+    - certificates_mode == 'letsencrypt'
+    - certificates_acme_auto_renew | bool
+  tags:
+    - certificates_renewal
+    - certificates
+
+- name: Include jlira.web_server.certificates.monitor.yml
+  ansible.builtin.include_tasks: monitor.yml
+  when:
+    - certificates_monitor_expiration | bool
+    - certificates_list | length > 0
+  tags:
+    - certificates_monitor
+    - certificates
+
+- name: Display completion message
+  ansible.builtin.debug:
+    msg:
+      - "======================================================================="
+      - "Certificates Role Execution Complete"
+      - "======================================================================="
+      - "Mode: {{ certificates_mode }}"
+      - "Certificates managed: {{ certificates_list | length }}"
+      - "Certificate directory: {{ certificates_cert_dir }}"
+      - "Private key directory: {{ certificates_key_dir }}"
+      - "======================================================================="
+  when: certificates_list | length > 0

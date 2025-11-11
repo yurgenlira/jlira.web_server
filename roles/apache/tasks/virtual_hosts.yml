@@ -23,7 +23,7 @@
       {{
         apache_ssl_cert_list | default([]) +
         [{
-          'name': item.name,
+          'name': item.https.certificate_file | basename | regex_replace('\\.crt$', ''),
           'certificate_file': item.https.certificate_file,
           'certificate_key_file': item.https.certificate_key_file,
           'server_name': item.server_name | default(item.name),

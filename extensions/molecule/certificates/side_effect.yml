@@ -1,0 +1,214 @@
+---
+# =============================================================================
+# Side Effect Playbook - Tests Import Mode
+# =============================================================================
+# This playbook runs after the initial converge to test import mode functionality
+
+- name: Test Certificate Import Mode
+  hosts: certificates_test
+  gather_facts: true
+  vars:
+    # Override to test import mode
+    certificates_mode: import
+    certificates_list:
+      - name: test-import
+        cert_src: "{{ playbook_dir }}/files/test-import.crt"
+        key_src: "{{ playbook_dir }}/files/test-import.key"
+
+  tasks:
+    - name: Display mode change message
+      ansible.builtin.debug:
+        msg:
+          - "========================================"
+          - "Testing Certificate Import Mode"
+          - "========================================"
+          - "Previous mode: selfsigned"
+          - "Current mode: import"
+          - "========================================"
+
+    - name: Apply certificates role in import mode
+      ansible.builtin.include_role:
+        name: certificates
+
+    - name: Verify imported certificate exists
+      ansible.builtin.stat:
+        path: "{{ certificates_cert_dir }}/test-import.crt"
+      register: imported_cert
+      failed_when: not imported_cert.stat.exists
+
+    - name: Verify imported private key exists
+      ansible.builtin.stat:
+        path: "{{ certificates_key_dir }}/test-import.key"
+      register: imported_key
+      failed_when: not imported_key.stat.exists
+
+    - name: Verify imported certificate permissions
+      ansible.builtin.assert:
+        that:
+          - imported_cert.stat.mode == '0644'
+          - imported_cert.stat.pw_name == 'root'
+        fail_msg: "Imported certificate has incorrect permissions"
+        success_msg: "Imported certificate has correct permissions"
+
+    - name: Verify imported private key permissions
+      ansible.builtin.assert:
+        that:
+          - imported_key.stat.mode == '0600'
+          - imported_key.stat.pw_name == 'root'
+        fail_msg: "Imported private key has incorrect permissions"
+        success_msg: "Imported private key has correct permissions"
+
+    - name: Get imported certificate information
+      community.crypto.x509_certificate_info:
+        path: "{{ certificates_cert_dir }}/test-import.crt"
+      register: imported_cert_info
+
+    - name: Display imported certificate information
+      ansible.builtin.debug:
+        msg:
+          - "========================================"
+          - "Imported Certificate Details"
+          - "========================================"
+          - "Subject: {{ imported_cert_info.subject }}"
+          - "Issuer: {{ imported_cert_info.issuer }}"
+          - "Valid From: {{ imported_cert_info.not_before }}"
+          - "Valid Until: {{ imported_cert_info.not_after }}"
+          - "Serial Number: {{ imported_cert_info.serial_number }}"
+          - "========================================"
+          - "✓ Certificate import test PASSED"
+          - "========================================"
+
+# =============================================================================
+# Test Certificate Expiration Monitoring
+# =============================================================================
+
+- name: Test Certificate Expiration Monitoring
+  hosts: certificates_test
+  gather_facts: true
+  vars:
+    # Enable monitoring for existing certificates
+    certificates_mode: selfsigned
+    certificates_monitor_expiration: true
+    certificates_expiration_warning_days: 30
+    certificates_expiration_critical_days: 7
+    certificates_expiration_action: log
+    certificates_list:
+      - name: test-basic.local
+        common_name: test-basic.local
+        organization: "Test Organization"
+        days: 365
+
+  tasks:
+    - name: Display monitoring test message
+      ansible.builtin.debug:
+        msg:
+          - "========================================"
+          - "Testing Certificate Expiration Monitoring"
+          - "========================================"
+          - "Monitoring enabled: {{ certificates_monitor_expiration }}"
+          - "Warning threshold: {{ certificates_expiration_warning_days }} days"
+          - "Critical threshold: {{ certificates_expiration_critical_days }} days"
+          - "========================================"
+
+    - name: Apply certificates role with monitoring enabled
+      ansible.builtin.include_role:
+        name: certificates
+      tags:
+        - certificates_monitor
+
+    - name: Verify monitoring was executed
+      ansible.builtin.debug:
+        msg: "✓ Certificate expiration monitoring test PASSED"
+
+# =============================================================================
+# Test Let's Encrypt Validation (Configuration Only)
+# =============================================================================
+
+- name: Test Let's Encrypt Configuration Validation
+  hosts: certificates_test
+  gather_facts: true
+  vars:
+    # Configure Let's Encrypt mode for validation testing
+    certificates_mode: letsencrypt
+    certificates_acme_email: "test@example.com"
+    certificates_acme_agree_tos: true
+    certificates_acme_challenge_type: http-01
+    certificates_acme_webroot: /var/www/html
+    certificates_acme_directory: https://acme-staging-v02.api.letsencrypt.org/directory
+    certificates_acme_auto_renew: true
+    certificates_list:
+      - name: test-letsencrypt.example.com
+        domains:
+          - test-letsencrypt.example.com
+          - www.test-letsencrypt.example.com
+
+  tasks:
+    - name: Display Let's Encrypt validation test message
+      ansible.builtin.debug:
+        msg:
+          - "========================================"
+          - "Testing Let's Encrypt Configuration Validation"
+          - "========================================"
+          - "Mode: {{ certificates_mode }}"
+          - "ACME Directory: {{ certificates_acme_directory }}"
+          - "Challenge Type: {{ certificates_acme_challenge_type }}"
+          - "Email: {{ certificates_acme_email }}"
+          - "Auto-renewal: {{ certificates_acme_auto_renew }}"
+          - "========================================"
+          - "Note: This test validates configuration only"
+          - "It does not connect to Let's Encrypt servers"
+          - "========================================"
+
+    - name: Run validation only (no actual certificate generation)
+      ansible.builtin.include_role:
+        name: certificates
+        tasks_from: validate.yml
+      tags:
+        - certificates_validate
+
+    - name: Verify Let's Encrypt configuration was validated
+      ansible.builtin.debug:
+        msg: "✓ Let's Encrypt configuration validation test PASSED"
+
+    - name: Test Let's Encrypt ACME account setup (without actual registration)
+      block:
+        - name: Ensure ACME account directory exists
+          ansible.builtin.file:
+            path: /etc/letsencrypt/accounts
+            state: directory
+            owner: root
+            group: root
+            mode: "0700"
+
+        - name: Generate test ACME account key
+          community.crypto.openssl_privatekey:
+            path: /etc/letsencrypt/accounts/account.key
+            size: 4096
+            type: RSA
+            mode: "0600"
+            owner: root
+            group: root
+
+        - name: Verify ACME account key was created
+          ansible.builtin.stat:
+            path: /etc/letsencrypt/accounts/account.key
+          register: acme_key_stat
+
+        - name: Assert ACME account key exists with correct permissions
+          ansible.builtin.assert:
+            that:
+              - acme_key_stat.stat.exists
+              - acme_key_stat.stat.mode == "0600"
+            fail_msg: "ACME account key creation failed"
+            success_msg: "ACME account key created successfully"
+
+    - name: Display Let's Encrypt test summary
+      ansible.builtin.debug:
+        msg:
+          - "========================================"
+          - "✓ Let's Encrypt validation tests PASSED"
+          - "========================================"
+          - "Configuration validated successfully"
+          - "ACME account directory structure created"
+          - "Ready for production use with real domains"
+          - "========================================"

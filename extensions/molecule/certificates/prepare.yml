@@ -1,0 +1,41 @@
+---
+# Prepare playbook runs before converge to set up test prerequisites
+- name: Prepare
+  hosts: certificates_test
+  gather_facts: false
+  tasks:
+    - name: Create temporary directory for test certificates on control node
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/files"
+        state: directory
+        mode: "0755"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Generate test certificate for import mode on control node
+      community.crypto.x509_certificate:
+        path: "{{ playbook_dir }}/files/test-import.crt"
+        privatekey_path: "{{ playbook_dir }}/files/test-import.key"
+        provider: selfsigned
+        selfsigned_not_after: "+365d"
+        mode: "0644"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Generate test private key for import mode on control node
+      community.crypto.openssl_privatekey:
+        path: "{{ playbook_dir }}/files/test-import.key"
+        size: 2048
+        type: RSA
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Update package cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      become: true

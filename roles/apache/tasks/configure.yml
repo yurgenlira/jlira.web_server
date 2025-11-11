@@ -73,7 +73,7 @@
     - name: Build SSL certificate list for default virtual host
       ansible.builtin.set_fact:
         apache_default_ssl_cert_list:
-          - name: default
+          - name: "{{ apache_default_ssl_certificate_file | basename | regex_replace('\\.crt$', '') }}"
             certificate_file: "{{ apache_default_ssl_certificate_file }}"
             certificate_key_file: "{{ apache_default_ssl_certificate_key_file }}"
             server_name: "{{ apache_server_name }}"
@@ -90,7 +90,7 @@
 
     - name: Set fact for SSL certificate status from certificate management results
       ansible.builtin.set_fact:
-        apache_ssl_certificates_exist: "{{ apache_ssl_cert_existence_status['default'] | default(false) }}"
+        apache_ssl_certificates_exist: "{{ apache_ssl_cert_existence_status[apache_default_ssl_certificate_file | basename | regex_replace('\\.crt$', '')] | default(false) }}"
       when: apache_ssl_enabled
 
     - name: Configure default SSL virtual host

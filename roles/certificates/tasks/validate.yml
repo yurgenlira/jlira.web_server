@@ -1,0 +1,283 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Validate certificates_mode
+  ansible.builtin.assert:
+    that:
+      - certificates_mode is defined
+      - certificates_mode in ['selfsigned', 'import', 'letsencrypt']
+    fail_msg: >-
+      certificates_mode must be either 'selfsigned', 'import', or 'letsencrypt'.
+      Current value: '{{ certificates_mode | default("undefined") }}'
+    success_msg: "certificates_mode is valid: {{ certificates_mode}}"
+    quiet: true
+
+- name: Validate certificates_list is defined and is a list
+  ansible.builtin.assert:
+    that:
+      - certificates_list is defined
+      - certificates_list is iterable
+      - certificates_list is not string
+      - certificates_list is not mapping
+    fail_msg: "certificates_list must be a list"
+    success_msg: "certificates_list has {{ certificates_list | length }} certificate(s)"
+    quiet: true
+
+- name: Validate each certificate has a name
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name is string
+      - item.name | length > 0
+    fail_msg: >-
+      Each certificate must have a 'name' field.
+      Invalid entry: {{ item }}
+    success_msg: "Certificate '{{ item.name }}' has valid name"
+    quiet: true
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed') }}"
+  when: certificates_list | length > 0
+
+# Validation for selfsigned mode
+- name: Validate selfsigned mode requirements
+  when:
+    - certificates_mode == 'selfsigned'
+    - certificates_list | length > 0
+  block:
+    - name: Validate common_name is defined for selfsigned certificates
+      ansible.builtin.assert:
+        that:
+          - item.common_name is defined
+          - item.common_name is string
+          - item.common_name | length > 0
+        fail_msg: >-
+          Certificate '{{ item.name }}' in selfsigned mode must have a 'common_name' field.
+          Current value: '{{ item.common_name | default("undefined") }}'
+        success_msg: "Certificate '{{ item.name }}' has valid common_name"
+        quiet: true
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Validate days is a positive integer if specified
+      ansible.builtin.assert:
+        that:
+          - item.days | int > 0
+          - item.days | int == item.days
+        fail_msg: >-
+          Certificate '{{ item.name }}' days must be a positive integer.
+          Current value: '{{ item.days }}'
+        success_msg: "Certificate '{{ item.name }}' days is valid"
+        quiet: true
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.days is defined
+
+    - name: Validate key_size is valid if specified
+      ansible.builtin.assert:
+        that:
+          - item.key_size | int in [2048, 3072, 4096, 8192]
+        fail_msg: >-
+          Certificate '{{ item.name }}' key_size must be 2048, 3072, 4096, or 8192.
+          Current value: '{{ item.key_size }}'
+        success_msg: "Certificate '{{ item.name }}' key_size is valid"
+        quiet: true
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.key_size is defined
+
+    - name: Validate country code is 2 letters if specified
+      ansible.builtin.assert:
+        that:
+          - item.country is string
+          - item.country | length == 2
+          - item.country is match('^[A-Z]{2}$')
+        fail_msg: >-
+          Certificate '{{ item.name }}' country must be a 2-letter uppercase code.
+          Current value: '{{ item.country }}'
+        success_msg: "Certificate '{{ item.name }}' country code is valid"
+        quiet: true
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.country is defined and item.country | length > 0
+
+    - name: Validate SAN entries if specified
+      ansible.builtin.assert:
+        that:
+          - item.san is iterable
+          - item.san is not string
+          - item.san is not mapping
+        fail_msg: >-
+          Certificate '{{ item.name }}' san must be a list.
+          Current value: '{{ item.san }}'
+        success_msg: "Certificate '{{ item.name }}' SAN list is valid"
+        quiet: true
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.san is defined
+
+# Validation for import mode
+- name: Validate import mode requirements
+  when:
+    - certificates_mode == 'import'
+    - certificates_list | length > 0
+  block:
+    - name: Validate cert_src is defined for import certificates
+      ansible.builtin.assert:
+        that:
+          - item.cert_src is defined
+          - item.cert_src is string
+          - item.cert_src | length > 0
+        fail_msg: >-
+          Certificate '{{ item.name }}' in import mode must have a 'cert_src' field.
+          Current value: '{{ item.cert_src | default("undefined") }}'
+        success_msg: "Certificate '{{ item.name }}' has valid cert_src"
+        quiet: true
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Validate key_src is defined for import certificates
+      ansible.builtin.assert:
+        that:
+          - item.key_src is defined
+          - item.key_src is string
+          - item.key_src | length > 0
+        fail_msg: >-
+          Certificate '{{ item.name }}' in import mode must have a 'key_src' field.
+          Current value: '{{ item.key_src | default("undefined") }}'
+        success_msg: "Certificate '{{ item.name }}' has valid key_src"
+        quiet: true
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Check if source certificate files exist
+      ansible.builtin.stat:
+        path: "{{ item.cert_src }}"
+      register: certificates_cert_src_stat
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Check if source key files exist
+      ansible.builtin.stat:
+        path: "{{ item.key_src }}"
+      register: certificates_key_src_stat
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Fail if source certificate files don't exist
+      ansible.builtin.fail:
+        msg: >-
+          Source certificate file not found for '{{ item.item.name }}':
+          {{ item.item.cert_src }}
+      loop: "{{ certificates_cert_src_stat.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when:
+        - not item.stat.exists
+
+    - name: Fail if source key files don't exist
+      ansible.builtin.fail:
+        msg: >-
+          Source key file not found for '{{ item.item.name }}':
+          {{ item.item.key_src }}
+      loop: "{{ certificates_key_src_stat.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when:
+        - not item.stat.exists
+
+# Validation for letsencrypt mode
+- name: Validate letsencrypt mode requirements
+  when:
+    - certificates_mode == 'letsencrypt'
+    - certificates_list | length > 0
+  block:
+    - name: Validate ACME email is defined
+      ansible.builtin.assert:
+        that:
+          - certificates_acme_email is defined
+          - certificates_acme_email is string
+          - certificates_acme_email | length > 0
+          - "'@' in certificates_acme_email"
+        fail_msg: >-
+          certificates_acme_email must be a valid email address for Let's Encrypt registration.
+          Current value: '{{ certificates_acme_email | default("undefined") }}'
+        success_msg: "ACME email is valid"
+        quiet: true
+
+    - name: Validate ACME Terms of Service agreement
+      ansible.builtin.assert:
+        that:
+          - certificates_acme_agree_tos is defined
+          - certificates_acme_agree_tos | bool
+        fail_msg: >-
+          You must agree to Let's Encrypt Terms of Service by setting
+          certificates_acme_agree_tos: true
+        success_msg: "Let's Encrypt Terms of Service agreed"
+        quiet: true
+
+    - name: Validate domains field for letsencrypt certificates
+      ansible.builtin.assert:
+        that:
+          - item.domains is defined
+          - item.domains is iterable
+          - item.domains is not string
+          - item.domains is not mapping
+          - item.domains | length > 0
+        fail_msg: >-
+          Certificate '{{ item.name }}' in letsencrypt mode must have a 'domains' list field.
+          Current value: '{{ item.domains | default("undefined") }}'
+        success_msg: "Certificate '{{ item.name }}' has valid domains list"
+        quiet: true
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Validate challenge type is valid
+      ansible.builtin.assert:
+        that:
+          - certificates_acme_challenge_type in ['http-01', 'dns-01']
+        fail_msg: >-
+          certificates_acme_challenge_type must be either 'http-01' or 'dns-01'.
+          Current value: '{{ certificates_acme_challenge_type }}'
+        success_msg: "ACME challenge type is valid: {{ certificates_acme_challenge_type }}"
+        quiet: true
+
+    - name: Validate DNS provider is set for DNS-01 challenge
+      ansible.builtin.assert:
+        that:
+          - certificates_acme_dns_provider is defined
+          - certificates_acme_dns_provider is string
+          - certificates_acme_dns_provider | length > 0
+        fail_msg: >-
+          certificates_acme_dns_provider must be set when using dns-01 challenge.
+          Current value: '{{ certificates_acme_dns_provider | default("undefined") }}'
+        success_msg: "DNS provider is set: {{ certificates_acme_dns_provider }}"
+        quiet: true
+      when: certificates_acme_challenge_type == 'dns-01'
+
+- name: Display validation summary
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "Certificates Role Validation Summary"
+      - "==================================================================="
+      - "Mode: {{ certificates_mode }}"
+      - "Certificates to manage: {{ certificates_list | length }}"
+      - "Output directory (certs): {{ certificates_cert_dir }}"
+      - "Output directory (keys): {{ certificates_key_dir }}"
+      - "==================================================================="
+      - "All variable validations passed successfully!"
+      - "==================================================================="

@@ -1,0 +1,214 @@
+---
+# =============================================================================
+# Let's Encrypt Mode Tests
+# =============================================================================
+# Note: These tests validate the Let's Encrypt configuration and setup
+# but do not actually connect to Let's Encrypt servers
+
+- name: Test Let's Encrypt ACME account directory
+  when: certificates_mode == 'letsencrypt'
+  block:
+    - name: Check if ACME account directory exists
+      ansible.builtin.stat:
+        path: "{{ certificates_acme_account_key_dir | default('/etc/letsencrypt/accounts') }}"
+      register: acme_account_dir
+
+    - name: Verify ACME account directory exists
+      ansible.builtin.assert:
+        that:
+          - acme_account_dir.stat.exists
+          - acme_account_dir.stat.isdir
+          - acme_account_dir.stat.mode == "0700"
+          - acme_account_dir.stat.pw_name == "root"
+        fail_msg: "ACME account directory does not exist or has incorrect permissions"
+        success_msg: "ACME account directory exists with correct permissions"
+
+    - name: Check if ACME account key exists
+      ansible.builtin.stat:
+        path: "{{ certificates_acme_account_key_dir | default('/etc/letsencrypt/accounts') }}/account.key"
+      register: acme_account_key
+
+    - name: Verify ACME account key exists
+      ansible.builtin.assert:
+        that:
+          - acme_account_key.stat.exists
+          - acme_account_key.stat.isreg
+          - acme_account_key.stat.mode == "0600"
+          - acme_account_key.stat.pw_name == "root"
+        fail_msg: "ACME account key does not exist or has incorrect permissions"
+        success_msg: "ACME account key exists with correct permissions"
+
+    - name: Validate ACME account key is valid RSA key
+      ansible.builtin.command:
+        cmd: openssl rsa -in {{ certificates_acme_account_key_dir | default('/etc/letsencrypt/accounts') }}/account.key -check -noout
+      register: acme_key_check
+      changed_when: false
+      failed_when: false
+
+    - name: Verify ACME account key is valid
+      ansible.builtin.assert:
+        that:
+          - acme_key_check.rc == 0
+          - "'RSA key ok' in acme_key_check.stdout or acme_key_check.rc == 0"
+        fail_msg: "ACME account key is not a valid RSA key"
+        success_msg: "ACME account key is valid"
+
+- name: Test Let's Encrypt webroot setup for HTTP-01
+  when:
+    - certificates_mode == 'letsencrypt'
+    - certificates_acme_challenge_type == 'http-01'
+  block:
+    - name: Check if webroot .well-known directory exists
+      ansible.builtin.stat:
+        path: "{{ certificates_acme_webroot | default('/var/www/html') }}/.well-known"
+      register: wellknown_dir
+
+    - name: Verify .well-known directory exists
+      ansible.builtin.assert:
+        that:
+          - wellknown_dir.stat.exists
+          - wellknown_dir.stat.isdir
+        fail_msg: ".well-known directory does not exist"
+        success_msg: ".well-known directory exists"
+
+    - name: Check if acme-challenge directory exists
+      ansible.builtin.stat:
+        path: "{{ certificates_acme_webroot | default('/var/www/html') }}/.well-known/acme-challenge"
+      register: acme_challenge_dir
+
+    - name: Verify acme-challenge directory exists with correct permissions
+      ansible.builtin.assert:
+        that:
+          - acme_challenge_dir.stat.exists
+          - acme_challenge_dir.stat.isdir
+          - acme_challenge_dir.stat.mode == "0755"
+        fail_msg: "acme-challenge directory does not exist or has incorrect permissions"
+        success_msg: "acme-challenge directory configured correctly"
+
+- name: Test Let's Encrypt certificate files were created
+  when: certificates_mode == 'letsencrypt'
+  block:
+    - name: Check for certificate files
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: le_cert_files
+      loop:
+        - "{{ certificates_cert_dir }}/{{ certificates_list[0].name }}.crt"
+        - "{{ certificates_key_dir }}/{{ certificates_list[0].name }}.key"
+        - "{{ certificates_cert_dir }}/{{ certificates_list[0].name }}-fullchain.crt"
+        - "{{ certificates_cert_dir }}/{{ certificates_list[0].name }}-chain.crt"
+      when: certificates_list | length > 0
+      failed_when: false
+
+    - name: Display certificate file status
+      ansible.builtin.debug:
+        msg:
+          - "Certificate file status:"
+          - "{{ item.item }}: {{ 'EXISTS' if item.stat.exists else 'NOT FOUND' }}"
+      loop: "{{ le_cert_files.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when:
+        - le_cert_files is defined
+        - le_cert_files.results is defined
+
+- name: Test Let's Encrypt configuration validation
+  when: certificates_mode == 'letsencrypt'
+  block:
+    - name: Verify ACME email is configured
+      ansible.builtin.assert:
+        that:
+          - certificates_acme_email is defined
+          - certificates_acme_email | length > 0
+          - "'@' in certificates_acme_email"
+        fail_msg: "ACME email is not properly configured"
+        success_msg: "ACME email is properly configured"
+
+    - name: Verify Terms of Service agreement
+      ansible.builtin.assert:
+        that:
+          - certificates_acme_agree_tos is defined
+          - certificates_acme_agree_tos | bool
+        fail_msg: "Let's Encrypt Terms of Service must be agreed to"
+        success_msg: "Terms of Service agreement confirmed"
+
+    - name: Verify challenge type is valid
+      ansible.builtin.assert:
+        that:
+          - certificates_acme_challenge_type is defined
+          - certificates_acme_challenge_type in ['http-01', 'dns-01']
+        fail_msg: "Invalid ACME challenge type: {{ certificates_acme_challenge_type | default('undefined') }}"
+        success_msg: "Valid ACME challenge type: {{ certificates_acme_challenge_type }}"
+
+    - name: Verify ACME directory is configured
+      ansible.builtin.assert:
+        that:
+          - certificates_acme_directory is defined
+          - certificates_acme_directory | length > 0
+          - "'acme' in certificates_acme_directory"
+        fail_msg: "ACME directory is not properly configured"
+        success_msg: "ACME directory is properly configured: {{ certificates_acme_directory }}"
+
+- name: Test Let's Encrypt domains configuration
+  when:
+    - certificates_mode == 'letsencrypt'
+    - certificates_list | length > 0
+  block:
+    - name: Verify domains are configured for all certificates
+      ansible.builtin.assert:
+        that:
+          - item.domains is defined
+          - item.domains | length > 0
+        fail_msg: "Certificate {{ item.name }} missing domains list"
+        success_msg: "Certificate {{ item.name }} has domains configured"
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Display configured domains
+      ansible.builtin.debug:
+        msg:
+          - "Certificate: {{ item.name }}"
+          - "Domains: {{ item.domains | join(', ') }}"
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+- name: Test Let's Encrypt DNS-01 configuration
+  when:
+    - certificates_mode == 'letsencrypt'
+    - certificates_acme_challenge_type == 'dns-01'
+  block:
+    - name: Verify DNS provider is configured for DNS-01
+      ansible.builtin.assert:
+        that:
+          - certificates_acme_dns_provider is defined
+          - certificates_acme_dns_provider | length > 0
+        fail_msg: "DNS provider must be configured for DNS-01 challenge"
+        success_msg: "DNS provider configured: {{ certificates_acme_dns_provider }}"
+
+    - name: Display DNS-01 configuration
+      ansible.builtin.debug:
+        msg:
+          - "==================================================================="
+          - "DNS-01 Challenge Configuration"
+          - "==================================================================="
+          - "DNS Provider: {{ certificates_acme_dns_provider }}"
+          - "Note: Credentials must be configured separately"
+          - "==================================================================="
+
+- name: Display Let's Encrypt tests summary
+  when: certificates_mode == 'letsencrypt'
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "Let's Encrypt Configuration Tests Completed"
+      - "==================================================================="
+      - "ACME Directory: {{ certificates_acme_directory }}"
+      - "Challenge Type: {{ certificates_acme_challenge_type }}"
+      - "Email: {{ certificates_acme_email }}"
+      - "Auto-renewal: {{ certificates_acme_auto_renew | default(true) }}"
+      - "Certificates configured: {{ certificates_list | length }}"
+      - "==================================================================="
+      - "All Let's Encrypt configuration tests passed"
+      - "==================================================================="

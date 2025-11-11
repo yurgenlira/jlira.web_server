@@ -1,0 +1,49 @@
+---
+# =============================================================================
+# Installation Tests for Certificates Role
+# =============================================================================
+
+- name: Check that python3-cryptography is installed
+  ansible.builtin.package:
+    name: python3-cryptography
+    state: present
+  check_mode: true
+  register: crypto_package
+  failed_when: crypto_package is changed
+
+- name: Verify certificate directory exists
+  ansible.builtin.stat:
+    path: "{{ certificates_cert_dir }}"
+  register: cert_dir_stat
+  failed_when: not cert_dir_stat.stat.exists or not cert_dir_stat.stat.isdir
+
+- name: Verify certificate directory permissions
+  ansible.builtin.assert:
+    that:
+      - cert_dir_stat.stat.mode == '0755'
+      - cert_dir_stat.stat.pw_name == 'root'
+      - cert_dir_stat.stat.gr_name == 'root'
+    fail_msg: "Certificate directory has incorrect permissions"
+    success_msg: "Certificate directory permissions are correct"
+
+- name: Verify private key directory exists
+  ansible.builtin.stat:
+    path: "{{ certificates_key_dir }}"
+  register: key_dir_stat
+  failed_when: not key_dir_stat.stat.exists or not key_dir_stat.stat.isdir
+
+- name: Verify private key directory permissions
+  ansible.builtin.assert:
+    that:
+      - key_dir_stat.stat.mode == '0700'
+      - key_dir_stat.stat.pw_name == 'root'
+      - key_dir_stat.stat.gr_name == 'root'
+    fail_msg: "Private key directory has incorrect permissions"
+    success_msg: "Private key directory permissions are correct"
+
+- name: Display installation test results
+  ansible.builtin.debug:
+    msg:
+      - "✓ python3-cryptography is installed"
+      - "✓ Certificate directory exists with correct permissions ({{ certificates_cert_dir }})"
+      - "✓ Private key directory exists with correct permissions ({{ certificates_key_dir }})"
