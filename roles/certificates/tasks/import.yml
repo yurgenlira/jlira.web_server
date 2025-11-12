@@ -4,9 +4,9 @@
   ansible.builtin.copy:
     src: "{{ item.cert_src }}"
     dest: "{{ certificates_cert_dir }}/{{ item.name }}.crt"
-    mode: "{{ certificates_cert_mode }}"
-    owner: "{{ certificates_owner }}"
-    group: "{{ certificates_group }}"
+    mode: "0644"
+    owner: root
+    group: root
   loop: "{{ certificates_list }}"
   loop_control:
     label: "{{ item.name }}"
@@ -15,9 +15,9 @@
   ansible.builtin.copy:
     src: "{{ item.key_src }}"
     dest: "{{ certificates_key_dir }}/{{ item.name }}.key"
-    mode: "{{ certificates_key_mode }}"
-    owner: "{{ certificates_owner }}"
-    group: "{{ certificates_group }}"
+    mode: "0600"
+    owner: root
+    group: root
   loop: "{{ certificates_list }}"
   loop_control:
     label: "{{ item.name }}"
@@ -26,9 +26,9 @@
   ansible.builtin.copy:
     src: "{{ item.chain_src }}"
     dest: "{{ certificates_cert_dir }}/{{ item.name }}-chain.crt"
-    mode: "{{ certificates_cert_mode }}"
-    owner: "{{ certificates_owner }}"
-    group: "{{ certificates_group }}"
+    mode: "0644"
+    owner: root
+    group: root
   loop: "{{ certificates_list }}"
   loop_control:
     label: "{{ item.name }}"

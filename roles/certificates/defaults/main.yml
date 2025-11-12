@@ -8,43 +8,72 @@
 # Options:
 #   - 'selfsigned': Generate self-signed certificates
 #   - 'import': Import existing certificates from source files
-#   - 'letsencrypt': Obtain certificates from Let's Encrypt
+#   - 'letsencrypt': Obtain certificates from Let's Encrypt using certbot
 # Type: String
 certificates_mode: selfsigned
 
-# Output directory for certificates
+# Output directory for certificates (selfsigned and import modes only)
+# For letsencrypt mode, certificates are stored in /etc/letsencrypt/live/
 # Type: String
 certificates_cert_dir: /etc/ssl/certs
 
-# Output directory for private keys
+# Output directory for private keys (selfsigned and import modes only)
+# For letsencrypt mode, keys are stored in /etc/letsencrypt/live/
 # Type: String
 certificates_key_dir: /etc/ssl/private
 
 # List of certificates to manage
-# Each certificate is defined as a dictionary with the following keys:
-#
-# Common fields (all modes):
-#   - name: Unique identifier for the certificate (required)
-#
-# Fields for 'selfsigned' mode:
-#   - common_name: Common Name (CN) for the certificate (required)
-#   - organization: Organization Name (O) (optional)
-#   - organizational_unit: Organizational Unit (OU) (optional)
-#   - country: Country Code (C) - 2 letter code (optional)
-#   - state: State or Province (ST) (optional)
-#   - locality: Locality or City (L) (optional)
-#   - email: Email Address (optional)
-#   - days: Certificate validity in days (default: 365)
-#   - key_size: RSA key size in bits (default: 4096)
-#   - san: Subject Alternative Names list (optional)
-#          Format: ['DNS:example.com', 'DNS:www.example.com', 'IP:192.168.1.1']
-#
-# Fields for 'import' mode:
-#   - cert_src: Source path to certificate file on control machine (required)
-#   - key_src: Source path to private key file on control machine (required)
-#   - chain_src: Source path to certificate chain file (optional)
-#
-# Example for selfsigned mode:
+# Structure varies by mode (see examples below)
+# Type: List of Dictionaries
+certificates_list: []
+
+# ============================================================================
+# Let's Encrypt / Certbot Configuration
+# ============================================================================
+
+# Email address for Let's Encrypt account registration and notifications
+# Used for all certificates unless overridden per-certificate
+# Type: String
+# Required when certificates_mode: letsencrypt
+certificates_certbot_email: ""
+
+# Certbot execution mode
+# Options:
+#   - 'production': Use production ACME directory, obtain real certificates
+#   - 'staging': Use staging ACME directory for testing (avoid rate limits)
+#   - 'dry-run': Validate configuration only, no actual certificates obtained
+# Type: String
+certificates_certbot_mode: production
+
+# DNS provider for DNS-01 challenges
+# Applies to all DNS-01 certificates unless using custom hooks
+# Options:
+#   - 'cloudflare': Cloudflare DNS (requires python3-certbot-dns-cloudflare)
+#   - 'route53': AWS Route53 (requires python3-certbot-dns-route53)
+#   - 'digitalocean': DigitalOcean DNS (requires python3-certbot-dns-digitalocean)
+#   - 'google': Google Cloud DNS (requires python3-certbot-dns-google)
+#   - 'custom': Use manual hooks (auth_hook and cleanup_hook per certificate)
+# Type: String
+certificates_certbot_dns_provider: ""
+
+# DNS provider credentials
+# Environment variables passed to certbot for DNS-01 challenges
+# Can be overridden per-certificate with dns_credentials field
+# Type: Dictionary
+# Example for Cloudflare:
+#   certificates_dns_credentials:
+#     CLOUDFLARE_API_TOKEN: "your-token-here"
+# Example for Route53:
+#   certificates_dns_credentials:
+#     AWS_ACCESS_KEY_ID: "your-key"
+#     AWS_SECRET_ACCESS_KEY: "your-secret"
+certificates_dns_credentials: {}
+
+# ============================================================================
+# Certificate List Examples
+# ============================================================================
+
+# Example 1: Self-signed certificates
 # certificates_list:
 #   - name: example.com
 #     common_name: example.com
@@ -60,145 +89,118 @@ certificates_key_dir: /etc/ssl/private
 #       - DNS:www.example.com
 #       - DNS:api.example.com
 #       - IP:192.168.1.1
-#
-# Example for import mode:
+
+# Example 2: Import existing certificates
 # certificates_list:
 #   - name: example.com
 #     cert_src: files/example.com.crt
 #     key_src: files/example.com.key
 #     chain_src: files/example.com-chain.crt
-#
-# Type: List of Dictionaries
-certificates_list: []
 
-# Default certificate validity in days (for selfsigned mode)
-# Type: Integer
-certificates_default_days: 365
-
-# Default RSA key size in bits (for selfsigned mode)
-# Type: Integer
-certificates_default_key_size: 4096
-
-# Certificate file permissions
-# Type: String (octal)
-certificates_cert_mode: "0644"
-
-# Private key file permissions
-# Type: String (octal)
-certificates_key_mode: "0600"
-
-# Owner for certificate files
-# Type: String
-certificates_owner: root
-
-# Group for certificate files
-# Type: String
-certificates_group: root
-
-# ============================================================================
-# Let's Encrypt Configuration
-# ============================================================================
-
-# Let's Encrypt ACME directory URL
-# Options:
-#   - 'https://acme-v02.api.letsencrypt.org/directory' (production)
-#   - 'https://acme-staging-v02.api.letsencrypt.org/directory' (staging/testing)
-# Type: String
-certificates_acme_directory: https://acme-v02.api.letsencrypt.org/directory
-
-# Email address for Let's Encrypt account registration and notifications
-# Type: String
-certificates_acme_email: ""
-
-# ACME challenge type
-# Options:
-#   - 'http-01': HTTP challenge (requires port 80 accessible)
-#   - 'dns-01': DNS challenge (requires DNS provider API access)
-# Type: String
-certificates_acme_challenge_type: http-01
-
-# Web server document root for HTTP-01 challenge
-# The .well-known/acme-challenge directory will be created here
-# Type: String
-certificates_acme_webroot: /var/www/html
-
-# Agreement to Let's Encrypt Terms of Service
-# Must be set to true to use Let's Encrypt
-# Type: Boolean
-certificates_acme_agree_tos: false
-
-# Directory for ACME account keys
-# Type: String
-certificates_acme_account_key_dir: /etc/letsencrypt/accounts
-
-# Enable automatic certificate renewal
-# Type: Boolean
-certificates_acme_auto_renew: true
-
-# Days before expiry to attempt renewal
-# Type: Integer
-certificates_acme_renew_days_before_expiry: 30
-
-# DNS provider for DNS-01 challenge (if using dns-01)
-# Examples: 'cloudflare', 'route53', 'digitalocean', 'gcp'
-# Type: String
-certificates_acme_dns_provider: ""
-
-# DNS provider credentials (varies by provider)
-# Type: Dictionary
-certificates_acme_dns_credentials: {}
-
-# Additional fields for 'letsencrypt' mode in certificates_list:
-#   - domains: List of domain names for the certificate (required)
-#              The first domain will be the certificate name
-#   - challenge_type: Override global challenge type for this cert (optional)
-#   - webroot: Override global webroot for HTTP-01 challenge (optional)
-#
-# Example for letsencrypt mode:
+# Example 3: Let's Encrypt with HTTP-01 challenge (webroot)
+# certificates_mode: letsencrypt
+# certificates_certbot_email: "admin@example.com"
+# certificates_certbot_mode: production
 # certificates_list:
 #   - name: example.com
 #     domains:
 #       - example.com
 #       - www.example.com
 #     challenge_type: http-01
-#     webroot: /var/www/example.com
+#     plugin: webroot
+#     webroot: /var/www/html
+
+# Example 4: Let's Encrypt with HTTP-01 challenge (Apache plugin)
+# certificates_list:
+#   - name: apache.example.com
+#     domains:
+#       - apache.example.com
+#     challenge_type: http-01
+#     plugin: apache
+
+# Example 5: Let's Encrypt with DNS-01 challenge (Cloudflare)
+# certificates_certbot_dns_provider: cloudflare
+# certificates_dns_credentials:
+#   CLOUDFLARE_API_TOKEN: "your-token-here"
+# certificates_list:
+#   - name: wildcard.example.com
+#     domains:
+#       - example.com
+#       - "*.example.com"
+#     challenge_type: dns-01
+#     deploy_hook: "/usr/local/bin/reload-nginx.sh"
+
+# Example 6: Let's Encrypt with DNS-01 challenge (custom hooks)
+# certificates_certbot_dns_provider: custom
+# certificates_list:
+#   - name: custom.example.com
+#     domains:
+#       - custom.example.com
+#     challenge_type: dns-01
+#     auth_hook: "/data/certbot/authenticator.sh"
+#     cleanup_hook: "/data/certbot/cleanup.sh"
+
+# Example 7: Mixed HTTP-01 and DNS-01 certificates
+# certificates_certbot_email: "admin@example.com"
+# certificates_certbot_mode: production
+# certificates_certbot_dns_provider: cloudflare
+# certificates_dns_credentials:
+#   CLOUDFLARE_API_TOKEN: "your-token"
+# certificates_list:
+#   - name: webroot.example.com
+#     domains:
+#       - webroot.example.com
+#     challenge_type: http-01
+#     plugin: webroot
+#     webroot: /var/www/html
+#
+#   - name: apache.example.com
+#     domains:
+#       - apache.example.com
+#     challenge_type: http-01
+#     plugin: apache
+#
+#   - name: wildcard.example.com
+#     domains:
+#       - "*.example.com"
+#     challenge_type: dns-01
 
 # ============================================================================
-# Certificate Expiration Monitoring
+# Per-Certificate Fields
 # ============================================================================
 
-# Enable certificate expiration monitoring
-# Type: Boolean
-certificates_monitor_expiration: false
+# Fields for 'selfsigned' mode:
+#   - name: Unique identifier (required)
+#   - common_name: Common Name (CN) (required)
+#   - organization: Organization Name (O) (optional)
+#   - organizational_unit: Organizational Unit (OU) (optional)
+#   - country: Country Code (C) - 2 letters (optional)
+#   - state: State or Province (ST) (optional)
+#   - locality: Locality or City (L) (optional)
+#   - email: Email Address (optional)
+#   - days: Validity in days (optional, default: 365)
+#   - key_size: RSA key size in bits (optional, default: 4096)
+#   - san: Subject Alternative Names (optional)
 
-# Warning threshold in days before expiry
-# Type: Integer
-certificates_expiration_warning_days: 30
+# Fields for 'import' mode:
+#   - name: Unique identifier (required)
+#   - cert_src: Source certificate file path on control machine (required)
+#   - key_src: Source private key file path on control machine (required)
+#   - chain_src: Source certificate chain file path (optional)
 
-# Critical threshold in days before expiry
-# Type: Integer
-certificates_expiration_critical_days: 7
-
-# Action to take when certificate is expiring
-# Options:
-#   - 'log': Log warning message only
-#   - 'fail': Fail the playbook execution
-#   - 'notify': Send notification (requires notification handler)
-# Type: String
-certificates_expiration_action: log
-
-# ============================================================================
-# Automatic Renewal Configuration
-# ============================================================================
-
-# Path to the playbook used for renewal
-# Type: String
-certificates_renewal_playbook_path: /etc/ansible/playbooks/cert-renewal.yml
-
-# Path to the inventory file for renewal
-# Type: String
-certificates_renewal_inventory_path: /etc/ansible/inventory/hosts
-
-# Service to reload after renewal (e.g., apache2, nginx)
-# Type: String
-certificates_renewal_service_to_reload: apache2
+# Fields for 'letsencrypt' mode:
+#   - name: Unique identifier (required)
+#   - domains: List of domain names (required, first domain is primary)
+#   - challenge_type: Challenge type (required: 'http-01' or 'dns-01')
+#
+#   For HTTP-01 challenges:
+#     - plugin: Certbot plugin (required: 'webroot', 'standalone', 'apache', 'nginx')
+#     - webroot: Document root path (required for webroot plugin)
+#
+#   For DNS-01 challenges:
+#     - dns_credentials: Override global DNS credentials (optional)
+#     - auth_hook: Authentication script for custom provider (required when provider: custom)
+#     - cleanup_hook: Cleanup script for custom provider (required when provider: custom)
+#
+#   Optional for all challenges:
+#     - deploy_hook: Command to run after successful obtain/renew

@@ -3,11 +3,11 @@
 - name: Generate private keys for self-signed certificates
   community.crypto.openssl_privatekey:
     path: "{{ certificates_key_dir }}/{{ item.name }}.key"
-    size: "{{ item.key_size | default(certificates_default_key_size) }}"
+    size: "{{ item.key_size | default(4096) }}"
     type: RSA
-    mode: "{{ certificates_key_mode }}"
-    owner: "{{ certificates_owner }}"
-    group: "{{ certificates_group }}"
+    mode: "0600"
+    owner: root
+    group: root
     state: present
   loop: "{{ certificates_list }}"
   loop_control:
@@ -25,9 +25,9 @@
     organizational_unit_name: "{{ item.organizational_unit | default(omit) }}"
     email_address: "{{ item.email | default(omit) }}"
     subject_alt_name: "{{ item.san | default(omit) }}"
-    mode: "{{ certificates_cert_mode }}"
-    owner: "{{ certificates_owner }}"
-    group: "{{ certificates_group }}"
+    mode: "0644"
+    owner: root
+    group: root
   loop: "{{ certificates_list }}"
   loop_control:
     label: "{{ item.name }}"
@@ -38,10 +38,10 @@
     privatekey_path: "{{ certificates_key_dir }}/{{ item.name }}.key"
     csr_path: "{{ certificates_cert_dir }}/{{ item.name }}.csr"
     provider: selfsigned
-    selfsigned_not_after: "+{{ item.days | default(certificates_default_days) }}d"
-    mode: "{{ certificates_cert_mode }}"
-    owner: "{{ certificates_owner }}"
-    group: "{{ certificates_group }}"
+    selfsigned_not_after: "+{{ item.days | default(365) }}d"
+    mode: "0644"
+    owner: root
+    group: root
     state: present
   loop: "{{ certificates_list }}"
   loop_control:
@@ -63,8 +63,8 @@
       - "  Common Name: {{ item.common_name }}"
       - "  Certificate: {{ certificates_cert_dir }}/{{ item.name }}.crt"
       - "  Private Key: {{ certificates_key_dir }}/{{ item.name }}.key"
-      - "  Validity: {{ item.days | default(certificates_default_days) }} days"
-      - "  Key Size: {{ item.key_size | default(certificates_default_key_size) }} bits"
+      - "  Validity: {{ item.days | default(365) }} days"
+      - "  Key Size: {{ item.key_size | default(4096) }} bits"
       - "{% if item.san is defined %}  SAN: {{ item.san | join(', ') }}{% endif %}"
   loop: "{{ certificates_list }}"
   loop_control:
