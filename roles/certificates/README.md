@@ -11,8 +11,6 @@ A comprehensive Ansible role for managing SSL/TLS certificates on Debian/Ubuntu 
 - [Dependencies](#dependencies)
 - [Example Playbooks](#example-playbooks)
 - [Let's Encrypt Integration](#lets-encrypt-integration)
-- [Certificate Expiration Monitoring](#certificate-expiration-monitoring)
-- [Automatic Renewal](#automatic-renewal)
 - [Tags](#tags)
 - [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
@@ -33,12 +31,12 @@ This role provides a comprehensive, flexible solution for SSL/TLS certificate ma
 
 - **Simple and Generic**: Works with single servers, multiple servers, and load balancer setups
 - **Three Operation Modes**: Generate self-signed certificates, import existing ones, or obtain from Let's Encrypt
-- **Let's Encrypt Integration**:
-  - HTTP-01 challenge support for domain verification
+- **Let's Encrypt Integration with Certbot**:
+  - HTTP-01 challenge support for domain verification (webroot, standalone, Apache, Nginx plugins)
   - DNS-01 challenge support for wildcard certificates
-  - Automatic certificate renewal via systemd timer
+  - Automatic certificate renewal via certbot's built-in systemd timer
   - Support for production and staging ACME directories
-- **Certificate Expiration Monitoring**: Track certificate expiration dates with configurable thresholds
+  - Deploy hooks for service reloads after renewal
 - **Comprehensive Validation**: Validates all inputs before execution
 - **Subject Alternative Names (SAN)**: Full support for multi-domain certificates
 - **Secure Defaults**: Proper file permissions and ownership
@@ -146,11 +144,23 @@ certificates_list:
 ```
 
 **Fields for letsencrypt mode:**
-- `domains`: List of domain names for the certificate (required)
-- `challenge_type`: Override global challenge type for this cert (optional)
-- `webroot`: Override global webroot for HTTP-01 challenge (optional)
+- `domains`: List of domain names for the certificate (required, first domain is primary)
+- `challenge_type`: ACME challenge type (required: `http-01` or `dns-01`)
 
-**Example for letsencrypt mode:**
+**For HTTP-01 challenges:**
+- `plugin`: Certbot plugin (required: `webroot`, `standalone`, `apache`, `nginx`)
+- `webroot`: Document root path (required for webroot plugin, must be absolute path)
+
+**For DNS-01 challenges:**
+- `provider`: DNS provider override (optional, uses global if not set)
+- `dns_credentials`: DNS credentials override (optional, uses global if not set)
+- `auth_hook`: Authentication script for custom provider (required when `certificates_certbot_dns_provider: custom`)
+- `cleanup_hook`: Cleanup script for custom provider (required when `certificates_certbot_dns_provider: custom`)
+
+**Optional for all challenges:**
+- `deploy_hook`: Command to run after successful obtain/renew
+
+**Example for letsencrypt mode (HTTP-01 with webroot):**
 ```yaml
 certificates_list:
   - name: example.com
@@ -158,100 +168,99 @@ certificates_list:
       - example.com
       - www.example.com
     challenge_type: http-01
-    webroot: /var/www/example.com
+    plugin: webroot
+    webroot: /var/www/html
+    deploy_hook: "systemctl reload apache2"
+```
+
+**Example for letsencrypt mode (HTTP-01 with Apache plugin):**
+```yaml
+certificates_list:
+  - name: example.com
+    domains:
+      - example.com
+      - www.example.com
+    challenge_type: http-01
+    plugin: apache
+```
+
+**Example for letsencrypt mode (DNS-01 wildcard):**
+```yaml
+certificates_list:
+  - name: wildcard.example.com
+    domains:
+      - example.com
+      - "*.example.com"
+    challenge_type: dns-01
 ```
 
 ### Let's Encrypt Configuration
 
-#### `certificates_acme_directory`
-- **Type**: String
-- **Default**: `https://acme-v02.api.letsencrypt.org/directory`
-- **Description**: Let's Encrypt ACME directory URL (use staging for testing)
-
-#### `certificates_acme_email`
+#### `certificates_certbot_email`
 - **Type**: String
 - **Default**: `""`
 - **Required**: Yes (for letsencrypt mode)
-- **Description**: Email address for ACME account registration
+- **Description**: Email address for ACME account registration and notifications
 
-#### `certificates_acme_agree_tos`
-- **Type**: Boolean
-- **Default**: `false`
-- **Required**: Yes (must be true for letsencrypt mode)
-- **Description**: Agreement to Let's Encrypt Terms of Service
+```yaml
+certificates_certbot_email: "admin@example.com"
+```
 
-#### `certificates_acme_challenge_type`
+#### `certificates_certbot_mode`
 - **Type**: String
-- **Default**: `http-01`
-- **Options**: `http-01`, `dns-01`
-- **Description**: ACME challenge type for domain verification
+- **Default**: `production`
+- **Options**: `production`, `staging`, `dry-run`
+- **Description**: Certbot execution mode
+  - `production`: Use production ACME directory, obtain real certificates
+  - `staging`: Use staging ACME directory for testing (avoids rate limits)
+  - `dry-run`: Validate configuration only, no actual certificates obtained
 
-#### `certificates_acme_webroot`
+```yaml
+# For production use
+certificates_certbot_mode: production
+
+# For testing without rate limits
+certificates_certbot_mode: staging
+
+# For validation only
+certificates_certbot_mode: dry-run
+```
+
+#### `certificates_certbot_dns_provider`
 - **Type**: String
-- **Default**: `/var/www/html`
-- **Description**: Web server document root for HTTP-01 challenge
+- **Default**: `""`
+- **Options**: `cloudflare`, `route53`, `digitalocean`, `google`, `custom`
+- **Description**: DNS provider for DNS-01 challenges (applies globally unless overridden per-certificate)
+- **Note**: Required DNS provider plugins are automatically installed based on certificate configurations
 
-#### `certificates_acme_auto_renew`
-- **Type**: Boolean
-- **Default**: `true`
-- **Description**: Enable automatic certificate renewal via systemd timer
+```yaml
+certificates_certbot_dns_provider: cloudflare
+```
 
-#### `certificates_acme_renew_days_before_expiry`
-- **Type**: Integer
-- **Default**: `30`
-- **Description**: Days before expiry to attempt renewal
+#### `certificates_certbot_dns_credentials`
+- **Type**: Dictionary
+- **Default**: `{}`
+- **Description**: Environment variables for DNS provider authentication (can be overridden per-certificate)
 
-### Certificate Expiration Monitoring
+```yaml
+# For Cloudflare
+certificates_certbot_dns_credentials:
+  CLOUDFLARE_API_TOKEN: "your-token-here"
 
-#### `certificates_monitor_expiration`
-- **Type**: Boolean
-- **Default**: `false`
-- **Description**: Enable certificate expiration monitoring
-
-#### `certificates_expiration_warning_days`
-- **Type**: Integer
-- **Default**: `30`
-- **Description**: Warning threshold in days before expiry
-
-#### `certificates_expiration_critical_days`
-- **Type**: Integer
-- **Default**: `7`
-- **Description**: Critical threshold in days before expiry
-
-#### `certificates_expiration_action`
-- **Type**: String
-- **Default**: `log`
-- **Options**: `log`, `fail`, `notify`
-- **Description**: Action to take when certificate is expiring
-
-### Default Values
-
-#### `certificates_default_days`
-- **Type**: Integer
-- **Default**: `365`
-- **Description**: Default certificate validity in days (for selfsigned mode)
-
-#### `certificates_default_key_size`
-- **Type**: Integer
-- **Default**: `4096`
-- **Description**: Default RSA key size in bits (for selfsigned mode)
+# For AWS Route53
+certificates_certbot_dns_credentials:
+  AWS_ACCESS_KEY_ID: "your-key-id"
+  AWS_SECRET_ACCESS_KEY: "your-secret-key"
+```
 
 ### File Permissions
 
-#### `certificates_cert_mode`
-- **Type**: String (octal)
-- **Default**: `"0644"`
-- **Description**: Certificate file permissions
+Certificate and private key files are managed with secure defaults:
+- Certificates: `0644` (root:root)
+- Private keys: `0600` (root:root)
+- Directories: `0755` for certificates, `0700` for private keys
 
-#### `certificates_key_mode`
-- **Type**: String (octal)
-- **Default**: `"0600"`
-- **Description**: Private key file permissions
-
-#### `certificates_owner` / `certificates_group`
-- **Type**: String
-- **Default**: `root`
-- **Description**: Owner and group for certificate files
+For Let's Encrypt certificates, certbot manages its own permissions in `/etc/letsencrypt/`.
 
 ## Dependencies
 
@@ -430,11 +439,85 @@ In this scenario, certificates are managed only on the load balancer, and web se
 
 ## Let's Encrypt Integration
 
-### HTTP-01 Challenge Example
+This role uses **certbot** (the official Let's Encrypt client) for obtaining and managing Let's Encrypt certificates. Certbot provides:
+
+- Automatic certificate obtainment with various challenge methods
+- Built-in automatic renewal via systemd timer
+- Deploy hooks for service reloads
+- Support for multiple plugins (webroot, standalone, apache, nginx, DNS providers)
+
+### Certbot Configuration Variables
+
+#### `certificates_certbot_plugin`
+- **Type**: String
+- **Default**: `webroot`
+- **Options**: `webroot`, `standalone`, `apache`, `nginx`
+- **Description**: Certbot plugin to use for HTTP-01 challenges
+- **Note**: When set to `apache` or `nginx`, the corresponding plugin package (`python3-certbot-apache` or `python3-certbot-nginx`) is automatically installed
+
+#### `certificates_certbot_plugins`
+- **Type**: List
+- **Default**: `[]`
+- **Description**: Additional certbot plugins to install (e.g., DNS provider plugins)
+- **Note**: Only needed for DNS providers or other additional plugins. Apache and Nginx plugins are installed automatically based on `certificates_certbot_plugin`.
+
+```yaml
+# Apache/Nginx plugins are installed automatically, no need to specify
+certificates_certbot_plugin: apache  # Automatically installs python3-certbot-apache
+
+# Only specify additional plugins like DNS providers
+certificates_certbot_plugins:
+  - python3-certbot-dns-cloudflare
+  - python3-certbot-dns-route53
+```
+
+#### `certificates_certbot_copy_certs`
+- **Type**: Boolean
+- **Default**: `true`
+- **Description**: Copy certificates from /etc/letsencrypt/live/ to custom locations for backward compatibility
+
+#### `certificates_certbot_deploy_hook`
+- **Type**: String
+- **Default**: `""`
+- **Description**: Command to run after successful renewal (e.g., service reload)
+
+```yaml
+# Reload Apache after renewal
+certificates_certbot_deploy_hook: "systemctl reload apache2"
+
+# Reload multiple services
+certificates_certbot_deploy_hook: "systemctl reload apache2 && systemctl reload nginx"
+```
+
+#### `certificates_acme_webroot_owner`
+- **Type**: String
+- **Default**: `www-data`
+- **Description**: Owner of the webroot directory for HTTP-01 challenge (varies by web server)
+
+#### `certificates_acme_webroot_group`
+- **Type**: String
+- **Default**: `www-data`
+- **Description**: Group of the webroot directory for HTTP-01 challenge (varies by web server)
+
+```yaml
+# For Nginx on Debian/Ubuntu
+certificates_acme_webroot_owner: www-data
+certificates_acme_webroot_group: www-data
+
+# For Nginx on RHEL/CentOS
+certificates_acme_webroot_owner: nginx
+certificates_acme_webroot_group: nginx
+
+# For Apache on RHEL/CentOS
+certificates_acme_webroot_owner: apache
+certificates_acme_webroot_group: apache
+```
+
+### HTTP-01 Challenge Example (Webroot Plugin)
 
 ```yaml
 ---
-- name: Setup Let's Encrypt with HTTP-01 challenge
+- name: Setup Let's Encrypt with HTTP-01 challenge (webroot)
   hosts: web_servers
   become: true
   roles:
@@ -444,8 +527,9 @@ In this scenario, certificates are managed only on the load balancer, and web se
         certificates_acme_email: "admin@example.com"
         certificates_acme_agree_tos: true
         certificates_acme_challenge_type: http-01
+        certificates_certbot_plugin: webroot
         certificates_acme_webroot: /var/www/html
-        certificates_acme_auto_renew: true
+        certificates_certbot_deploy_hook: "systemctl reload apache2"
         certificates_list:
           - name: example.com
             domains:
@@ -464,7 +548,62 @@ In this scenario, certificates are managed only on the load balancer, and web se
               certificate_key_file: /etc/ssl/private/example.com.key
 ```
 
+### HTTP-01 Challenge Example (Nginx with Webroot)
+
+For Nginx servers, configure the webroot owner to match your web server:
+
+```yaml
+---
+- name: Setup Let's Encrypt with Nginx (webroot)
+  hosts: web_servers
+  become: true
+  roles:
+    - role: jlira.web_server.certificates
+      vars:
+        certificates_mode: letsencrypt
+        certificates_acme_email: "admin@example.com"
+        certificates_acme_agree_tos: true
+        certificates_acme_challenge_type: http-01
+        certificates_certbot_plugin: webroot
+        certificates_acme_webroot: /var/www/html
+        certificates_acme_webroot_owner: www-data  # Nginx user on Debian/Ubuntu
+        certificates_acme_webroot_group: www-data
+        certificates_certbot_deploy_hook: "systemctl reload nginx"
+        certificates_list:
+          - name: example.com
+            domains:
+              - example.com
+              - www.example.com
+```
+
+### HTTP-01 Challenge Example (Apache Plugin)
+
+The Apache plugin automatically configures Apache virtual hosts:
+
+```yaml
+---
+- name: Setup Let's Encrypt with Apache plugin
+  hosts: web_servers
+  become: true
+  roles:
+    - role: jlira.web_server.certificates
+      vars:
+        certificates_mode: letsencrypt
+        certificates_acme_email: "admin@example.com"
+        certificates_acme_agree_tos: true
+        certificates_acme_challenge_type: http-01
+        certificates_certbot_plugin: apache  # Plugin automatically installed
+        certificates_certbot_deploy_hook: "systemctl reload apache2"
+        certificates_list:
+          - name: example.com
+            domains:
+              - example.com
+              - www.example.com
+```
+
 ### DNS-01 Challenge Example (Wildcard Certificates)
+
+For wildcard certificates, use DNS-01 challenge with a DNS provider plugin:
 
 ```yaml
 ---
@@ -479,7 +618,11 @@ In this scenario, certificates are managed only on the load balancer, and web se
         certificates_acme_agree_tos: true
         certificates_acme_challenge_type: dns-01
         certificates_acme_dns_provider: "cloudflare"
-        certificates_acme_auto_renew: true
+        certificates_certbot_plugins:
+          - python3-certbot-dns-cloudflare
+        certificates_acme_dns_credentials:
+          CLOUDFLARE_API_TOKEN: "your-api-token-here"
+        certificates_certbot_deploy_hook: "systemctl reload apache2"
         certificates_list:
           - name: example.com
             domains:
@@ -509,58 +652,6 @@ For testing, use the staging environment to avoid rate limits:
               - test.example.com
 ```
 
-## Certificate Expiration Monitoring
-
-Monitor certificate expiration and take action when certificates are about to expire:
-
-```yaml
----
-- name: Setup certificate expiration monitoring
-  hosts: web_servers
-  become: true
-  roles:
-    - role: jlira.web_server.certificates
-      vars:
-        certificates_mode: selfsigned
-        certificates_monitor_expiration: true
-        certificates_expiration_warning_days: 30
-        certificates_expiration_critical_days: 7
-        certificates_expiration_action: fail  # Fail playbook if certificate is critical
-        certificates_list:
-          - name: example.com
-            common_name: example.com
-            days: 90
-```
-
-## Automatic Renewal
-
-When using Let's Encrypt with `certificates_acme_auto_renew: true`, a systemd timer is automatically configured to check for and renew certificates twice daily.
-
-### Check Renewal Timer Status
-
-```bash
-sudo systemctl status cert-renew.timer
-sudo systemctl list-timers cert-renew.timer
-```
-
-### Manually Trigger Renewal
-
-```bash
-sudo systemctl start cert-renew.service
-```
-
-### View Renewal Logs
-
-```bash
-sudo journalctl -u cert-renew.service
-```
-
-### Disable Automatic Renewal
-
-```yaml
-certificates_acme_auto_renew: false
-```
-
 ## Tags
 
 The role supports the following tags for selective execution:
@@ -570,8 +661,6 @@ The role supports the following tags for selective execution:
 - `certificates_selfsigned`: Self-signed certificate generation
 - `certificates_import`: Certificate import tasks
 - `certificates_letsencrypt`: Let's Encrypt certificate obtainment
-- `certificates_renewal`: Automatic renewal setup
-- `certificates_monitor`: Certificate expiration monitoring
 - `certificates`: All certificate management tasks (excludes validation)
 - `always`: Validation tasks (always run)
 
@@ -583,12 +672,6 @@ ansible-playbook playbook.yml --tags certificates_selfsigned
 
 # Only Let's Encrypt tasks
 ansible-playbook playbook.yml --tags certificates_letsencrypt
-
-# Setup renewal only
-ansible-playbook playbook.yml --tags certificates_renewal
-
-# Monitor expiration only
-ansible-playbook playbook.yml --tags certificates_monitor
 
 # Run everything except validation
 ansible-playbook playbook.yml --skip-tags always

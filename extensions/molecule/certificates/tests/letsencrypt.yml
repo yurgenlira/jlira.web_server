@@ -1,214 +1,589 @@
 ---
 # =============================================================================
-# Let's Encrypt Mode Tests
+# Let's Encrypt Mode Tests (Certbot)
 # =============================================================================
-# Note: These tests validate the Let's Encrypt configuration and setup
-# but do not actually connect to Let's Encrypt servers
+# Note: These tests validate the Let's Encrypt/certbot configuration and setup
 
-- name: Test Let's Encrypt ACME account directory
-  when: certificates_mode == 'letsencrypt'
-  block:
-    - name: Check if ACME account directory exists
-      ansible.builtin.stat:
-        path: "{{ certificates_acme_account_key_dir | default('/etc/letsencrypt/accounts') }}"
-      register: acme_account_dir
+# =============================================================================
+# Test Certbot Installation
+# =============================================================================
 
-    - name: Verify ACME account directory exists
-      ansible.builtin.assert:
-        that:
-          - acme_account_dir.stat.exists
-          - acme_account_dir.stat.isdir
-          - acme_account_dir.stat.mode == "0700"
-          - acme_account_dir.stat.pw_name == "root"
-        fail_msg: "ACME account directory does not exist or has incorrect permissions"
-        success_msg: "ACME account directory exists with correct permissions"
+- name: Check if certbot is installed
+  ansible.builtin.command: which certbot
+  register: certbot_installed
+  changed_when: false
+  failed_when: false
 
-    - name: Check if ACME account key exists
-      ansible.builtin.stat:
-        path: "{{ certificates_acme_account_key_dir | default('/etc/letsencrypt/accounts') }}/account.key"
-      register: acme_account_key
+- name: Verify certbot is installed
+  ansible.builtin.assert:
+    that:
+      - certbot_installed.rc == 0
+    fail_msg: "Certbot is not installed"
+    success_msg: "Certbot is installed"
 
-    - name: Verify ACME account key exists
-      ansible.builtin.assert:
-        that:
-          - acme_account_key.stat.exists
-          - acme_account_key.stat.isreg
-          - acme_account_key.stat.mode == "0600"
-          - acme_account_key.stat.pw_name == "root"
-        fail_msg: "ACME account key does not exist or has incorrect permissions"
-        success_msg: "ACME account key exists with correct permissions"
+- name: Check certbot version
+  ansible.builtin.command: certbot --version
+  register: certbot_version
+  changed_when: false
 
-    - name: Validate ACME account key is valid RSA key
-      ansible.builtin.command:
-        cmd: openssl rsa -in {{ certificates_acme_account_key_dir | default('/etc/letsencrypt/accounts') }}/account.key -check -noout
-      register: acme_key_check
-      changed_when: false
-      failed_when: false
+- name: Display certbot version
+  ansible.builtin.debug:
+    msg: "{{ certbot_version.stdout }}"
 
-    - name: Verify ACME account key is valid
-      ansible.builtin.assert:
-        that:
-          - acme_key_check.rc == 0
-          - "'RSA key ok' in acme_key_check.stdout or acme_key_check.rc == 0"
-        fail_msg: "ACME account key is not a valid RSA key"
-        success_msg: "ACME account key is valid"
+# =============================================================================
+# Test Certbot Plugins Installation
+# =============================================================================
 
-- name: Test Let's Encrypt webroot setup for HTTP-01
-  when:
-    - certificates_mode == 'letsencrypt'
-    - certificates_acme_challenge_type == 'http-01'
-  block:
-    - name: Check if webroot .well-known directory exists
-      ansible.builtin.stat:
-        path: "{{ certificates_acme_webroot | default('/var/www/html') }}/.well-known"
-      register: wellknown_dir
+- name: Build list of HTTP-01 plugins from certificates
+  ansible.builtin.set_fact:
+    test_http_plugins: >-
+      {{
+        certificates_list
+        | selectattr('challenge_type', 'defined')
+        | selectattr('challenge_type', 'equalto', 'http-01')
+        | selectattr('plugin', 'defined')
+        | map(attribute='plugin')
+        | list
+        | unique
+      }}
 
-    - name: Verify .well-known directory exists
-      ansible.builtin.assert:
-        that:
-          - wellknown_dir.stat.exists
-          - wellknown_dir.stat.isdir
-        fail_msg: ".well-known directory does not exist"
-        success_msg: ".well-known directory exists"
+- name: Build list of DNS-01 providers from certificates
+  ansible.builtin.set_fact:
+    test_dns_providers: >-
+      {{
+        (
+          certificates_list
+          | selectattr('challenge_type', 'defined')
+          | selectattr('challenge_type', 'equalto', 'dns-01')
+          | map(attribute='provider', default='')
+          | reject('equalto', '')
+          | reject('equalto', 'custom')
+          | list
+        ) + ([certificates_certbot_dns_provider] if (certificates_certbot_dns_provider | default('')) not in ['', 'custom'] else [])
+        | unique
+      }}
 
-    - name: Check if acme-challenge directory exists
-      ansible.builtin.stat:
-        path: "{{ certificates_acme_webroot | default('/var/www/html') }}/.well-known/acme-challenge"
-      register: acme_challenge_dir
+- name: Map HTTP-01 plugins to package names
+  ansible.builtin.set_fact:
+    test_http_packages: >-
+      {{
+        test_http_plugins
+        | map('regex_replace', '^(.*)$', 'python3-certbot-\1')
+        | select('in', ['python3-certbot-apache', 'python3-certbot-nginx'])
+        | list
+      }}
 
-    - name: Verify acme-challenge directory exists with correct permissions
-      ansible.builtin.assert:
-        that:
-          - acme_challenge_dir.stat.exists
-          - acme_challenge_dir.stat.isdir
-          - acme_challenge_dir.stat.mode == "0755"
-        fail_msg: "acme-challenge directory does not exist or has incorrect permissions"
-        success_msg: "acme-challenge directory configured correctly"
+- name: Map DNS-01 providers to package names
+  ansible.builtin.set_fact:
+    test_dns_packages: >-
+      {{
+        test_dns_providers
+        | map('regex_replace', '^(.*)$', 'python3-certbot-dns-\1')
+        | list
+      }}
 
-- name: Test Let's Encrypt certificate files were created
-  when: certificates_mode == 'letsencrypt'
-  block:
-    - name: Check for certificate files
-      ansible.builtin.stat:
-        path: "{{ item }}"
-      register: le_cert_files
-      loop:
-        - "{{ certificates_cert_dir }}/{{ certificates_list[0].name }}.crt"
-        - "{{ certificates_key_dir }}/{{ certificates_list[0].name }}.key"
-        - "{{ certificates_cert_dir }}/{{ certificates_list[0].name }}-fullchain.crt"
-        - "{{ certificates_cert_dir }}/{{ certificates_list[0].name }}-chain.crt"
-      when: certificates_list | length > 0
-      failed_when: false
+- name: Combine all expected certbot plugin packages
+  ansible.builtin.set_fact:
+    test_certbot_packages: >-
+      {{
+        ((test_http_packages | default([])) + (test_dns_packages | default([])))
+        | unique
+      }}
 
-    - name: Display certificate file status
-      ansible.builtin.debug:
-        msg:
-          - "Certificate file status:"
-          - "{{ item.item }}: {{ 'EXISTS' if item.stat.exists else 'NOT FOUND' }}"
-      loop: "{{ le_cert_files.results }}"
-      loop_control:
-        label: "{{ item.item }}"
-      when:
-        - le_cert_files is defined
-        - le_cert_files.results is defined
+- name: Check if certbot plugins are installed
+  ansible.builtin.command: "dpkg -l {{ item }}"
+  register: plugin_installed
+  loop: "{{ test_certbot_packages }}"
+  changed_when: false
+  failed_when: false
+  when: test_certbot_packages | length > 0
 
-- name: Test Let's Encrypt configuration validation
-  when: certificates_mode == 'letsencrypt'
-  block:
-    - name: Verify ACME email is configured
-      ansible.builtin.assert:
-        that:
-          - certificates_acme_email is defined
-          - certificates_acme_email | length > 0
-          - "'@' in certificates_acme_email"
-        fail_msg: "ACME email is not properly configured"
-        success_msg: "ACME email is properly configured"
+- name: Verify all expected plugins are installed
+  ansible.builtin.assert:
+    that:
+      - item.rc == 0
+    fail_msg: "Plugin {{ item.item }} is not installed"
+    success_msg: "Plugin {{ item.item }} is installed"
+  loop: "{{ plugin_installed.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: test_certbot_packages | length > 0
 
-    - name: Verify Terms of Service agreement
-      ansible.builtin.assert:
-        that:
-          - certificates_acme_agree_tos is defined
-          - certificates_acme_agree_tos | bool
-        fail_msg: "Let's Encrypt Terms of Service must be agreed to"
-        success_msg: "Terms of Service agreement confirmed"
+- name: Display plugin installation status
+  ansible.builtin.debug:
+    msg: "Plugin {{ item.item }}: INSTALLED"
+  loop: "{{ plugin_installed.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: test_certbot_packages | length > 0
 
-    - name: Verify challenge type is valid
-      ansible.builtin.assert:
-        that:
-          - certificates_acme_challenge_type is defined
-          - certificates_acme_challenge_type in ['http-01', 'dns-01']
-        fail_msg: "Invalid ACME challenge type: {{ certificates_acme_challenge_type | default('undefined') }}"
-        success_msg: "Valid ACME challenge type: {{ certificates_acme_challenge_type }}"
+# =============================================================================
+# Test Webroot Directories for HTTP-01 Challenges
+# =============================================================================
 
-    - name: Verify ACME directory is configured
-      ansible.builtin.assert:
-        that:
-          - certificates_acme_directory is defined
-          - certificates_acme_directory | length > 0
-          - "'acme' in certificates_acme_directory"
-        fail_msg: "ACME directory is not properly configured"
-        success_msg: "ACME directory is properly configured: {{ certificates_acme_directory }}"
+- name: Get list of webroot certificates
+  ansible.builtin.set_fact:
+    test_webroot_certs: >-
+      {{
+        certificates_list
+        | selectattr('challenge_type', 'defined')
+        | selectattr('challenge_type', 'equalto', 'http-01')
+        | selectattr('plugin', 'defined')
+        | selectattr('plugin', 'equalto', 'webroot')
+        | list
+      }}
 
-- name: Test Let's Encrypt domains configuration
-  when:
-    - certificates_mode == 'letsencrypt'
-    - certificates_list | length > 0
-  block:
-    - name: Verify domains are configured for all certificates
-      ansible.builtin.assert:
-        that:
-          - item.domains is defined
-          - item.domains | length > 0
-        fail_msg: "Certificate {{ item.name }} missing domains list"
-        success_msg: "Certificate {{ item.name }} has domains configured"
-      loop: "{{ certificates_list }}"
-      loop_control:
-        label: "{{ item.name }}"
+- name: Check if webroot directories exist
+  ansible.builtin.stat:
+    path: "{{ item.webroot }}"
+  register: webroot_dirs
+  loop: "{{ test_webroot_certs }}"
+  loop_control:
+    label: "{{ item.name }} - {{ item.webroot }}"
+  when: test_webroot_certs | length > 0
 
-    - name: Display configured domains
-      ansible.builtin.debug:
-        msg:
-          - "Certificate: {{ item.name }}"
-          - "Domains: {{ item.domains | join(', ') }}"
-      loop: "{{ certificates_list }}"
-      loop_control:
-        label: "{{ item.name }}"
+- name: Verify webroot directories exist
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isdir
+    fail_msg: "Webroot directory {{ item.item.webroot }} does not exist for certificate {{ item.item.name }}"
+    success_msg: "Webroot directory {{ item.item.webroot }} exists for certificate {{ item.item.name }}"
+  loop: "{{ webroot_dirs.results }}"
+  loop_control:
+    label: "{{ item.item.name }} - {{ item.item.webroot }}"
+  when: test_webroot_certs | length > 0
 
-- name: Test Let's Encrypt DNS-01 configuration
-  when:
-    - certificates_mode == 'letsencrypt'
-    - certificates_acme_challenge_type == 'dns-01'
-  block:
-    - name: Verify DNS provider is configured for DNS-01
-      ansible.builtin.assert:
-        that:
-          - certificates_acme_dns_provider is defined
-          - certificates_acme_dns_provider | length > 0
-        fail_msg: "DNS provider must be configured for DNS-01 challenge"
-        success_msg: "DNS provider configured: {{ certificates_acme_dns_provider }}"
+# =============================================================================
+# Test Certbot Configuration Directories
+# =============================================================================
 
-    - name: Display DNS-01 configuration
-      ansible.builtin.debug:
-        msg:
-          - "==================================================================="
-          - "DNS-01 Challenge Configuration"
-          - "==================================================================="
-          - "DNS Provider: {{ certificates_acme_dns_provider }}"
-          - "Note: Credentials must be configured separately"
-          - "==================================================================="
+- name: Check if letsencrypt directory exists
+  ansible.builtin.stat:
+    path: /etc/letsencrypt
+  register: letsencrypt_dir
 
-- name: Display Let's Encrypt tests summary
-  when: certificates_mode == 'letsencrypt'
+- name: Verify letsencrypt directory exists
+  ansible.builtin.assert:
+    that:
+      - letsencrypt_dir.stat.exists
+      - letsencrypt_dir.stat.isdir
+    fail_msg: "Let's Encrypt directory does not exist"
+    success_msg: "Let's Encrypt directory exists"
+
+- name: Check for certbot configuration directories
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: certbot_dirs
+  loop:
+    - /etc/letsencrypt/accounts
+    - /etc/letsencrypt/live
+    - /etc/letsencrypt/renewal
+  failed_when: false
+
+- name: Display certbot directory status
+  ansible.builtin.debug:
+    msg: "{{ item.item }}: {{ 'EXISTS' if item.stat.exists else 'NOT FOUND (will be created on first certificate)' }}"
+  loop: "{{ certbot_dirs.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+# =============================================================================
+# Test Let's Encrypt Configuration Variables
+# =============================================================================
+
+- name: Verify certbot email is configured
+  ansible.builtin.assert:
+    that:
+      - certificates_certbot_email is defined
+      - certificates_certbot_email | length > 0
+      - "'@' in certificates_certbot_email"
+    fail_msg: "Certbot email is not properly configured"
+    success_msg: "Certbot email is properly configured: {{ certificates_certbot_email }}"
+
+- name: Verify certbot mode is valid
+  ansible.builtin.assert:
+    that:
+      - certificates_certbot_mode is defined
+      - certificates_certbot_mode in ['production', 'staging', 'dry-run']
+    fail_msg: "Invalid certbot mode: {{ certificates_certbot_mode | default('undefined') }}"
+    success_msg: "Valid certbot mode: {{ certificates_certbot_mode }}"
+
+- name: Verify ACME server is configured
+  ansible.builtin.assert:
+    that:
+      - certificates_acme_server is defined
+      - certificates_acme_server | length > 0
+    fail_msg: "ACME server is not configured"
+    success_msg: "ACME server configured: {{ certificates_acme_server }}"
+
+# =============================================================================
+# Test Certificate List Configuration
+# =============================================================================
+
+- name: Verify all certificates have required fields
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.domains is defined
+      - item.domains | length > 0
+      - item.challenge_type is defined
+      - item.challenge_type in ['http-01', 'dns-01']
+    fail_msg: "Certificate {{ item.name | default('UNNAMED') }} is missing required fields"
+    success_msg: "Certificate {{ item.name }} has all required fields"
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name | default('UNNAMED') }}"
+  when: certificates_list | length > 0
+
+- name: Get list of HTTP-01 certificates
+  ansible.builtin.set_fact:
+    test_http01_certs: >-
+      {{
+        certificates_list
+        | selectattr('challenge_type', 'equalto', 'http-01')
+        | list
+      }}
+
+- name: Verify HTTP-01 certificates have plugin configured
+  ansible.builtin.assert:
+    that:
+      - item.plugin is defined
+      - item.plugin in ['webroot', 'standalone', 'apache', 'nginx']
+    fail_msg: "Certificate {{ item.name }} with HTTP-01 challenge must have valid plugin"
+    success_msg: "Certificate {{ item.name }} has valid plugin: {{ item.plugin }}"
+  loop: "{{ test_http01_certs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: test_http01_certs | length > 0
+
+- name: Get list of HTTP-01 webroot certificates
+  ansible.builtin.set_fact:
+    test_webroot_plugin_certs: >-
+      {{
+        certificates_list
+        | selectattr('challenge_type', 'equalto', 'http-01')
+        | selectattr('plugin', 'equalto', 'webroot')
+        | list
+      }}
+
+- name: Verify HTTP-01 webroot certificates have webroot path
+  ansible.builtin.assert:
+    that:
+      - item.webroot is defined
+      - item.webroot | length > 0
+    fail_msg: "Certificate {{ item.name }} with webroot plugin must have webroot path"
+    success_msg: "Certificate {{ item.name }} has webroot path: {{ item.webroot }}"
+  loop: "{{ test_webroot_plugin_certs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: test_webroot_plugin_certs | length > 0
+
+- name: Get list of DNS-01 custom provider certificates
+  ansible.builtin.set_fact:
+    test_dns_custom_certs: >-
+      {{
+        certificates_list
+        | selectattr('challenge_type', 'equalto', 'dns-01')
+        | selectattr('provider', 'defined')
+        | selectattr('provider', 'equalto', 'custom')
+        | list
+      }}
+
+- name: Verify DNS-01 custom provider certificates have hooks
+  ansible.builtin.assert:
+    that:
+      - item.auth_hook is defined
+      - item.cleanup_hook is defined
+    fail_msg: "Certificate {{ item.name }} with custom DNS provider must have auth_hook and cleanup_hook"
+    success_msg: "Certificate {{ item.name }} has custom DNS hooks configured"
+  loop: "{{ test_dns_custom_certs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: test_dns_custom_certs | length > 0
+
+- name: Display configured certificates
   ansible.builtin.debug:
     msg:
-      - "==================================================================="
-      - "Let's Encrypt Configuration Tests Completed"
-      - "==================================================================="
-      - "ACME Directory: {{ certificates_acme_directory }}"
-      - "Challenge Type: {{ certificates_acme_challenge_type }}"
-      - "Email: {{ certificates_acme_email }}"
-      - "Auto-renewal: {{ certificates_acme_auto_renew | default(true) }}"
+      - "Certificate: {{ item.name }}"
+      - "  Domains: {{ item.domains | join(', ') }}"
+      - "  Challenge: {{ item.challenge_type }}"
+      - >-
+        "  Plugin/Provider: {{ item.plugin if item.challenge_type == 'http-01' else
+        (item.provider | default(certificates_certbot_dns_provider | default('N/A'))) }}"
+      - "  Webroot: {{ item.webroot | default('N/A') }}"
+      - "  Deploy Hook: {{ item.deploy_hook | default('None') }}"
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: certificates_list | length > 0
+
+# =============================================================================
+# Test DNS-01 Configuration
+# =============================================================================
+
+- name: Get list of DNS-01 certificates
+  ansible.builtin.set_fact:
+    test_dns01_certs: >-
+      {{
+        certificates_list
+        | selectattr('challenge_type', 'equalto', 'dns-01')
+        | list
+      }}
+
+- name: Verify DNS provider is configured for each DNS-01 certificate
+  ansible.builtin.assert:
+    that: >-
+      (item.provider is defined and item.provider | length > 0) or
+      (certificates_certbot_dns_provider is defined and certificates_certbot_dns_provider | length > 0)
+    fail_msg: >-
+      "Certificate {{ item.name }} with DNS-01 challenge needs provider or global certificates_certbot_dns_provider"
+    success_msg: "Certificate {{ item.name }} has DNS provider configured"
+  loop: "{{ test_dns01_certs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: test_dns01_certs | length > 0
+
+- name: Display DNS-01 configuration
+  ansible.builtin.debug:
+    msg:
+      - "========================================================================="
+      - "DNS-01 Challenge Configuration"
+      - "========================================================================="
+      - "Global DNS Provider: {{ certificates_certbot_dns_provider | default('None') }}"
+      - "DNS-01 Certificates: {{ test_dns01_certs | length }}"
+      - "========================================================================="
+  when: test_dns01_certs | length > 0
+
+# =============================================================================
+# Test Deploy Hooks
+# =============================================================================
+
+- name: Get list of certificates with deploy hooks
+  ansible.builtin.set_fact:
+    test_deploy_hook_certs: >-
+      {{
+        certificates_list
+        | selectattr('deploy_hook', 'defined')
+        | list
+      }}
+
+- name: Check if deploy hook scripts exist
+  ansible.builtin.stat:
+    path: "{{ item.deploy_hook }}"
+  register: deploy_hooks
+  loop: "{{ test_deploy_hook_certs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  failed_when: false
+  when: test_deploy_hook_certs | length > 0
+
+- name: Display deploy hook status
+  ansible.builtin.debug:
+    msg:
+      - "Certificate: {{ item.item.name }}"
+      - "  Deploy Hook: {{ item.item.deploy_hook }}"
+      - "  Status: {{ 'EXISTS' if item.stat.exists else 'NOT FOUND' }}"
+      - "  Executable: {{ 'YES' if item.stat.executable | default(false) else 'NO' }}"
+  loop: "{{ deploy_hooks.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: test_deploy_hook_certs | length > 0
+
+# =============================================================================
+# Test Certificate Files Existence
+# =============================================================================
+
+- name: Check if certificate live directories exist
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ item.domains[0] }}"
+  register: cert_live_dirs
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  failed_when: false
+  when:
+    - certificates_list | length > 0
+    - certificates_certbot_mode != 'dry-run'
+
+- name: Check if certificate files exist
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ item[0].domains[0] }}/{{ cert_file }}"
+  register: cert_files
+  loop: "{{ certificates_list | product(['cert.pem', 'chain.pem', 'fullchain.pem', 'privkey.pem']) | list }}"
+  loop_control:
+    label: "{{ item[0].name }} - {{ item[1] }}"
+  vars:
+    cert_file: "{{ item[1] }}"
+  failed_when: false
+  when:
+    - certificates_list | length > 0
+    - certificates_certbot_mode != 'dry-run'
+
+- name: Verify certificate live directories exist (non-dry-run mode)
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isdir
+    fail_msg: >-
+      "Certificate directory /etc/letsencrypt/live/{{ item.item.domains[0] }} does not exist for {{ item.item.name }}"
+    success_msg: "Certificate directory exists for {{ item.item.name }}"
+  loop: "{{ cert_live_dirs.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - certificates_list | length > 0
+    - certificates_certbot_mode != 'dry-run'
+    - cert_live_dirs.results is defined
+
+- name: Display certificate file status
+  ansible.builtin.debug:
+    msg: "{{ item.item[0].name }} - {{ item.item[1] }}: {{ 'EXISTS' if item.stat.exists else 'NOT FOUND' }}"
+  loop: "{{ cert_files.results }}"
+  loop_control:
+    label: "{{ item.item[0].name }} - {{ item.item[1] }}"
+  when:
+    - certificates_list | length > 0
+    - certificates_certbot_mode != 'dry-run'
+    - cert_files.results is defined
+
+- name: Verify required certificate files exist (non-dry-run mode)
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+    fail_msg: "Certificate file /etc/letsencrypt/live/{{ item.item[0].domains[0] }}/{{ item.item[1] }} does not exist"
+    success_msg: "Certificate file {{ item.item[1] }} exists for {{ item.item[0].name }}"
+  loop: "{{ cert_files.results }}"
+  loop_control:
+    label: "{{ item.item[0].name }} - {{ item.item[1] }}"
+  when:
+    - certificates_list | length > 0
+    - certificates_certbot_mode != 'dry-run'
+    - cert_files.results is defined
+
+- name: Check certificate file permissions
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ item.domains[0] }}/privkey.pem"
+  register: privkey_perms
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  failed_when: false
+  when:
+    - certificates_list | length > 0
+    - certificates_certbot_mode != 'dry-run'
+
+- name: Verify private key has secure permissions
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.mode == '0600' or item.stat.mode == '0640'
+    fail_msg: >
+      "Private key for {{ item.item.name }} has incorrect permissions: {{ item.stat.mode
+      | default('NOT FOUND') }}"
+    success_msg: "Private key for {{ item.item.name }} has secure permissions: {{ item.stat.mode }}"
+  loop: "{{ privkey_perms.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - certificates_list | length > 0
+    - certificates_certbot_mode != 'dry-run'
+    - privkey_perms.results is defined
+    - item.stat.exists
+
+- name: Get certificate information
+  community.crypto.x509_certificate_info:
+    path: "/etc/letsencrypt/live/{{ item.domains[0] }}/cert.pem"
+  register: cert_info
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  failed_when: false
+  when:
+    - certificates_list | length > 0
+    - certificates_certbot_mode != 'dry-run'
+
+- name: Display certificate information
+  ansible.builtin.debug:
+    msg:
+      - "Certificate: {{ item.item.name }}"
+      - "  Subject: {{ item.subject | default('N/A') }}"
+      - "  Issuer: {{ item.issuer | default('N/A') }}"
+      - "  Valid From: {{ item.not_before | default('N/A') }}"
+      - "  Valid Until: {{ item.not_after | default('N/A') }}"
+      - "  Serial Number: {{ item.serial_number | default('N/A') }}"
+      - "  Signature Algorithm: {{ item.signature_algorithm | default('N/A') }}"
+  loop: "{{ cert_info.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - certificates_list | length > 0
+    - certificates_certbot_mode != 'dry-run'
+    - cert_info.results is defined
+    - item.failed is defined
+    - not item.failed
+
+- name: Verify certificate domains match configuration
+  ansible.builtin.assert:
+    that:
+      - item.item.domains[0] in (item.subject_alt_name | default([]) | map('regex_replace', '^DNS:', '') | list)
+    fail_msg: "Certificate {{ item.item.name }} does not contain expected domain {{ item.item.domains[0] }}"
+    success_msg: "Certificate {{ item.item.name }} contains expected domain"
+  loop: "{{ cert_info.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - certificates_list | length > 0
+    - certificates_certbot_mode != 'dry-run'
+    - cert_info.results is defined
+    - item.failed is defined
+    - not item.failed
+    - item.subject_alt_name is defined
+
+# =============================================================================
+# Display Summary
+# =============================================================================
+
+- name: Count HTTP-01 and DNS-01 certificates
+  ansible.builtin.set_fact:
+    test_http01_count: "{{ test_http01_certs | default([]) | length }}"
+    test_dns01_count: "{{ test_dns01_certs | default([]) | length }}"
+
+- name: Count successfully created certificates
+  ansible.builtin.set_fact:
+    test_created_count: >-
+      {{
+        cert_live_dirs.results | default([])
+        | selectattr('stat.exists', 'defined')
+        | selectattr('stat.exists', 'equalto', true)
+        | list
+        | length
+      }}
+  when:
+    - certificates_list | length > 0
+    - certificates_certbot_mode != 'dry-run'
+    - cert_live_dirs.results is defined
+
+- name: Display Let's Encrypt tests summary
+  ansible.builtin.debug:
+    msg:
+      - "========================================================================="
+      - "Let's Encrypt Configuration Tests Completed (Certbot)"
+      - "========================================================================="
+      - "Mode: {{ certificates_mode }}"
+      - "Certbot Mode: {{ certificates_certbot_mode }}"
+      - "ACME Server: {{ certificates_acme_server }}"
+      - "Email: {{ certificates_certbot_email }}"
+      - "SSL Verification: {{ certificates_acme_verify_ssl }}"
       - "Certificates configured: {{ certificates_list | length }}"
-      - "==================================================================="
+      - "  - HTTP-01 certificates: {{ test_http01_count }}"
+      - "  - DNS-01 certificates: {{ test_dns01_count }}"
+      - >-
+        "{% if certificates_certbot_mode != 'dry-run' %}  - Certificates created: {{ test_created_count | default(0) }}
+        {% endif %}"
+      - "Certbot plugins installed: {{ test_certbot_packages | length }}"
+      - "Auto-renewal: Handled by certbot.timer (systemd)"
+      - "========================================================================="
       - "All Let's Encrypt configuration tests passed"
-      - "==================================================================="
+      - "========================================================================="

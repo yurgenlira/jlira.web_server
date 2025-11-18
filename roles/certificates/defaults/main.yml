@@ -61,13 +61,19 @@ certificates_certbot_dns_provider: ""
 # Can be overridden per-certificate with dns_credentials field
 # Type: Dictionary
 # Example for Cloudflare:
-#   certificates_dns_credentials:
+#   certificates_certbot_dns_credentials:
 #     CLOUDFLARE_API_TOKEN: "your-token-here"
 # Example for Route53:
-#   certificates_dns_credentials:
+#   certificates_certbot_dns_credentials:
 #     AWS_ACCESS_KEY_ID: "your-key"
 #     AWS_SECRET_ACCESS_KEY: "your-secret"
-certificates_dns_credentials: {}
+certificates_certbot_dns_credentials: {}
+
+# ACME server SSL certificate verification
+# Set to false when using test ACME servers with self-signed certificates (e.g., Pebble)
+# WARNING: Only disable for testing purposes. Always use true in production.
+# Type: Boolean
+certificates_acme_verify_ssl: true
 
 # ============================================================================
 # Certificate List Examples
@@ -120,7 +126,7 @@ certificates_dns_credentials: {}
 
 # Example 5: Let's Encrypt with DNS-01 challenge (Cloudflare)
 # certificates_certbot_dns_provider: cloudflare
-# certificates_dns_credentials:
+# certificates_certbot_dns_credentials:
 #   CLOUDFLARE_API_TOKEN: "your-token-here"
 # certificates_list:
 #   - name: wildcard.example.com
@@ -144,7 +150,7 @@ certificates_dns_credentials: {}
 # certificates_certbot_email: "admin@example.com"
 # certificates_certbot_mode: production
 # certificates_certbot_dns_provider: cloudflare
-# certificates_dns_credentials:
+# certificates_certbot_dns_credentials:
 #   CLOUDFLARE_API_TOKEN: "your-token"
 # certificates_list:
 #   - name: webroot.example.com

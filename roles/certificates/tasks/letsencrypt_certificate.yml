@@ -1,0 +1,181 @@
+# SPDX-License-Identifier: MIT-0
+---
+# =============================================================================
+# Per-Certificate Let's Encrypt Processing
+# This file is included from letsencrypt.yml with loop_var: certificates_item
+# =============================================================================
+
+# =============================================================================
+# HTTP-01 Challenge Processing
+# =============================================================================
+
+- name: Process HTTP-01 certificate ({{ certificates_item.name }})
+  when: certificates_item.challenge_type == 'http-01'
+  block:
+    - name: Build certbot command for HTTP-01 {{ certificates_item.name }}
+      ansible.builtin.set_fact:
+        certificates_certbot_cmd: >-
+          certbot certonly
+          --{{ certificates_item.plugin }}
+          {% if certificates_item.plugin == 'webroot' %}
+          -w {{ certificates_item.webroot }}
+          {% endif %}
+          {% for domain in certificates_item.domains %}
+          -d {{ domain }}
+          {% endfor %}
+          --email {{ certificates_certbot_email }}
+          --agree-tos
+          --non-interactive
+          --server {{ certificates_acme_server }}
+          {% if not certificates_acme_verify_ssl %}
+          --no-verify-ssl
+          {% endif %}
+          {% if certificates_item.deploy_hook is defined %}
+          --deploy-hook "{{ certificates_item.deploy_hook }}"
+          {% endif %}
+          {% if certificates_certbot_mode == 'dry-run' %}
+          --dry-run
+          {% else %}
+          --keep-until-expiring
+          {% endif %}
+
+    - name: Obtain certificate with HTTP-01 challenge {{ certificates_item.name }}
+      ansible.builtin.command:
+        cmd: "{{ certificates_certbot_cmd }}"
+        creates: >-
+          {{ certificates_certbot_mode != 'dry-run' | ternary('/etc/letsencrypt/live/'
+          + certificates_item.domains[0] + '/fullchain.pem', omit) }}
+      register: certificates_http_result
+
+    - name: Display HTTP-01 certificate result ({{ certificates_item.name }})
+      ansible.builtin.debug:
+        msg:
+          - "Certificate: {{ certificates_item.name }}"
+          - "  Challenge: HTTP-01"
+          - "  Plugin: {{ certificates_item.plugin }}"
+          - "  Domains: {{ certificates_item.domains | join(', ') }}"
+          - "  Certificate path: /etc/letsencrypt/live/{{ certificates_item.domains[0] }}/"
+          - >-
+            "  Status: {{ 'Validated (dry-run)' if certificates_certbot_mode == 'dry-run' else
+            ('Created' if certificates_http_result.changed else 'Already exists') }}"
+
+# =============================================================================
+# DNS-01 Challenge Processing
+# =============================================================================
+
+- name: Process DNS-01 certificate {{ certificates_item.name }}
+  when: certificates_item.challenge_type == 'dns-01'
+  block:
+    # Determine DNS provider for this certificate (may override global setting)
+    - name: Determine DNS provider for {{ certificates_item.name }}
+      ansible.builtin.set_fact:
+        certificates_item_certbot_dns_provider: >-
+          {{ certificates_item.provider | default(certificates_certbot_dns_provider) }}
+        certificates_item_certbot_dns_credentials: >-
+          {{ certificates_item.dns_credentials | default(certificates_certbot_dns_credentials) }}
+
+    # Standard DNS provider (cloudflare, route53, digitalocean, google, etc.)
+    - name: Obtain certificate with DNS-01 using standard provider {{ certificates_item.name }}
+      when: certificates_item_certbot_dns_provider != 'custom'
+      block:
+
+        - name: Build certbot command for DNS-01 standard provider {{ certificates_item.name }}
+          ansible.builtin.set_fact:
+            certificates_certbot_cmd: >-
+              certbot certonly
+              --dns-{{ certificates_item_certbot_dns_provider }}
+              {% for domain in certificates_item.domains %}
+              -d {{ domain }}
+              {% endfor %}
+              --email {{ certificates_certbot_email }}
+              --agree-tos
+              --non-interactive
+              --server {{ certificates_acme_server }}
+              {% if not certificates_acme_verify_ssl %}
+              --no-verify-ssl
+              {% endif %}
+              {% if certificates_item.deploy_hook is defined %}
+              --deploy-hook "{{ certificates_item.deploy_hook }}"
+              {% endif %}
+              {% if certificates_certbot_mode == 'dry-run' %}
+              --dry-run
+              {% else %}
+              --keep-until-expiring
+              {% endif %}
+
+        - name: Obtain certificate with DNS-01 standard provider {{ certificates_item.name }}
+          ansible.builtin.command:
+            cmd: "{{ certificates_certbot_cmd }}"
+            creates: >-
+              {{ certificates_certbot_mode != 'dry-run' | ternary('/etc/letsencrypt/live/'
+              + certificates_item.domains[0] + '/fullchain.pem', omit) }}
+          environment: "{{ certificates_item_certbot_dns_credentials }}"
+          register: certificates_dns_result
+
+        - name: Display DNS-01 certificate result ({{ certificates_item.name }})
+          ansible.builtin.debug:
+            msg:
+              - "Certificate: {{ certificates_item.name }}"
+              - "  Challenge: DNS-01"
+              - "  Provider: {{ certificates_item_certbot_dns_provider }}"
+              - "  Domains: {{ certificates_item.domains | join(', ') }}"
+              - "  Certificate path: /etc/letsencrypt/live/{{ certificates_item.domains[0] }}/"
+              - >-
+                "  Status: {{
+                  'Validated (dry-run)' if certificates_certbot_mode == 'dry-run' else
+                  ('Created' if certificates_dns_result.changed else 'Already exists')
+                }}"
+
+    # Custom DNS provider (manual hooks)
+    - name: Obtain certificate with DNS-01 using custom hooks {{ certificates_item.name }}
+      when: certificates_item_certbot_dns_provider == 'custom'
+      block:
+        - name: Build certbot command for DNS-01 custom hooks {{ certificates_item.name }}
+          ansible.builtin.set_fact:
+            certificates_certbot_cmd: >-
+              certbot certonly
+              --manual
+              --preferred-challenges dns
+              --manual-auth-hook "{{ certificates_item.auth_hook }}"
+              --manual-cleanup-hook "{{ certificates_item.cleanup_hook }}"
+              {% for domain in certificates_item.domains %}
+              -d {{ domain }}
+              {% endfor %}
+              --email {{ certificates_certbot_email }}
+              --agree-tos
+              --non-interactive
+              --server {{ certificates_acme_server }}
+              {% if not certificates_acme_verify_ssl %}
+              --no-verify-ssl
+              {% endif %}
+              {% if certificates_item.deploy_hook is defined %}
+              --deploy-hook "{{ certificates_item.deploy_hook }}"
+              {% endif %}
+              {% if certificates_certbot_mode == 'dry-run' %}
+              --dry-run
+              {% else %}
+              --keep-until-expiring
+              {% endif %}
+
+        - name: Obtain certificate with DNS-01 custom hooks {{ certificates_item.name }}
+          ansible.builtin.command:
+            cmd: "{{ certificates_certbot_cmd }}"
+            creates: >-
+              {{ certificates_certbot_mode != 'dry-run' | ternary('/etc/letsencrypt/live/'
+              + certificates_item.domains[0] + '/fullchain.pem', omit) }}
+          register: certificates_dns_custom_result
+
+        - name: Display DNS-01 custom certificate result {{ certificates_item.name }}
+          ansible.builtin.debug:
+            msg:
+              - "Certificate: {{ certificates_item.name }}"
+              - "  Challenge: DNS-01 (custom hooks)"
+              - "  Auth hook: {{ certificates_item.auth_hook }}"
+              - "  Cleanup hook: {{ certificates_item.cleanup_hook }}"
+              - "  Domains: {{ certificates_item.domains | join(', ') }}"
+              - "  Certificate path: /etc/letsencrypt/live/{{ certificates_item.domains[0] }}/"
+              - >-
+                Status: {{
+                  'Validated (dry-run)' if certificates_certbot_mode == 'dry-run' else
+                  ('Created' if certificates_dns_custom_result.changed else 'Already exists')
+                }}

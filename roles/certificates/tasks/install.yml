@@ -4,21 +4,118 @@
   ansible.builtin.apt:
     name: python3-cryptography
     state: present
-    update_cache: false
-  when: ansible_os_family == 'Debian'
+    update_cache: true
+  when:
+    - ansible_os_family == 'Debian'
+    - certificates_mode in ['selfsigned', 'import']
+
+- name: Install certbot (for Let's Encrypt)
+  ansible.builtin.apt:
+    name:
+      - certbot
+      - python3-certbot
+    state: present
+    update_cache: true
+  when:
+    - ansible_os_family == 'Debian'
+    - certificates_mode == 'letsencrypt'
+
+- name: Build list of HTTP-01 plugins from all certificates
+  ansible.builtin.set_fact:
+    certificates_http_plugins: >-
+      {{
+        certificates_list
+        | selectattr('challenge_type', 'defined')
+        | selectattr('challenge_type', 'equalto', 'http-01')
+        | selectattr('plugin', 'defined')
+        | map(attribute='plugin')
+        | list
+        | unique
+      }}
+  when:
+    - ansible_os_family == 'Debian'
+    - certificates_mode == 'letsencrypt'
+
+- name: Build list of DNS-01 providers from all certificates
+  ansible.builtin.set_fact:
+    certificates_dns_providers: >-
+      {{
+        (
+          certificates_list
+          | selectattr('challenge_type', 'defined')
+          | selectattr('challenge_type', 'equalto', 'dns-01')
+          | map(attribute='provider', default='')
+          | reject('equalto', '')
+          | reject('equalto', 'custom')
+          | list
+        ) + ([certificates_certbot_dns_provider] if certificates_certbot_dns_provider not in ['', 'custom'] else [])
+        | unique
+      }}
+  when:
+    - ansible_os_family == 'Debian'
+    - certificates_mode == 'letsencrypt'
+
+- name: Map HTTP plugins to package names
+  ansible.builtin.set_fact:
+    certificates_http_packages: >-
+      {{
+        certificates_http_plugins
+        | map('regex_replace', '^(.*)$', 'python3-certbot-\1')
+        | select('in', ['python3-certbot-apache', 'python3-certbot-nginx'])
+        | list
+      }}
+  when:
+    - ansible_os_family == 'Debian'
+    - certificates_mode == 'letsencrypt'
+    - certificates_http_plugins is defined
+
+- name: Map DNS providers to package names
+  ansible.builtin.set_fact:
+    certificates_dns_packages: >-
+      {{
+        certificates_dns_providers
+        | map('regex_replace', '^(.*)$', 'python3-certbot-dns-\1')
+        | list
+      }}
+  when:
+    - ansible_os_family == 'Debian'
+    - certificates_mode == 'letsencrypt'
+    - certificates_dns_providers is defined
+
+- name: Combine all certbot plugins to install
+  ansible.builtin.set_fact:
+    certificates_certbot_plugins_to_install: >-
+      {{
+        ((certificates_http_packages | default([])) + (certificates_dns_packages | default([])))
+        | unique
+      }}
+  when:
+    - ansible_os_family == 'Debian'
+    - certificates_mode == 'letsencrypt'
+
+- name: Install certbot plugins (auto + manual)
+  ansible.builtin.apt:
+    name: "{{ certificates_certbot_plugins_to_install }}"
+    state: present
+  when:
+    - ansible_os_family == 'Debian'
+    - certificates_mode == 'letsencrypt'
+    - certificates_certbot_plugins_to_install | length > 0
 
 - name: Ensure certificate output directory exists
   ansible.builtin.file:
     path: "{{ certificates_cert_dir }}"
     state: directory
     mode: "0755"
-    owner: "{{ certificates_owner }}"
-    group: "{{ certificates_group }}"
+    owner: root
+    group: root
+  when: certificates_mode in ['selfsigned', 'import']
 
 - name: Ensure private key output directory exists
   ansible.builtin.file:
     path: "{{ certificates_key_dir }}"
     state: directory
     mode: "0700"
-    owner: "{{ certificates_owner }}"
-    group: "{{ certificates_group }}"
+    owner: root
+    group: root
+  when: certificates_mode in ['selfsigned', 'import']

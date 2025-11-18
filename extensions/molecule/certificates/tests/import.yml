@@ -4,7 +4,6 @@
 # =============================================================================
 
 - name: Test certificate import mode
-  when: certificates_mode == 'import'
   block:
     - name: Check if imported certificate files exist
       ansible.builtin.stat:
@@ -64,26 +63,38 @@
       ansible.builtin.assert:
         that:
           - imported_cert_info.subject.commonName is defined
-          - imported_cert_info.valid_at.current_time | default(false)
+          - imported_cert_info.not_before is defined
+          - imported_cert_info.not_after is defined
+          - >-
+            (imported_cert_info.not_after | to_datetime('%Y%m%d%H%M%SZ')) >
+            (ansible_date_time.iso8601 | to_datetime('%Y-%m-%dT%H:%M:%SZ'))
         fail_msg: "Imported certificate is not valid"
         success_msg: "Imported certificate is valid"
 
     - name: Check if chain file was imported (if provided)
       ansible.builtin.stat:
-        path: /etc/ssl/certs/test-import-chain.crt
+        path: "{{ certificates_cert_dir }}/{{ item.name }}-chain.crt"
       register: imported_chain_file
-      when: import_chain_provided | default(false)
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.chain_src is defined
 
-    - name: Verify chain file exists if provided
+    - name: Verify chain file exists and has correct permissions
       ansible.builtin.assert:
         that:
-          - imported_chain_file.stat.exists
-          - imported_chain_file.stat.mode == "0644"
-        fail_msg: "Chain file was not imported correctly"
-        success_msg: "Chain file imported successfully"
+          - item.stat.exists
+          - item.stat.mode == "0644"
+          - item.stat.pw_name == "root"
+          - item.stat.gr_name == "root"
+        fail_msg: "Chain file {{ item.item.name }}-chain.crt was not imported correctly"
+        success_msg: "Chain file {{ item.item.name }}-chain.crt imported successfully"
+      loop: "{{ imported_chain_file.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
       when:
-        - import_chain_provided | default(false)
-        - imported_chain_file is defined
+        - imported_chain_file.results is defined
+        - item.skipped is not defined
 
     - name: Display import summary
       ansible.builtin.debug:
@@ -99,14 +110,12 @@
           - "==================================================================="
 
 - name: Test import mode validation errors
-  when: certificates_mode == 'import'
   block:
     - name: Verify source file validation was performed
       ansible.builtin.debug:
         msg: "Import mode validation tests passed - source files were checked"
 
 - name: Display import tests summary
-  when: certificates_mode == 'import'
   ansible.builtin.debug:
     msg:
       - "==================================================================="

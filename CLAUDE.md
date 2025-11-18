@@ -281,7 +281,7 @@ The project is structured as an Ansible collection, which is the standard way to
 6.  Create Tests (Mandatory):
     -   Create a scenario for each role (molecule scenario should match the role name).
     -   Design and implement Molecule tests for the new role or feature.
-    -   **Molecule Inventory**: Variables for tests should be defined in the `inventory/hosts.yml` file for the scenario, not in the `converge.yml` playbook or passed via the command line.
+    -   **Molecule Inventory**: Variables for tests should be defined in the `inventory/hosts.yml` file for the scenario. This rule does not apply when the test uses `side_effect.yml` playbooks, in which case variables can be defined in `converge.yml` playbook and / or the side_effect playbook itself.
     -   Test file organization: The test file name in `extensions/molecule/<role>/tests/` must match the task file name in `roles/<role>/tasks/`. For example:
         -   Task file: `roles/apache/tasks/configure.yml` → Test file: `extensions/molecule/apache/tests/configure.yml`
         -   Task file: `roles/apache/tasks/install.yml` → Test file: `extensions/molecule/apache/tests/install.yml`

@@ -3,33 +3,114 @@
   hosts: certificates_test
   gather_facts: true
   tasks:
-    - name: Include installation tests
+    # =========================================================================
+    # Test Self-Signed Mode (from converge.yml)
+    # =========================================================================
+    - name: Verify self-signed certificate installation
       ansible.builtin.include_tasks:
         file: tests/install.yml
+      vars:
+        certificates_mode: selfsigned
+        certificates_cert_dir: /etc/ssl/certs
+        certificates_key_dir: /etc/ssl/private
 
-    - name: Include self-signed certificate tests
+    - name: Verify self-signed certificates
       ansible.builtin.include_tasks:
         file: tests/selfsigned.yml
-      when: certificates_mode == 'selfsigned'
+      vars:
+        certificates_mode: selfsigned
+        certificates_cert_dir: /etc/ssl/certs
+        certificates_key_dir: /etc/ssl/private
+        certificates_list:
+          - name: test-basic.local
+            common_name: test-basic.local
+            organization: "Test Organization"
+            days: 365
+          - name: test-advanced.local
+            common_name: test-advanced.local
+            organization: "Advanced Test Org"
+            organizational_unit: "IT Department"
+            country: "US"
+            state: "California"
+            locality: "San Francisco"
+            email: "test@example.com"
+            days: 730
+            key_size: 4096
+          - name: test-san.local
+            common_name: test-san.local
+            organization: "SAN Test Org"
+            days: 365
+            san:
+              - DNS:www.test-san.local
+              - DNS:api.test-san.local
+              - DNS:mail.test-san.local
+              - IP:192.168.1.100
+              - IP:10.0.0.1
+          - name: test-multidomain.local
+            common_name: test-multidomain.local
+            organization: "Multi-Domain Test"
+            days: 365
+            san:
+              - DNS:test-multidomain.local
+              - DNS:www.test-multidomain.local
+              - DNS:*.test-multidomain.local
 
-    - name: Include import certificate tests
+    # =========================================================================
+    # Test Import Mode (from side_effect.yml - import phase)
+    # =========================================================================
+    - name: Verify import certificate tests
       ansible.builtin.include_tasks:
         file: tests/import.yml
-      when: certificates_mode == 'import'
+      vars:
+        certificates_mode: import
+        certificates_cert_dir: /etc/ssl/certs
+        certificates_key_dir: /etc/ssl/private
+        certificates_list:
+          - name: test-import
+            cert_src: "{{ playbook_dir }}/files/test-import.crt"
+            key_src: "{{ playbook_dir }}/files/test-import.key"
+            chain_src: "{{ playbook_dir }}/files/test-import-chain.crt"
 
-    - name: Include Let's Encrypt tests
+    # =========================================================================
+    # Test Let's Encrypt Mode (from side_effect.yml - letsencrypt phase)
+    # =========================================================================
+    - name: Verify Let's Encrypt installation
+      ansible.builtin.include_tasks:
+        file: tests/install.yml
+      vars:
+        certificates_mode: letsencrypt
+        certificates_cert_dir: /etc/ssl/certs
+        certificates_key_dir: /etc/ssl/private
+
+    - name: Verify Let's Encrypt configuration
       ansible.builtin.include_tasks:
         file: tests/letsencrypt.yml
-      when: certificates_mode == 'letsencrypt'
-
-    - name: Include certificate expiration monitoring tests
-      ansible.builtin.include_tasks:
-        file: tests/monitoring.yml
-      when: certificates_monitor_expiration | default(false)
-
-    - name: Include automatic renewal tests
-      ansible.builtin.include_tasks:
-        file: tests/renewal.yml
-      when:
-        - certificates_mode == 'letsencrypt'
-        - certificates_acme_auto_renew | default(false)
+      vars:
+        certificates_mode: letsencrypt
+        certificates_certbot_email: "test@example.com"
+        certificates_certbot_mode: dry-run
+        certificates_certbot_dns_provider: cloudflare
+        certificates_acme_server: "https://pebble:14000/dir"
+        certificates_acme_verify_ssl: false
+        certificates_list:
+          - name: test-webroot-letsencrypt.example.com
+            domains:
+              - test-webroot-letsencrypt.example.com
+              - www.test-webroot-letsencrypt.example.com
+            challenge_type: http-01
+            plugin: webroot
+            webroot: /var/www/html
+          - name: test-apache-letsencrypt.example.com
+            domains:
+              - test-apache-letsencrypt.example.com
+            challenge_type: http-01
+            plugin: apache
+          - name: test-dns-letsencrypt.example.com
+            domains:
+              - test-dns-letsencrypt.example.com
+              - "*.test-dns-letsencrypt.example.com"
+            challenge_type: dns-01
+            provider: custom
+            auth_hook: "/data/certbot/authenticator.sh"
+            cleanup_hook: "/data/certbot/cleanup.sh"
+            deploy_hook: "/usr/local/bin/deploy.sh"

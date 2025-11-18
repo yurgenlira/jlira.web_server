@@ -11,6 +11,36 @@ driver:
   name: docker
 
 platforms:
+  # Challenge test server for DNS-01 testing
+  - name: challtestsrv
+    image: ghcr.io/letsencrypt/pebble-challtestsrv:latest
+    pre_build_image: true
+    published_ports:
+      - "8055:8055"  # Management API
+    networks:
+      - name: molecule
+    command: -http01 "" -https01 "" -tlsalpn01 ""
+
+  # Pebble ACME test server for Let's Encrypt testing
+  - name: pebble
+    image: ghcr.io/letsencrypt/pebble:latest
+    pre_build_image: true
+    command: -config /test/config/pebble-config.json -dnsserver challtestsrv:8053
+    published_ports:
+      - "14000:14000"  # ACME API
+      - "15000:15000"  # Management API
+    env:
+      PEBBLE_VA_NOSLEEP: "1"
+      PEBBLE_VA_ALWAYS_VALID: "1"  # Accept all validations for testing
+    networks:
+      - name: molecule
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "https://localhost:15000/dir"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Main test instance
   - name: ${MOLECULE_SCENARIO_NAME}-instance
     image: geerlingguy/docker-ubuntu2404-ansible
     pre_build_image: true
@@ -22,6 +52,10 @@ platforms:
     cgroupns_mode: host
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    networks:
+      - name: molecule
+    dns_servers:
+      - 8.8.8.8  # Ensure DNS resolution works
 
 ansible:
   cfg:

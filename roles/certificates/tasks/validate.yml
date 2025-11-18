@@ -8,7 +8,7 @@
     fail_msg: >-
       certificates_mode must be either 'selfsigned', 'import', or 'letsencrypt'.
       Current value: '{{ certificates_mode | default("undefined") }}'
-    success_msg: "certificates_mode is valid: {{ certificates_mode}}"
+    success_msg: "certificates_mode is valid: {{ certificates_mode }}"
     quiet: true
 
 - name: Validate certificates_list is defined and is a list
@@ -38,7 +38,9 @@
     label: "{{ item.name | default('unnamed') }}"
   when: certificates_list | length > 0
 
+# ============================================================================
 # Validation for selfsigned mode
+# ============================================================================
 - name: Validate selfsigned mode requirements
   when:
     - certificates_mode == 'selfsigned'
@@ -120,7 +122,9 @@
         label: "{{ item.name }}"
       when: item.san is defined
 
+# ============================================================================
 # Validation for import mode
+# ============================================================================
 - name: Validate import mode requirements
   when:
     - certificates_mode == 'import'
@@ -198,36 +202,40 @@
       when:
         - not item.stat.exists
 
+# ============================================================================
 # Validation for letsencrypt mode
+# ============================================================================
 - name: Validate letsencrypt mode requirements
   when:
     - certificates_mode == 'letsencrypt'
     - certificates_list | length > 0
   block:
-    - name: Validate ACME email is defined
+    # Global certbot configuration validation
+    - name: Validate certbot email is defined
       ansible.builtin.assert:
         that:
-          - certificates_acme_email is defined
-          - certificates_acme_email is string
-          - certificates_acme_email | length > 0
-          - "'@' in certificates_acme_email"
+          - certificates_certbot_email is defined
+          - certificates_certbot_email is string
+          - certificates_certbot_email | length > 0
+          - "'@' in certificates_certbot_email"
         fail_msg: >-
-          certificates_acme_email must be a valid email address for Let's Encrypt registration.
-          Current value: '{{ certificates_acme_email | default("undefined") }}'
-        success_msg: "ACME email is valid"
+          certificates_certbot_email must be a valid email address for Let's Encrypt registration.
+          Current value: '{{ certificates_certbot_email | default("undefined") }}'
+        success_msg: "Certbot email is valid"
         quiet: true
 
-    - name: Validate ACME Terms of Service agreement
+    - name: Validate certbot mode is valid
       ansible.builtin.assert:
         that:
-          - certificates_acme_agree_tos is defined
-          - certificates_acme_agree_tos | bool
+          - certificates_certbot_mode is defined
+          - certificates_certbot_mode in ['production', 'staging', 'dry-run']
         fail_msg: >-
-          You must agree to Let's Encrypt Terms of Service by setting
-          certificates_acme_agree_tos: true
-        success_msg: "Let's Encrypt Terms of Service agreed"
+          certificates_certbot_mode must be one of: production, staging, dry-run.
+          Current value: '{{ certificates_certbot_mode | default("undefined") }}'
+        success_msg: "Certbot mode is valid: {{ certificates_certbot_mode }}"
         quiet: true
 
+    # Per-certificate validation
     - name: Validate domains field for letsencrypt certificates
       ansible.builtin.assert:
         that:
@@ -237,7 +245,7 @@
           - item.domains is not mapping
           - item.domains | length > 0
         fail_msg: >-
-          Certificate '{{ item.name }}' in letsencrypt mode must have a 'domains' list field.
+          Certificate '{{ item.name }}' in letsencrypt mode must have a 'domains' list field with at least one domain.
           Current value: '{{ item.domains | default("undefined") }}'
         success_msg: "Certificate '{{ item.name }}' has valid domains list"
         quiet: true
@@ -245,39 +253,147 @@
       loop_control:
         label: "{{ item.name }}"
 
-    - name: Validate challenge type is valid
+    - name: Validate challenge_type is defined for each certificate
       ansible.builtin.assert:
         that:
-          - certificates_acme_challenge_type in ['http-01', 'dns-01']
+          - item.challenge_type is defined
+          - item.challenge_type in ['http-01', 'dns-01']
         fail_msg: >-
-          certificates_acme_challenge_type must be either 'http-01' or 'dns-01'.
-          Current value: '{{ certificates_acme_challenge_type }}'
-        success_msg: "ACME challenge type is valid: {{ certificates_acme_challenge_type }}"
+          Certificate '{{ item.name }}' must have challenge_type set to 'http-01' or 'dns-01'.
+          Current value: '{{ item.challenge_type | default("undefined") }}'
+        success_msg: "Certificate '{{ item.name }}' has valid challenge_type"
         quiet: true
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
 
+    # HTTP-01 specific validation
+    - name: Validate HTTP-01 challenge requirements
+      ansible.builtin.assert:
+        that:
+          - item.plugin is defined
+          - item.plugin in ['webroot', 'standalone', 'apache', 'nginx']
+        fail_msg: >-
+          Certificate '{{ item.name }}' with HTTP-01 challenge must have 'plugin' set to one of: webroot, standalone,
+          apache, nginx. Current value: '{{ item.plugin | default("undefined") }}'
+        success_msg: "Certificate '{{ item.name }}' has valid plugin"
+        quiet: true
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.challenge_type == 'http-01'
+
+    - name: Validate webroot path for webroot plugin
+      ansible.builtin.assert:
+        that:
+          - item.webroot is defined
+          - item.webroot is string
+          - item.webroot | length > 0
+          - item.webroot is match('^/')
+        fail_msg: >-
+          Certificate '{{ item.name }}' using webroot plugin must have 'webroot' set to an absolute path.
+          Current value: '{{ item.webroot | default("undefined") }}'
+        success_msg: "Certificate '{{ item.name }}' has valid webroot path"
+        quiet: true
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when:
+        - item.challenge_type == 'http-01'
+        - item.plugin is defined
+        - item.plugin == 'webroot'
+
+    # DNS-01 specific validation
     - name: Validate DNS provider is set for DNS-01 challenge
       ansible.builtin.assert:
         that:
-          - certificates_acme_dns_provider is defined
-          - certificates_acme_dns_provider is string
-          - certificates_acme_dns_provider | length > 0
+          - certificates_certbot_dns_provider is defined
+          - certificates_certbot_dns_provider is string
+          - certificates_certbot_dns_provider | length > 0
         fail_msg: >-
-          certificates_acme_dns_provider must be set when using dns-01 challenge.
-          Current value: '{{ certificates_acme_dns_provider | default("undefined") }}'
-        success_msg: "DNS provider is set: {{ certificates_acme_dns_provider }}"
+          certificates_certbot_dns_provider must be set when using dns-01 challenge.
+          Current value: '{{ certificates_certbot_dns_provider | default("undefined") }}'
+          Example: certificates_certbot_dns_provider: cloudflare
+        success_msg: "DNS provider is set: {{ certificates_certbot_dns_provider }}"
         quiet: true
-      when: certificates_acme_challenge_type == 'dns-01'
+      when: >
+        certificates_list
+        | selectattr('challenge_type', 'defined')
+        | selectattr('challenge_type', 'equalto', 'dns-01')
+        | list
+        | length > 0
+
+    - name: Validate custom DNS provider hooks
+      ansible.builtin.assert:
+        that:
+          - item.auth_hook is defined
+          - item.auth_hook is string
+          - item.auth_hook | length > 0
+          - item.cleanup_hook is defined
+          - item.cleanup_hook is string
+          - item.cleanup_hook | length > 0
+        fail_msg: >-
+          Certificate '{{ item.name }}' with custom DNS provider must have both 'auth_hook' and 'cleanup_hook' defined.
+          auth_hook: '{{ item.auth_hook | default("undefined") }}'
+          cleanup_hook: '{{ item.cleanup_hook | default("undefined") }}'
+        success_msg: "Certificate '{{ item.name }}' has valid custom DNS hooks"
+        quiet: true
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when:
+        - item.challenge_type is defined
+        - item.challenge_type == 'dns-01'
+        - certificates_certbot_dns_provider == 'custom'
+
+    # Optional fields validation
+    - name: Validate deploy_hook path if specified
+      ansible.builtin.assert:
+        that:
+          - item.deploy_hook is string
+          - item.deploy_hook | length > 0
+        fail_msg: >-
+          Certificate '{{ item.name }}' deploy_hook must be a non-empty string.
+          Current value: '{{ item.deploy_hook }}'
+        success_msg: "Certificate '{{ item.name }}' has valid deploy_hook"
+        quiet: true
+      loop: "{{ certificates_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when:
+        - item.deploy_hook is defined
+
+- name: Build validation summary message
+  ansible.builtin.set_fact:
+    certificates_validation_summary: >-
+      {{
+        [
+          '===================================================================',
+          'Certificates Role Validation Summary',
+          '===================================================================',
+          'Mode: ' + certificates_mode,
+          'Certificates to manage: ' + (certificates_list | length | string)
+        ] +
+        (
+          [
+            'Certbot mode: ' + certificates_certbot_mode,
+            'Certbot email: ' + certificates_certbot_email,
+            'Certificate directory: /etc/letsencrypt/live/'
+          ] if certificates_mode == 'letsencrypt' else []
+        ) +
+        (
+          [
+            'Certificate directory: ' + certificates_cert_dir,
+            'Private key directory: ' + certificates_key_dir
+          ] if certificates_mode in ['selfsigned', 'import'] else []
+        ) +
+        [
+          '===================================================================',
+          'All variable validations passed successfully!',
+          '==================================================================='
+        ]
+      }}
 
 - name: Display validation summary
   ansible.builtin.debug:
-    msg:
-      - "==================================================================="
-      - "Certificates Role Validation Summary"
-      - "==================================================================="
-      - "Mode: {{ certificates_mode }}"
-      - "Certificates to manage: {{ certificates_list | length }}"
-      - "Output directory (certs): {{ certificates_cert_dir }}"
-      - "Output directory (keys): {{ certificates_key_dir }}"
-      - "==================================================================="
-      - "All variable validations passed successfully!"
-      - "==================================================================="
+    msg: "{{ certificates_validation_summary }}"

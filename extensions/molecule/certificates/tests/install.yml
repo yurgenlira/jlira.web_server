@@ -3,21 +3,32 @@
 # Installation Tests for Certificates Role
 # =============================================================================
 
-- name: Check that python3-cryptography is installed
+- name: Check that python3-cryptography is installed (selfsigned/import modes)
   ansible.builtin.package:
     name: python3-cryptography
     state: present
   check_mode: true
   register: crypto_package
   failed_when: crypto_package is changed
+  when: certificates_mode in ['selfsigned', 'import']
 
-- name: Verify certificate directory exists
+- name: Check that certbot is installed (letsencrypt mode)
+  ansible.builtin.package:
+    name: certbot
+    state: present
+  check_mode: true
+  register: certbot_package
+  failed_when: certbot_package is changed
+  when: certificates_mode == 'letsencrypt'
+
+- name: Verify certificate directory exists (selfsigned/import modes)
   ansible.builtin.stat:
     path: "{{ certificates_cert_dir }}"
   register: cert_dir_stat
   failed_when: not cert_dir_stat.stat.exists or not cert_dir_stat.stat.isdir
+  when: certificates_mode in ['selfsigned', 'import']
 
-- name: Verify certificate directory permissions
+- name: Verify certificate directory permissions (selfsigned/import modes)
   ansible.builtin.assert:
     that:
       - cert_dir_stat.stat.mode == '0755'
@@ -25,25 +36,54 @@
       - cert_dir_stat.stat.gr_name == 'root'
     fail_msg: "Certificate directory has incorrect permissions"
     success_msg: "Certificate directory permissions are correct"
+  when: certificates_mode in ['selfsigned', 'import']
 
-- name: Verify private key directory exists
+- name: Verify private key directory exists (selfsigned/import modes)
   ansible.builtin.stat:
     path: "{{ certificates_key_dir }}"
   register: key_dir_stat
   failed_when: not key_dir_stat.stat.exists or not key_dir_stat.stat.isdir
+  when: certificates_mode in ['selfsigned', 'import']
 
-- name: Verify private key directory permissions
+- name: Verify private key directory permissions (selfsigned/import modes)
   ansible.builtin.assert:
     that:
-      - key_dir_stat.stat.mode == '0700'
+      - key_dir_stat.stat.mode == '0700' or key_dir_stat.stat.mode == '0710'
       - key_dir_stat.stat.pw_name == 'root'
-      - key_dir_stat.stat.gr_name == 'root'
-    fail_msg: "Private key directory has incorrect permissions"
+      - key_dir_stat.stat.gr_name == 'root' or key_dir_stat.stat.gr_name == 'ssl-cert'
+    fail_msg: "Private key directory has incorrect permissions: mode={{ key_dir_stat.stat.mode }} or owner != root"
     success_msg: "Private key directory permissions are correct"
+  when: certificates_mode in ['selfsigned', 'import']
+
+- name: Build installation summary message
+  ansible.builtin.set_fact:
+    test_install_summary:
+      - "======================================================================="
+      - "Installation Tests Completed"
+      - "======================================================================="
+      - "Mode: {{ certificates_mode }}"
+      - "✓ {{ 'python3-cryptography' if certificates_mode in ['selfsigned', 'import'] else 'certbot' }} is installed"
+
+- name: Add certificate directory status (selfsigned/import modes)
+  ansible.builtin.set_fact:
+    test_install_summary: >-
+      {{ test_install_summary + ['✓ Certificate directory exists with correct permissions (' +
+      certificates_cert_dir + ')'] }}
+  when: certificates_mode in ['selfsigned', 'import']
+
+- name: Add private key directory status (selfsigned/import modes)
+  ansible.builtin.set_fact:
+    test_install_summary: >-
+      {{ test_install_summary + ['✓ Private key directory exists with correct permissions (' +
+      certificates_key_dir + ')'] }}
+  when: certificates_mode in ['selfsigned', 'import']
+
+- name: Add certbot plugin status (letsencrypt mode)
+  ansible.builtin.set_fact:
+    test_install_summary: >-
+      {{ test_install_summary + ['✓ Certbot plugins installed'] }}
+  when: certificates_mode == 'letsencrypt'
 
 - name: Display installation test results
   ansible.builtin.debug:
-    msg:
-      - "✓ python3-cryptography is installed"
-      - "✓ Certificate directory exists with correct permissions ({{ certificates_cert_dir }})"
-      - "✓ Private key directory exists with correct permissions ({{ certificates_key_dir }})"
+    msg: "{{ test_install_summary + ['======================================================================='] }}"

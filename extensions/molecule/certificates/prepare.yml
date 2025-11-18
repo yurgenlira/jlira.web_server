@@ -13,17 +13,6 @@
       become: false
       run_once: true
 
-    - name: Generate test certificate for import mode on control node
-      community.crypto.x509_certificate:
-        path: "{{ playbook_dir }}/files/test-import.crt"
-        privatekey_path: "{{ playbook_dir }}/files/test-import.key"
-        provider: selfsigned
-        selfsigned_not_after: "+365d"
-        mode: "0644"
-      delegate_to: localhost
-      become: false
-      run_once: true
-
     - name: Generate test private key for import mode on control node
       community.crypto.openssl_privatekey:
         path: "{{ playbook_dir }}/files/test-import.key"
@@ -34,8 +23,202 @@
       become: false
       run_once: true
 
+    - name: Generate test CSR for import mode on control node
+      community.crypto.openssl_csr:
+        path: "{{ playbook_dir }}/files/test-import.csr"
+        privatekey_path: "{{ playbook_dir }}/files/test-import.key"
+        common_name: test-import.local
+        organization_name: "Test Organization"
+        country_name: "US"
+        state_or_province_name: "California"
+        locality_name: "San Francisco"
+        mode: "0644"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Generate test certificate for import mode on control node
+      community.crypto.x509_certificate:
+        path: "{{ playbook_dir }}/files/test-import.crt"
+        privatekey_path: "{{ playbook_dir }}/files/test-import.key"
+        csr_path: "{{ playbook_dir }}/files/test-import.csr"
+        provider: selfsigned
+        selfsigned_not_after: "+365d"
+        mode: "0644"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Generate intermediate CA private key for chain on control node
+      community.crypto.openssl_privatekey:
+        path: "{{ playbook_dir }}/files/test-import-chain.key"
+        size: 2048
+        type: RSA
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Generate intermediate CA CSR for chain on control node
+      community.crypto.openssl_csr:
+        path: "{{ playbook_dir }}/files/test-import-chain.csr"
+        privatekey_path: "{{ playbook_dir }}/files/test-import-chain.key"
+        common_name: "Test Intermediate CA"
+        organization_name: "Test Organization"
+        country_name: "US"
+        basic_constraints:
+          - "CA:TRUE"
+        basic_constraints_critical: true
+        key_usage:
+          - keyCertSign
+          - cRLSign
+        key_usage_critical: true
+        mode: "0644"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Generate intermediate CA certificate (chain) for import mode on control node
+      community.crypto.x509_certificate:
+        path: "{{ playbook_dir }}/files/test-import-chain.crt"
+        privatekey_path: "{{ playbook_dir }}/files/test-import-chain.key"
+        csr_path: "{{ playbook_dir }}/files/test-import-chain.csr"
+        provider: selfsigned
+        selfsigned_not_after: "+730d"
+        mode: "0644"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Remove test CSR files (cleanup)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ playbook_dir }}/files/test-import.csr"
+        - "{{ playbook_dir }}/files/test-import-chain.csr"
+        - "{{ playbook_dir }}/files/test-import-chain.key"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
     - name: Update package cache
       ansible.builtin.apt:
         update_cache: true
         cache_valid_time: 3600
+      become: true
+
+    # =============================================================================
+    # Configure Pebble ACME Server Trust
+    # =============================================================================
+    - name: Install ca-certificates package
+      ansible.builtin.apt:
+        name: ca-certificates
+        state: present
+      become: true
+
+    - name: Download Pebble root CA certificate
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/letsencrypt/pebble/main/test/certs/pebble.minica.pem
+        dest: /usr/local/share/ca-certificates/pebble-root.crt
+        mode: '0644'
+      become: true
+      register: pebble_ca_download
+      retries: 3
+      delay: 5
+      until: pebble_ca_download is succeeded
+
+    - name: Update CA certificates trust store
+      ansible.builtin.command: update-ca-certificates
+      become: true
+      changed_when: false
+
+    - name: Wait for Pebble ACME server to be ready
+      ansible.builtin.uri:
+        url: https://pebble:14000/dir
+        validate_certs: false
+        return_content: true
+      register: pebble_health
+      until: pebble_health.status == 200
+      retries: 30
+      delay: 10
+
+    # =============================================================================
+    # Create dummy hook scripts for testing
+    # =============================================================================
+    - name: Create directory for certbot hooks
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /usr/local/bin
+        - /data/certbot
+      become: true
+
+    - name: Create dummy deploy hook script
+      ansible.builtin.copy:
+        dest: /usr/local/bin/deploy.sh
+        content: |
+          #!/bin/bash
+          # Dummy deploy hook for testing
+          echo "Deploy hook called for domain: ${RENEWED_DOMAINS}"
+          exit 0
+        mode: '0755'
+      become: true
+
+    - name: Install curl for challtestsrv API calls
+      ansible.builtin.apt:
+        name: curl
+        state: present
+      become: true
+
+    - name: Create DNS authentication hook script for challtestsrv
+      ansible.builtin.copy:
+        dest: /data/certbot/authenticator.sh
+        content: |
+          #!/bin/bash
+          # DNS authentication hook for challtestsrv
+          set -e
+          echo "Setting TXT record for ${CERTBOT_DOMAIN}"
+          echo "Validation token: ${CERTBOT_VALIDATION}"
+
+          # Add TXT record via challtestsrv API
+          curl -X POST http://challtestsrv:8055/set-txt \
+            -H "Content-Type: application/json" \
+            -d "{\"host\":\"_acme-challenge.${CERTBOT_DOMAIN}.\",\"value\":\"${CERTBOT_VALIDATION}\"}"
+
+          # Wait for DNS propagation
+          sleep 2
+          exit 0
+        mode: '0755'
+      become: true
+
+    - name: Create DNS cleanup hook script for challtestsrv
+      ansible.builtin.copy:
+        dest: /data/certbot/cleanup.sh
+        content: |
+          #!/bin/bash
+          # DNS cleanup hook for challtestsrv
+          set -e
+          echo "Clearing TXT record for ${CERTBOT_DOMAIN}"
+
+          # Clear TXT record via challtestsrv API
+          curl -X POST http://challtestsrv:8055/clear-txt \
+            -H "Content-Type: application/json" \
+            -d "{\"host\":\"_acme-challenge.${CERTBOT_DOMAIN}.\"}"
+
+          exit 0
+        mode: '0755'
+      become: true
+
+    - name: Create dummy deploy hook for custom DNS test
+      ansible.builtin.copy:
+        dest: /data/certbot/deploy.sh
+        content: |
+          #!/bin/bash
+          # Dummy deploy hook for custom DNS testing
+          echo "Deploy hook called for domain: ${RENEWED_DOMAINS}"
+          exit 0
+        mode: '0755'
       become: true
