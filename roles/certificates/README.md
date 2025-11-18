@@ -37,6 +37,7 @@ This role provides a comprehensive, flexible solution for SSL/TLS certificate ma
   - Support for production, staging, and dry-run modes
   - Per-certificate deploy hooks for service reloads
   - Per-certificate configuration (challenge type, plugin, webroot, DNS provider)
+  - Automatic domain expansion when adding domains to existing certificates
 - **Comprehensive Validation**: Validates all inputs before execution
 - **Subject Alternative Names (SAN)**: Full support for multi-domain certificates
 - **Secure Defaults**: Proper file permissions and ownership
@@ -640,10 +641,10 @@ openssl x509 -in /etc/ssl/certs/test.local.crt -text -noout
 
 ### Molecule Testing
 
-The role includes comprehensive Molecule tests:
+The role includes comprehensive Molecule test scenarios:
 
+**Main certificates scenario** - Tests all three modes (selfsigned, import, letsencrypt):
 ```bash
-# Full test suite (creates Pebble ACME server, test instance, runs all modes)
 cd extensions
 molecule test -s certificates
 
@@ -656,7 +657,15 @@ molecule idempotence -s certificates
 molecule destroy -s certificates
 ```
 
-For details on the test suite, see [extensions/molecule/certificates/README.md](../../extensions/molecule/certificates/README.md).
+**certificates_standalone scenario** - Tests HTTP-01 standalone and nginx plugins:
+```bash
+cd extensions
+molecule test -s certificates_standalone
+```
+
+For detailed documentation on each test scenario:
+- [extensions/molecule/certificates/README.md](../../extensions/molecule/certificates/README.md) - Main scenario
+- [extensions/molecule/certificates_standalone/README.md](../../extensions/molecule/certificates_standalone/README.md) - Standalone/nginx plugins
 
 ## Troubleshooting
 
@@ -713,6 +722,31 @@ certbot renew --dry-run
 journalctl -u certbot.service
 ```
 
+### Adding Domains to Existing Certificates
+
+The role automatically handles domain expansion when you add new domains to an existing certificate. Simply update your `certificates_list` with the additional domains and re-run the playbook:
+
+```yaml
+certificates_list:
+  - name: example.com
+    domains:
+      - example.com
+      - www.example.com
+      - api.example.com  # New domain added
+    challenge_type: http-01
+    plugin: webroot
+    webroot: /var/www/html
+```
+
+The role uses certbot's `--expand` flag automatically, which:
+- ✅ Expands the certificate to include the new domains
+- ✅ Replaces the old certificate with the expanded one
+- ✅ Maintains the same certificate name
+- ✅ Works idempotently (safe to run multiple times)
+- ✅ No manual intervention required
+
+**Note**: You cannot remove domains from an existing certificate. To remove domains, you must delete the old certificate and create a new one with the desired domain list.
+
 ### Permission Issues
 
 **Symptoms**: Permission denied errors
@@ -750,6 +784,67 @@ tail -f /var/log/letsencrypt/letsencrypt.log
 grep "example.com" /var/log/letsencrypt/letsencrypt.log
 ```
 
+## Certificate Management Best Practices
+
+### Production Deployments
+
+1. **Start with Staging**: Always test with `certificates_certbot_mode: staging` before switching to production
+2. **Monitor Expiration**: Use `certbot certificates` to monitor expiration dates
+3. **Test Renewal**: Run `certbot renew --dry-run` to verify renewal will work
+4. **Backup Certificates**: Backup `/etc/letsencrypt/` regularly (especially before major changes)
+5. **Deploy Hooks**: Use `deploy_hook` to reload services after certificate renewal
+
+### Domain Changes
+
+**Adding domains:**
+```yaml
+# Safe - uses --expand flag automatically
+certificates_list:
+  - name: example.com
+    domains:
+      - example.com
+      - www.example.com
+      - api.example.com  # Adding new domain
+```
+
+**Removing domains:**
+```bash
+# Manual process required
+1. Delete the certificate: certbot delete --cert-name example.com
+2. Update your certificates_list to remove unwanted domains
+3. Re-run the playbook to obtain a new certificate
+```
+
+### Multiple Certificates
+
+For better organization, use separate certificates for different services:
+
+```yaml
+certificates_list:
+  # Web application
+  - name: web.example.com
+    domains:
+      - example.com
+      - www.example.com
+
+  # API service
+  - name: api.example.com
+    domains:
+      - api.example.com
+      - api-v2.example.com
+
+  # Admin panel
+  - name: admin.example.com
+    domains:
+      - admin.example.com
+```
+
+This approach provides:
+- ✅ Easier certificate management
+- ✅ Independent renewal cycles
+- ✅ Service-specific deploy hooks
+- ✅ Better troubleshooting
+
 ## Future Enhancements
 
 These features may be added in future versions without breaking existing functionality:
@@ -762,6 +857,7 @@ These features may be added in future versions without breaking existing functio
 - Additional DNS provider support for DNS-01 challenge
 - Certificate backup and restore functionality
 - Prometheus metrics export for monitoring
+- Automatic certificate revocation support
 
 ## License
 

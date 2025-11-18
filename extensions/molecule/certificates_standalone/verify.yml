@@ -1,0 +1,92 @@
+---
+- name: Verify
+  hosts: certificates_standalone_test
+  gather_facts: true
+  tasks:
+    # =============================================================================
+    # Verify standalone plugin certificate
+    # =============================================================================
+    - name: Verify standalone certificate was obtained
+      ansible.builtin.stat:
+        path: /etc/letsencrypt/live/test-standalone-letsencrypt.example.com/fullchain.pem
+      register: standalone_cert
+      failed_when: not standalone_cert.stat.exists
+
+    - name: Verify standalone certificate key exists
+      ansible.builtin.stat:
+        path: /etc/letsencrypt/live/test-standalone-letsencrypt.example.com/privkey.pem
+      register: standalone_key
+      failed_when: not standalone_key.stat.exists
+
+    - name: Verify standalone certificate chain exists
+      ansible.builtin.stat:
+        path: /etc/letsencrypt/live/test-standalone-letsencrypt.example.com/chain.pem
+      register: standalone_chain
+      failed_when: not standalone_chain.stat.exists
+
+    - name: Verify standalone certificate privkey permissions
+      ansible.builtin.stat:
+        path: /etc/letsencrypt/live/test-standalone-letsencrypt.example.com/privkey.pem
+        follow: true
+      register: standalone_key_perms
+      failed_when: standalone_key_perms.stat.mode not in ['0600', '0640']
+
+    # =============================================================================
+    # Verify nginx plugin certificate
+    # =============================================================================
+    - name: Verify nginx certificate was obtained
+      ansible.builtin.stat:
+        path: /etc/letsencrypt/live/test-nginx-letsencrypt.example.com/fullchain.pem
+      register: nginx_cert
+      failed_when: not nginx_cert.stat.exists
+
+    - name: Verify nginx certificate key exists
+      ansible.builtin.stat:
+        path: /etc/letsencrypt/live/test-nginx-letsencrypt.example.com/privkey.pem
+      register: nginx_key
+      failed_when: not nginx_key.stat.exists
+
+    - name: Verify nginx certificate chain exists
+      ansible.builtin.stat:
+        path: /etc/letsencrypt/live/test-nginx-letsencrypt.example.com/chain.pem
+      register: nginx_chain
+      failed_when: not nginx_chain.stat.exists
+
+    - name: Verify nginx certificate privkey permissions
+      ansible.builtin.stat:
+        path: /etc/letsencrypt/live/test-nginx-letsencrypt.example.com/privkey.pem
+        follow: true
+      register: nginx_key_perms
+      failed_when: nginx_key_perms.stat.mode not in ['0600', '0640']
+
+    # =============================================================================
+    # Verify certificate information
+    # =============================================================================
+    - name: Get standalone certificate information
+      ansible.builtin.command:
+        cmd: openssl x509 -in /etc/letsencrypt/live/test-standalone-letsencrypt.example.com/cert.pem -noout -subject -dates
+      register: standalone_cert_info
+      changed_when: false
+
+    - name: Get nginx certificate information
+      ansible.builtin.command:
+        cmd: openssl x509 -in /etc/letsencrypt/live/test-nginx-letsencrypt.example.com/cert.pem -noout -subject -dates
+      register: nginx_cert_info
+      changed_when: false
+
+    - name: Display verification results
+      ansible.builtin.debug:
+        msg:
+          - "======================================================================="
+          - "✓ All certificates verified successfully"
+          - "======================================================================="
+          - "Standalone certificate:"
+          - "  Path: {{ standalone_cert.stat.path }}"
+          - "  Key permissions: {{ standalone_key_perms.stat.mode }}"
+          - "  Info: {{ standalone_cert_info.stdout_lines | join(' | ') }}"
+          - ""
+          - "Nginx certificate:"
+          - "  Path: {{ nginx_cert.stat.path }}"
+          - "  Key permissions: {{ nginx_key_perms.stat.mode }}"
+          - "  Info: {{ nginx_cert_info.stdout_lines | join(' | ') }}"
+          - "======================================================================="

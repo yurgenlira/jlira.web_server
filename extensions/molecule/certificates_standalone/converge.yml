@@ -1,0 +1,24 @@
+---
+- name: Converge
+  hosts: certificates_standalone_test
+  gather_facts: true
+  tasks:
+    - name: Display test configuration
+      ansible.builtin.debug:
+        msg:
+          - "========================================"
+          - "Testing Let's Encrypt Standalone/Nginx Plugins"
+          - "========================================"
+          - "Mode: {{ certificates_mode }}"
+          - "Certbot Mode: {{ certificates_certbot_mode }}"
+          - "Email: {{ certificates_certbot_email }}"
+          - "ACME Server: {{ certificates_acme_server }}"
+          - "========================================"
+          - "Testing {{ certificates_list | length }} certificate configurations:"
+          - "  1. HTTP-01 + standalone plugin (2 domains)"
+          - "  2. HTTP-01 + nginx plugin (2 domains)"
+          - "========================================"
+
+    - name: Apply certificates role under test
+      ansible.builtin.include_role:
+        name: certificates
