@@ -1,0 +1,106 @@
+# SPDX-License-Identifier: MIT-0
+---
+# =============================================================================
+# Let's Encrypt Certificate Management with Certbot
+# =============================================================================
+
+- name: Determine ACME server URL based on mode
+  ansible.builtin.set_fact:
+    certificates_acme_server: >-
+      {{
+        certificates_acme_server | default(
+          {
+            'production': 'https://acme-v02.api.letsencrypt.org/directory',
+            'staging': 'https://acme-staging-v02.api.letsencrypt.org/directory',
+            'dry-run': 'https://acme-v02.api.letsencrypt.org/directory'
+          }[certificates_certbot_mode]
+        )
+      }}
+  when: certificates_acme_server is not defined
+
+- name: Register with Let's Encrypt using certbot
+  ansible.builtin.command:
+    cmd: >
+      certbot register
+      --email {{ certificates_certbot_email }}
+      --agree-tos
+      --no-eff-email
+      --server {{ certificates_acme_server }}
+      {{ '--no-verify-ssl' if not certificates_acme_verify_ssl else '' }}
+      --non-interactive
+  register: certificates_certbot_register
+  changed_when: "'Your account credentials have been saved' in certificates_certbot_register.stdout"
+  failed_when:
+    - certificates_certbot_register.rc != 0
+    - "'There is an existing account' not in certificates_certbot_register.stderr"
+  when:
+    - not ansible_check_mode
+    - certificates_certbot_mode != 'dry-run'
+
+- name: Display certbot registration status
+  ansible.builtin.debug:
+    msg:
+      - >-
+        Certbot account status: {{
+          'Registered' if certificates_certbot_register.changed
+          else ('Already registered' if certificates_certbot_register is defined
+          else 'Skipped (dry-run mode)')
+        }}
+      - "ACME server: {{ certificates_acme_server }}"
+      - "Certbot mode: {{ certificates_certbot_mode }}"
+  when: not ansible_check_mode
+
+# =============================================================================
+# Process each certificate individually based on its configuration
+# =============================================================================
+
+- name: Obtain/renew Let's Encrypt certificates
+  ansible.builtin.include_tasks: letsencrypt_certificate.yml
+  loop: "{{ certificates_list }}"
+  loop_control:
+    loop_var: certificates_item
+    label: "{{ certificates_item.name }}"
+  when: not ansible_check_mode
+
+# =============================================================================
+# Display summary
+# =============================================================================
+
+- name: Count certificates by challenge type
+  ansible.builtin.set_fact:
+    certificates_http_count: >-
+      {{
+        certificates_list
+        | selectattr('challenge_type', 'defined')
+        | selectattr('challenge_type', 'equalto', 'http-01')
+        | list
+        | length
+      }}
+    certificates_dns_count: >-
+      {{
+        certificates_list
+        | selectattr('challenge_type', 'defined')
+        | selectattr('challenge_type', 'equalto', 'dns-01')
+        | list
+        | length
+      }}
+
+- name: Display Let's Encrypt certificate generation summary
+  ansible.builtin.debug:
+    msg:
+      - "========================================================================="
+      - >-
+        "Let's Encrypt Certificates {{ 'Validated (Dry-Run)' if certificates_certbot_mode == 'dry-run'
+        else 'Obtained Successfully' }}"
+      - "========================================================================="
+      - "Mode: {{ certificates_certbot_mode | upper }}"
+      - "Total certificates: {{ certificates_list | length }}"
+      - "  - HTTP-01 challenges: {{ certificates_http_count }}"
+      - "  - DNS-01 challenges: {{ certificates_dns_count }}"
+      - "ACME server: {{ certificates_acme_server }}"
+      - "Certbot directory: /etc/letsencrypt/live/"
+      - "========================================================================="
+      - >-
+        "{% if certificates_certbot_mode == 'dry-run' %}NOTE: No actual certificates were created in dry-run mode
+        {% endif %}"
+      - "========================================================================="

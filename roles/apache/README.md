@@ -84,6 +84,73 @@ apache_server_name: "example.com"
 apache_ssl_enabled: true
 ```
 
+### SSL Certificate Configuration
+
+#### `apache_default_ssl_certificate_file`
+- **Type**: String
+- **Default**: `/etc/ssl/certs/ssl-cert-snakeoil.pem`
+- **Description**: Path to the SSL certificate file for the default SSL virtual host
+
+```yaml
+apache_default_ssl_certificate_file: /etc/ssl/certs/example.com.crt
+```
+
+#### `apache_default_ssl_certificate_key_file`
+- **Type**: String
+- **Default**: `/etc/ssl/private/ssl-cert-snakeoil.key`
+- **Description**: Path to the SSL certificate key file for the default SSL virtual host
+
+```yaml
+apache_default_ssl_certificate_key_file: /etc/ssl/private/example.com.key
+```
+
+#### `apache_ssl_certificate_fallback`
+- **Type**: String
+- **Default**: `fail`
+- **Options**: `fail`, `disable`, `generate`
+- **Description**: Behavior when SSL is enabled but certificates don't exist
+
+**Options:**
+- `fail`: Fail the playbook with clear error message (recommended for production)
+- `disable`: Skip SSL configuration, run HTTP-only (fallback mode)
+- `generate`: Auto-generate self-signed certificates (good for development)
+
+```yaml
+# For production - fail if certificates missing
+apache_ssl_certificate_fallback: fail
+
+# For development - auto-generate self-signed
+apache_ssl_certificate_fallback: generate
+
+# For graceful degradation - disable SSL if certificates missing
+apache_ssl_certificate_fallback: disable
+```
+
+#### `apache_ssl_selfsigned`
+- **Type**: Dictionary
+- **Default**: See defaults/main.yml
+- **Description**: Self-signed certificate generation settings (only used when `apache_ssl_certificate_fallback` is `generate`)
+
+Available settings:
+- `organization` (required): Organization name
+- `organizational_unit` (optional): Department or division name
+- `days` (default: 365): Number of days the certificate is valid
+- `country` (optional): 2-letter country code
+- `state` (optional): State or province name
+- `locality` (optional): City or locality name
+- `email` (optional): Email address
+
+```yaml
+apache_ssl_selfsigned:
+  organization: "My Company"
+  organizational_unit: "IT Department"
+  days: 730  # 2 years
+  country: "US"
+  state: "California"
+  locality: "San Francisco"
+  email: "admin@example.com"
+```
+
 #### `apache_main_settings`
 - **Type**: List of Dictionaries
 - **Default**: `[]`
@@ -368,6 +435,7 @@ apache_custom_configs:
 ## Dependencies
 
 - **jlira.web_server.php**: Automatically included when `apache_php_fpm_integration: true`
+- **jlira.web_server.certificates** (Optional): Use this role to generate or import SSL certificates before running the Apache role. See the "Apache with Certificate Role Integration" section for examples.
 
 ## Example Playbooks
 
@@ -394,6 +462,190 @@ apache_custom_configs:
       vars:
         apache_php_fpm_integration: true
         apache_php_fpm_version: "8.4"
+```
+
+### Apache with Custom SSL Certificates
+
+```yaml
+---
+- name: Apache with custom SSL certificates
+  hosts: webservers
+  become: true
+  roles:
+    - role: jlira.web_server.apache
+      vars:
+        apache_ssl_enabled: true
+        apache_default_ssl_certificate_file: /etc/ssl/certs/mysite.crt
+        apache_default_ssl_certificate_key_file: /etc/ssl/private/mysite.key
+        apache_ssl_certificate_fallback: fail  # Fail if certs missing
+```
+
+### Apache with Auto-Generated Self-Signed Certificate (Development)
+
+```yaml
+---
+- name: Apache with auto-generated self-signed certificate
+  hosts: devservers
+  become: true
+  roles:
+    - role: jlira.web_server.apache
+      vars:
+        apache_ssl_enabled: true
+        apache_ssl_certificate_fallback: generate  # Auto-generate if missing
+        apache_ssl_selfsigned:
+          organization: "Development Test"
+          organizational_unit: "DevOps"
+          days: 365
+          country: "US"
+          state: "California"
+          locality: "San Francisco"
+          email: "dev@example.com"
+```
+
+### Apache with SSL Fallback to HTTP
+
+```yaml
+---
+- name: Apache with SSL fallback to HTTP
+  hosts: webservers
+  become: true
+  roles:
+    - role: jlira.web_server.apache
+      vars:
+        apache_ssl_enabled: true
+        apache_ssl_certificate_fallback: disable  # Skip SSL if certs missing
+```
+
+### Apache with Certificate Role Integration
+
+#### Simple Role-Based Integration
+
+```yaml
+---
+- name: Apache with certificates role (role-based)
+  hosts: webservers
+  become: true
+  roles:
+    - role: jlira.web_server.certificates
+      vars:
+        certificates_mode: selfsigned
+        certificates_list:
+          - name: "{{ inventory_hostname }}"
+            common_name: "{{ inventory_hostname }}"
+            organization: "My Company"
+            days: 365
+
+    - role: jlira.web_server.apache
+      vars:
+        apache_ssl_enabled: true
+        apache_default_ssl_certificate_file: "/etc/ssl/certs/{{ inventory_hostname }}.crt"
+        apache_default_ssl_certificate_key_file: "/etc/ssl/private/{{ inventory_hostname }}.key"
+        apache_ssl_certificate_fallback: fail  # Fail if certs weren't generated
+```
+
+#### Task-Based Integration
+
+```yaml
+---
+- name: Apache with certificates role (task-based)
+  hosts: webservers
+  become: true
+  tasks:
+    - name: Generate self-signed certificates
+      ansible.builtin.include_role:
+        name: jlira.web_server.certificates
+      vars:
+        certificates_mode: selfsigned
+        certificates_list:
+          - name: "{{ inventory_hostname }}"
+            common_name: "{{ inventory_hostname }}"
+            organization: "My Organization"
+            days: 365
+
+    - name: Configure Apache with generated certificates
+      ansible.builtin.include_role:
+        name: jlira.web_server.apache
+      vars:
+        apache_ssl_enabled: true
+        apache_default_ssl_certificate_file: "/etc/ssl/certs/{{ inventory_hostname }}.crt"
+        apache_default_ssl_certificate_key_file: "/etc/ssl/private/{{ inventory_hostname }}.key"
+```
+
+#### Advanced: Multiple Virtual Hosts with Separate Certificates
+
+```yaml
+---
+- name: Apache with multiple certificates
+  hosts: webservers
+  become: true
+  roles:
+    - role: jlira.web_server.certificates
+      vars:
+        certificates_mode: selfsigned
+        certificates_list:
+          - name: site1.example.com
+            common_name: site1.example.com
+            organization: "Company A"
+            days: 365
+
+          - name: site2.example.com
+            common_name: site2.example.com
+            organization: "Company B"
+            days: 730
+            san:
+              - DNS:www.site2.example.com
+              - DNS:api.site2.example.com
+
+    - role: jlira.web_server.apache
+      vars:
+        apache_ssl_enabled: true
+        apache_virtual_hosts:
+          - name: site1.example.com
+            server_name: site1.example.com
+            document_root: /var/www/site1
+            http:
+              enabled: true
+            https:
+              enabled: true
+              certificate_file: /etc/ssl/certs/site1.example.com.crt
+              certificate_key_file: /etc/ssl/private/site1.example.com.key
+
+          - name: site2.example.com
+            server_name: site2.example.com
+            server_alias:
+              - www.site2.example.com
+            document_root: /var/www/site2
+            http:
+              enabled: true
+            https:
+              enabled: true
+              certificate_file: /etc/ssl/certs/site2.example.com.crt
+              certificate_key_file: /etc/ssl/private/site2.example.com.key
+```
+
+#### Production: Import Certificates
+
+```yaml
+---
+- name: Apache with imported production certificates
+  hosts: webservers
+  become: true
+  roles:
+    - role: jlira.web_server.certificates
+      vars:
+        certificates_mode: import
+        certificates_list:
+          - name: example.com
+            cert_src: files/production/example.com.crt
+            key_src: files/production/example.com.key
+            chain_src: files/production/example.com-chain.crt
+
+    - role: jlira.web_server.apache
+      vars:
+        apache_ssl_enabled: true
+        apache_default_ssl_certificate_file: /etc/ssl/certs/example.com.crt
+        apache_default_ssl_certificate_key_file: /etc/ssl/private/example.com.key
+        apache_ssl_certificate_fallback: fail
 ```
 
 ### Complete Configuration

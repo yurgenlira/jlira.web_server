@@ -1,0 +1,212 @@
+# SPDX-License-Identifier: MIT-0
+---
+# ============================================================================
+# Certificate Management Configuration
+# ============================================================================
+
+# Certificate operation mode
+# Options:
+#   - 'selfsigned': Generate self-signed certificates
+#   - 'import': Import existing certificates from source files
+#   - 'letsencrypt': Obtain certificates from Let's Encrypt using certbot
+# Type: String
+certificates_mode: selfsigned
+
+# Output directory for certificates (selfsigned and import modes only)
+# For letsencrypt mode, certificates are stored in /etc/letsencrypt/live/
+# Type: String
+certificates_cert_dir: /etc/ssl/certs
+
+# Output directory for private keys (selfsigned and import modes only)
+# For letsencrypt mode, keys are stored in /etc/letsencrypt/live/
+# Type: String
+certificates_key_dir: /etc/ssl/private
+
+# List of certificates to manage
+# Structure varies by mode (see examples below)
+# Type: List of Dictionaries
+certificates_list: []
+
+# ============================================================================
+# Let's Encrypt / Certbot Configuration
+# ============================================================================
+
+# Email address for Let's Encrypt account registration and notifications
+# Used for all certificates unless overridden per-certificate
+# Type: String
+# Required when certificates_mode: letsencrypt
+certificates_certbot_email: ""
+
+# Certbot execution mode
+# Options:
+#   - 'production': Use production ACME directory, obtain real certificates
+#   - 'staging': Use staging ACME directory for testing (avoid rate limits)
+#   - 'dry-run': Validate configuration only, no actual certificates obtained
+# Type: String
+certificates_certbot_mode: production
+
+# DNS provider for DNS-01 challenges
+# Applies to all DNS-01 certificates unless using custom hooks
+# Options:
+#   - 'cloudflare': Cloudflare DNS (requires python3-certbot-dns-cloudflare)
+#   - 'route53': AWS Route53 (requires python3-certbot-dns-route53)
+#   - 'digitalocean': DigitalOcean DNS (requires python3-certbot-dns-digitalocean)
+#   - 'google': Google Cloud DNS (requires python3-certbot-dns-google)
+#   - 'custom': Use manual hooks (auth_hook and cleanup_hook per certificate)
+# Type: String
+certificates_certbot_dns_provider: ""
+
+# DNS provider credentials
+# Environment variables passed to certbot for DNS-01 challenges
+# Can be overridden per-certificate with dns_credentials field
+# Type: Dictionary
+# Example for Cloudflare:
+#   certificates_certbot_dns_credentials:
+#     CLOUDFLARE_API_TOKEN: "your-token-here"
+# Example for Route53:
+#   certificates_certbot_dns_credentials:
+#     AWS_ACCESS_KEY_ID: "your-key"
+#     AWS_SECRET_ACCESS_KEY: "your-secret"
+certificates_certbot_dns_credentials: {}
+
+# ACME server SSL certificate verification
+# Set to false when using test ACME servers with self-signed certificates (e.g., Pebble)
+# WARNING: Only disable for testing purposes. Always use true in production.
+# Type: Boolean
+certificates_acme_verify_ssl: true
+
+# ============================================================================
+# Certificate List Examples
+# ============================================================================
+
+# Example 1: Self-signed certificates
+# certificates_list:
+#   - name: example.com
+#     common_name: example.com
+#     organization: "My Company"
+#     organizational_unit: "IT Department"
+#     country: "US"
+#     state: "California"
+#     locality: "San Francisco"
+#     email: "admin@example.com"
+#     days: 730
+#     key_size: 4096
+#     san:
+#       - DNS:www.example.com
+#       - DNS:api.example.com
+#       - IP:192.168.1.1
+
+# Example 2: Import existing certificates
+# certificates_list:
+#   - name: example.com
+#     cert_src: files/example.com.crt
+#     key_src: files/example.com.key
+#     chain_src: files/example.com-chain.crt
+
+# Example 3: Let's Encrypt with HTTP-01 challenge (webroot)
+# certificates_mode: letsencrypt
+# certificates_certbot_email: "admin@example.com"
+# certificates_certbot_mode: production
+# certificates_list:
+#   - name: example.com
+#     domains:
+#       - example.com
+#       - www.example.com
+#     challenge_type: http-01
+#     plugin: webroot
+#     webroot: /var/www/html
+
+# Example 4: Let's Encrypt with HTTP-01 challenge (Apache plugin)
+# certificates_list:
+#   - name: apache.example.com
+#     domains:
+#       - apache.example.com
+#     challenge_type: http-01
+#     plugin: apache
+
+# Example 5: Let's Encrypt with DNS-01 challenge (Cloudflare)
+# certificates_certbot_dns_provider: cloudflare
+# certificates_certbot_dns_credentials:
+#   CLOUDFLARE_API_TOKEN: "your-token-here"
+# certificates_list:
+#   - name: wildcard.example.com
+#     domains:
+#       - example.com
+#       - "*.example.com"
+#     challenge_type: dns-01
+#     deploy_hook: "/usr/local/bin/reload-nginx.sh"
+
+# Example 6: Let's Encrypt with DNS-01 challenge (custom hooks)
+# certificates_certbot_dns_provider: custom
+# certificates_list:
+#   - name: custom.example.com
+#     domains:
+#       - custom.example.com
+#     challenge_type: dns-01
+#     auth_hook: "/data/certbot/authenticator.sh"
+#     cleanup_hook: "/data/certbot/cleanup.sh"
+
+# Example 7: Mixed HTTP-01 and DNS-01 certificates
+# certificates_certbot_email: "admin@example.com"
+# certificates_certbot_mode: production
+# certificates_certbot_dns_provider: cloudflare
+# certificates_certbot_dns_credentials:
+#   CLOUDFLARE_API_TOKEN: "your-token"
+# certificates_list:
+#   - name: webroot.example.com
+#     domains:
+#       - webroot.example.com
+#     challenge_type: http-01
+#     plugin: webroot
+#     webroot: /var/www/html
+#
+#   - name: apache.example.com
+#     domains:
+#       - apache.example.com
+#     challenge_type: http-01
+#     plugin: apache
+#
+#   - name: wildcard.example.com
+#     domains:
+#       - "*.example.com"
+#     challenge_type: dns-01
+
+# ============================================================================
+# Per-Certificate Fields
+# ============================================================================
+
+# Fields for 'selfsigned' mode:
+#   - name: Unique identifier (required)
+#   - common_name: Common Name (CN) (required)
+#   - organization: Organization Name (O) (optional)
+#   - organizational_unit: Organizational Unit (OU) (optional)
+#   - country: Country Code (C) - 2 letters (optional)
+#   - state: State or Province (ST) (optional)
+#   - locality: Locality or City (L) (optional)
+#   - email: Email Address (optional)
+#   - days: Validity in days (optional, default: 365)
+#   - key_size: RSA key size in bits (optional, default: 4096)
+#   - san: Subject Alternative Names (optional)
+
+# Fields for 'import' mode:
+#   - name: Unique identifier (required)
+#   - cert_src: Source certificate file path on control machine (required)
+#   - key_src: Source private key file path on control machine (required)
+#   - chain_src: Source certificate chain file path (optional)
+
+# Fields for 'letsencrypt' mode:
+#   - name: Unique identifier (required)
+#   - domains: List of domain names (required, first domain is primary)
+#   - challenge_type: Challenge type (required: 'http-01' or 'dns-01')
+#
+#   For HTTP-01 challenges:
+#     - plugin: Certbot plugin (required: 'webroot', 'standalone', 'apache', 'nginx')
+#     - webroot: Document root path (required for webroot plugin)
+#
+#   For DNS-01 challenges:
+#     - dns_credentials: Override global DNS credentials (optional)
+#     - auth_hook: Authentication script for custom provider (required when provider: custom)
+#     - cleanup_hook: Cleanup script for custom provider (required when provider: custom)
+#
+#   Optional for all challenges:
+#     - deploy_hook: Command to run after successful obtain/renew

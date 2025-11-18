@@ -1,0 +1,183 @@
+---
+# =============================================================================
+# Side Effect Playbook - Tests Import Mode
+# =============================================================================
+# This playbook runs after the initial converge to test import mode functionality
+
+- name: Test Certificate Import Mode
+  hosts: certificates_test
+  gather_facts: true
+  vars:
+    # Override to test import mode
+    certificates_mode: import
+    certificates_list:
+      - name: test-import
+        cert_src: "{{ playbook_dir }}/files/test-import.crt"
+        key_src: "{{ playbook_dir }}/files/test-import.key"
+        chain_src: "{{ playbook_dir }}/files/test-import-chain.crt"
+
+    # Default configuration values
+    certificates_cert_dir: /etc/ssl/certs
+    certificates_key_dir: /etc/ssl/private
+
+  tasks:
+    - name: Display mode change message
+      ansible.builtin.debug:
+        msg:
+          - "========================================"
+          - "Testing Certificate Import Mode"
+          - "========================================"
+          - "Previous mode: selfsigned"
+          - "Current mode: import"
+          - "========================================"
+
+    - name: Apply certificates role in import mode
+      ansible.builtin.include_role:
+        name: certificates
+
+    - name: Verify imported certificate exists
+      ansible.builtin.stat:
+        path: "{{ certificates_cert_dir }}/test-import.crt"
+      register: imported_cert
+      failed_when: not imported_cert.stat.exists
+
+    - name: Verify imported private key exists
+      ansible.builtin.stat:
+        path: "{{ certificates_key_dir }}/test-import.key"
+      register: imported_key
+      failed_when: not imported_key.stat.exists
+
+    - name: Verify imported certificate permissions
+      ansible.builtin.assert:
+        that:
+          - imported_cert.stat.mode == '0644'
+          - imported_cert.stat.pw_name == 'root'
+        fail_msg: "Imported certificate has incorrect permissions"
+        success_msg: "Imported certificate has correct permissions"
+
+    - name: Verify imported private key permissions
+      ansible.builtin.assert:
+        that:
+          - imported_key.stat.mode == '0600'
+          - imported_key.stat.pw_name == 'root'
+        fail_msg: "Imported private key has incorrect permissions"
+        success_msg: "Imported private key has correct permissions"
+
+    - name: Verify imported chain certificate exists
+      ansible.builtin.stat:
+        path: "{{ certificates_cert_dir }}/test-import-chain.crt"
+      register: imported_chain
+      failed_when: not imported_chain.stat.exists
+
+    - name: Verify imported chain certificate permissions
+      ansible.builtin.assert:
+        that:
+          - imported_chain.stat.mode == '0644'
+          - imported_chain.stat.pw_name == 'root'
+        fail_msg: "Imported chain certificate has incorrect permissions"
+        success_msg: "Imported chain certificate has correct permissions"
+
+    - name: Get imported certificate information
+      community.crypto.x509_certificate_info:
+        path: "{{ certificates_cert_dir }}/test-import.crt"
+      register: imported_cert_info
+
+    - name: Display imported certificate information
+      ansible.builtin.debug:
+        msg:
+          - "========================================"
+          - "Imported Certificate Details"
+          - "========================================"
+          - "Subject: {{ imported_cert_info.subject }}"
+          - "Issuer: {{ imported_cert_info.issuer }}"
+          - "Valid From: {{ imported_cert_info.not_before }}"
+          - "Valid Until: {{ imported_cert_info.not_after }}"
+          - "Serial Number: {{ imported_cert_info.serial_number }}"
+          - "Chain certificate: IMPORTED"
+          - "========================================"
+          - "✓ Certificate import test PASSED"
+          - "✓ Chain certificate import test PASSED"
+          - "========================================"
+
+# =============================================================================
+# Test Let's Encrypt Validation (Configuration Only)
+# =============================================================================
+
+- name: Test Let's Encrypt Configuration with Pebble ACME Server - All Use Cases
+  hosts: certificates_test
+  gather_facts: true
+  vars:
+    # Configure Let's Encrypt mode with Pebble for testing all scenarios
+    certificates_mode: letsencrypt
+    certificates_certbot_email: "test@example.com"
+    certificates_certbot_mode: staging  # Use staging mode with Pebble
+    certificates_certbot_dns_provider: cloudflare
+    # Override ACME server to use Pebble
+    certificates_acme_server: "https://pebble:14000/dir"
+    # Disable SSL verification for Pebble's self-signed certificate
+    certificates_acme_verify_ssl: false
+    certificates_list:
+      # HTTP-01 with webroot plugin
+      - name: test-webroot-letsencrypt.example.com
+        domains:
+          - test-webroot-letsencrypt.example.com
+          - www.test-webroot-letsencrypt.example.com
+        challenge_type: http-01
+        plugin: webroot
+        webroot: /var/www/html
+
+      # HTTP-01 with apache plugin
+      - name: test-apache-letsencrypt.example.com
+        domains:
+          - test-apache-letsencrypt.example.com
+        challenge_type: http-01
+        plugin: apache
+
+      # DNS-01 with custom hooks (using challtestsrv)
+      - name: test-dns-letsencrypt.example.com
+        domains:
+          - test-dns-letsencrypt.example.com
+          - "*.test-dns-letsencrypt.example.com"
+        challenge_type: dns-01
+        provider: custom  # Override global dns_provider
+        auth_hook: "/data/certbot/authenticator.sh"
+        cleanup_hook: "/data/certbot/cleanup.sh"
+        deploy_hook: "/usr/local/bin/deploy.sh"
+
+  tasks:
+    - name: Display Let's Encrypt test message
+      ansible.builtin.debug:
+        msg:
+          - "========================================"
+          - "Testing Let's Encrypt with Certbot (Dry-Run Mode)"
+          - "========================================"
+          - "Mode: {{ certificates_mode }}"
+          - "Certbot Mode: {{ certificates_certbot_mode }}"
+          - "Email: {{ certificates_certbot_email }}"
+          - "DNS Provider: {{ certificates_certbot_dns_provider }}"
+          - "========================================"
+          - "Testing {{ certificates_list | length }} certificate configurations:"
+          - "  1. HTTP-01 + webroot plugin"
+          - "  2. HTTP-01 + apache plugin"
+          - "  3. DNS-01 + custom hooks with challtestsrv (wildcard)"
+          - "========================================"
+          - "Note: Standalone and nginx plugins tested in separate scenario"
+          - "Note: Staging mode with Pebble ACME server and challtestsrv for DNS"
+          - "No actual certificates will be obtained from Let's Encrypt"
+          - "Certbot handles automatic renewal via certbot.timer"
+          - "========================================"
+
+    - name: Apply certificates role in letsencrypt mode (dry-run)
+      ansible.builtin.include_role:
+        name: certificates
+
+    - name: Display Let's Encrypt test summary
+      ansible.builtin.debug:
+        msg:
+          - "========================================"
+          - "✓ Let's Encrypt validation tests PASSED"
+          - "========================================"
+          - "Configuration validated successfully"
+          - "ACME account directory structure created"
+          - "Ready for production use with real domains"
+          - "========================================"

@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Include jlira.web_server.certificates.validate.yml
+  ansible.builtin.include_tasks: validate.yml
+  tags:
+    - always
+
+- name: Include jlira.web_server.certificates.install.yml
+  ansible.builtin.include_tasks:
+    file: install.yml
+    apply:
+      tags:
+        - certificates_install
+        - install
+  tags:
+    - certificates_install
+    - certificates
+
+- name: Include jlira.web_server.certificates.selfsigned.yml
+  ansible.builtin.include_tasks:
+    file: selfsigned.yml
+    apply:
+      tags:
+        - certificates_selfsigned
+        - certificates
+  when:
+    - certificates_mode == 'selfsigned'
+    - certificates_list | length > 0
+  tags:
+    - certificates_selfsigned
+    - certificates
+
+- name: Include jlira.web_server.certificates.import.yml
+  ansible.builtin.include_tasks:
+    file: import.yml
+    apply:
+      tags:
+        - certificates_import
+        - certificates
+  when:
+    - certificates_mode == 'import'
+    - certificates_list | length > 0
+  tags:
+    - certificates_import
+    - certificates
+
+- name: Include jlira.web_server.certificates.letsencrypt.yml
+  ansible.builtin.include_tasks:
+    file: letsencrypt.yml
+    apply:
+      tags:
+        - certificates_letsencrypt
+        - certificates
+  when:
+    - certificates_mode == 'letsencrypt'
+    - certificates_list | length > 0
+  tags:
+    - certificates_letsencrypt
+    - certificates
+
+- name: Display completion message
+  ansible.builtin.debug:
+    msg:
+      - "======================================================================="
+      - "Certificates Role Execution Complete"
+      - "======================================================================="
+      - "Mode: {{ certificates_mode }}"
+      - "Certificates managed: {{ certificates_list | length }}"
+      - "Certificate directory: {{ certificates_cert_dir }}"
+      - "Private key directory: {{ certificates_key_dir }}"
+      - "======================================================================="
+  when: certificates_list | length > 0

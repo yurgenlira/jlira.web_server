@@ -1,0 +1,91 @@
+---
+dependency:
+  name: galaxy
+  options:
+    ignore-certs: false
+    ignore-errors: false
+    role-file: requirements.yml
+    requirements-file: requirements.yml
+
+driver:
+  name: docker
+
+platforms:
+  # Pebble ACME test server for Let's Encrypt testing
+  - name: pebble
+    image: ghcr.io/letsencrypt/pebble:latest
+    pre_build_image: true
+    command: -config /test/config/pebble-config.json
+    published_ports:
+      - "14000:14000"  # ACME API
+      - "15000:15000"  # Management API
+    env:
+      PEBBLE_VA_NOSLEEP: "1"
+      PEBBLE_VA_ALWAYS_VALID: "1"  # Accept all validations for testing
+    networks:
+      - name: molecule
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "https://localhost:15000/dir"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Main test instance (no web server running, for standalone plugin)
+  - name: ${MOLECULE_SCENARIO_NAME}-instance
+    image: geerlingguy/docker-ubuntu2404-ansible
+    pre_build_image: true
+    groups:
+      - certificates_standalone_test
+    # --- Systemd requirements ---
+    privileged: true
+    command: "/usr/lib/systemd/systemd"
+    cgroupns_mode: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    networks:
+      - name: molecule
+    dns_servers:
+      - 8.8.8.8  # Ensure DNS resolution works
+
+ansible:
+  cfg:
+    defaults:
+      host_key_checking: false
+      verbosity: 1
+      roles_path: '$MOLECULE_PROJECT_DIRECTORY/../roles'
+    ssh_connection:
+      pipelining: true
+  env:
+    ANSIBLE_FORCE_COLOR: "1"
+    ANSIBLE_LOAD_CALLBACK_PLUGINS: "1"
+
+  executor:
+    backend: ansible-playbook
+    args:
+      ansible_playbook:
+        - --diff
+        - --force-handlers
+        - --inventory=inventory/hosts.yml
+      ansible_navigator:
+        - --mode stdout
+        - --pull-policy missing
+        - --execution-environment-image ghcr.io/ansible/community-ansible-dev-tools:latest
+
+  playbooks:
+    converge: converge.yml
+    prepare: prepare.yml
+    verify: verify.yml
+
+scenario:
+  name: certificates_standalone
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - verify
+    - cleanup
+    - destroy

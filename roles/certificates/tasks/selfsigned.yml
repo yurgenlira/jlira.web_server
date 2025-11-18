@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Generate private keys for self-signed certificates
+  community.crypto.openssl_privatekey:
+    path: "{{ certificates_key_dir }}/{{ item.name }}.key"
+    size: "{{ item.key_size | default(4096) }}"
+    type: RSA
+    mode: "0600"
+    owner: root
+    group: root
+    state: present
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Check if certificates already exist
+  ansible.builtin.stat:
+    path: "{{ certificates_cert_dir }}/{{ item.name }}.crt"
+  register: certificates_existing_certs
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Generate Certificate Signing Requests (CSRs)
+  community.crypto.openssl_csr:
+    path: "{{ certificates_cert_dir }}/{{ item.item.name }}.csr"
+    privatekey_path: "{{ certificates_key_dir }}/{{ item.item.name }}.key"
+    common_name: "{{ item.item.common_name }}"
+    country_name: "{{ item.item.country | default(omit) }}"
+    state_or_province_name: "{{ item.item.state | default(omit) }}"
+    locality_name: "{{ item.item.locality | default(omit) }}"
+    organization_name: "{{ item.item.organization | default(omit) }}"
+    organizational_unit_name: "{{ item.item.organizational_unit | default(omit) }}"
+    email_address: "{{ item.item.email | default(omit) }}"
+    subject_alt_name: "{{ item.item.san | default(omit) }}"
+    mode: "0644"
+    owner: root
+    group: root
+  loop: "{{ certificates_existing_certs.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: not item.stat.exists
+
+- name: Generate self-signed certificates
+  community.crypto.x509_certificate:
+    path: "{{ certificates_cert_dir }}/{{ item.item.name }}.crt"
+    privatekey_path: "{{ certificates_key_dir }}/{{ item.item.name }}.key"
+    csr_path: "{{ certificates_cert_dir }}/{{ item.item.name }}.csr"
+    provider: selfsigned
+    selfsigned_not_after: "+{{ item.item.days | default(365) }}d"
+    mode: "0644"
+    owner: root
+    group: root
+    state: present
+  loop: "{{ certificates_existing_certs.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: not item.stat.exists
+
+- name: Remove CSR files (cleanup)
+  ansible.builtin.file:
+    path: "{{ certificates_cert_dir }}/{{ item.name }}.csr"
+    state: absent
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: false
+
+- name: Display generated certificate information
+  ansible.builtin.debug:
+    msg:
+      - "Self-signed certificate generated successfully"
+      - "  Name: {{ item.name }}"
+      - "  Common Name: {{ item.common_name }}"
+      - "  Certificate: {{ certificates_cert_dir }}/{{ item.name }}.crt"
+      - "  Private Key: {{ certificates_key_dir }}/{{ item.name }}.key"
+      - "  Validity: {{ item.days | default(365) }} days"
+      - "  Key Size: {{ item.key_size | default(4096) }} bits"
+      - "{% if item.san is defined %}  SAN: {{ item.san | join(', ') }}{% endif %}"
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"

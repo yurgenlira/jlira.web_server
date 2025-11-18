@@ -1,0 +1,85 @@
+---
+# Prepare playbook runs before converge to set up test prerequisites
+- name: Prepare
+  hosts: certificates_standalone_test
+  gather_facts: false
+  tasks:
+    - name: Update package cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      become: true
+
+    # =============================================================================
+    # Configure Pebble ACME Server Trust
+    # =============================================================================
+    - name: Install ca-certificates package
+      ansible.builtin.apt:
+        name: ca-certificates
+        state: present
+      become: true
+
+    - name: Download Pebble root CA certificate
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/letsencrypt/pebble/main/test/certs/pebble.minica.pem
+        dest: /usr/local/share/ca-certificates/pebble-root.crt
+        mode: '0644'
+      become: true
+      register: pebble_ca_download
+      retries: 3
+      delay: 5
+      until: pebble_ca_download is succeeded
+
+    - name: Update CA certificates trust store
+      ansible.builtin.command: update-ca-certificates
+      become: true
+      changed_when: false
+
+    - name: Wait for Pebble ACME server to be ready
+      ansible.builtin.uri:
+        url: https://pebble:14000/dir
+        validate_certs: false
+        return_content: true
+      register: pebble_health
+      until: pebble_health.status == 200
+      retries: 30
+      delay: 10
+
+    # =============================================================================
+    # Install nginx for plugin testing
+    # =============================================================================
+    - name: Install nginx for plugin testing
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+      become: true
+
+    - name: Ensure nginx is stopped (standalone plugin needs port 80)
+      ansible.builtin.systemd:
+        name: nginx
+        state: stopped
+      become: true
+
+    # =============================================================================
+    # Create dummy hook scripts for testing
+    # =============================================================================
+    - name: Create directory for certbot hooks
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /usr/local/bin
+        - /data/certbot
+      become: true
+
+    - name: Create dummy deploy hook script
+      ansible.builtin.copy:
+        dest: /usr/local/bin/deploy.sh
+        content: |
+          #!/bin/bash
+          # Dummy deploy hook for testing
+          echo "Deploy hook called for domain: ${RENEWED_DOMAINS}"
+          exit 0
+        mode: '0755'
+      become: true

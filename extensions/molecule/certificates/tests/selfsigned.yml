@@ -1,0 +1,154 @@
+---
+# =============================================================================
+# Self-Signed Certificate Tests
+# =============================================================================
+
+- name: Verify all certificate files exist
+  ansible.builtin.stat:
+    path: "{{ certificates_cert_dir }}/{{ item.name }}.crt"
+  register: cert_files
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  failed_when: not cert_files.stat.exists
+
+- name: Verify all private key files exist
+  ansible.builtin.stat:
+    path: "{{ certificates_key_dir }}/{{ item.name }}.key"
+  register: key_files
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  failed_when: not key_files.stat.exists
+
+- name: Verify certificate file permissions
+  ansible.builtin.assert:
+    that:
+      - item.stat.mode == '0644'
+      - item.stat.pw_name == 'root'
+      - item.stat.gr_name == 'root'
+    fail_msg: "Certificate {{ item.item.name }}.crt has incorrect permissions"
+    success_msg: "Certificate {{ item.item.name }}.crt has correct permissions"
+  loop: "{{ cert_files.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Verify private key file permissions
+  ansible.builtin.assert:
+    that:
+      - item.stat.mode == '0600'
+      - item.stat.pw_name == 'root'
+      - item.stat.gr_name == 'root'
+    fail_msg: "Private key {{ item.item.name }}.key has incorrect permissions"
+    success_msg: "Private key {{ item.item.name }}.key has correct permissions"
+  loop: "{{ key_files.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Get certificate information
+  community.crypto.x509_certificate_info:
+    path: "{{ certificates_cert_dir }}/{{ item.name }}.crt"
+  register: cert_info
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Verify basic certificate (test-basic.local)
+  ansible.builtin.assert:
+    that:
+      - cert_info.results[0].subject.commonName == 'test-basic.local'
+      - cert_info.results[0].subject.organizationName == 'Test Organization'
+      - cert_info.results[0].issuer.commonName == 'test-basic.local'
+    fail_msg: "Basic certificate validation failed"
+    success_msg: "Basic certificate is valid"
+
+- name: Verify advanced certificate (test-advanced.local)
+  ansible.builtin.assert:
+    that:
+      - cert_info.results[1].subject.commonName == 'test-advanced.local'
+      - cert_info.results[1].subject.organizationName == 'Advanced Test Org'
+      - cert_info.results[1].subject.organizationalUnitName == 'IT Department'
+      - cert_info.results[1].subject.countryName == 'US'
+      - cert_info.results[1].subject.stateOrProvinceName == 'California'
+      - cert_info.results[1].subject.localityName == 'San Francisco'
+      - cert_info.results[1].subject.emailAddress == 'test@example.com'
+    fail_msg: "Advanced certificate validation failed"
+    success_msg: "Advanced certificate is valid"
+
+- name: Verify SAN certificate (test-san.local)
+  ansible.builtin.assert:
+    that:
+      - cert_info.results[2].subject.commonName == 'test-san.local'
+      - "'DNS:www.test-san.local' in cert_info.results[2].subject_alt_name"
+      - "'DNS:api.test-san.local' in cert_info.results[2].subject_alt_name"
+      - "'DNS:mail.test-san.local' in cert_info.results[2].subject_alt_name"
+      - "'IP:192.168.1.100' in cert_info.results[2].subject_alt_name"
+      - "'IP:10.0.0.1' in cert_info.results[2].subject_alt_name"
+    fail_msg: "SAN certificate validation failed"
+    success_msg: "SAN certificate is valid"
+
+- name: Verify multi-domain certificate (test-multidomain.local)
+  ansible.builtin.assert:
+    that:
+      - cert_info.results[3].subject.commonName == 'test-multidomain.local'
+      - "'DNS:www.test-multidomain.local' in cert_info.results[3].subject_alt_name"
+      - "'DNS:*.test-multidomain.local' in cert_info.results[3].subject_alt_name"
+    fail_msg: "Multi-domain certificate validation failed"
+    success_msg: "Multi-domain certificate is valid"
+
+- name: Verify certificate validity period for basic cert
+  ansible.builtin.assert:
+    that:
+      - >-
+        (cert_info.results[0].not_after | to_datetime('%Y%m%d%H%M%SZ')) >
+        (ansible_date_time.iso8601 | to_datetime('%Y-%m-%dT%H:%M:%SZ'))
+    fail_msg: "Certificate has expired or invalid validity period"
+    success_msg: "Certificate validity period is correct"
+
+- name: Verify private key matches certificate
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      cert_modulus=$(openssl x509 -noout -modulus \
+        -in {{ certificates_cert_dir }}/{{ item.name }}.crt | openssl md5)
+      key_modulus=$(openssl rsa -noout -modulus \
+        -in {{ certificates_key_dir }}/{{ item.name }}.key | openssl md5)
+      if [ "$cert_modulus" = "$key_modulus" ]; then
+        echo "match"
+      else
+        echo "no_match"
+        exit 1
+      fi
+    executable: /bin/bash
+  register: key_match
+  changed_when: false
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  failed_when: "'no_match' in key_match.stdout"
+
+- name: Verify CSR files were cleaned up
+  ansible.builtin.stat:
+    path: "{{ certificates_cert_dir }}/{{ item.name }}.csr"
+  register: csr_cleanup
+  loop: "{{ certificates_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  failed_when: csr_cleanup.stat.exists
+
+- name: Display certificate test results summary
+  ansible.builtin.debug:
+    msg:
+      - "=========================================="
+      - "Certificate Verification Summary"
+      - "=========================================="
+      - "✓ All {{ certificates_list | length }} certificates generated successfully"
+      - "✓ All certificate files have correct permissions (0644)"
+      - "✓ All private key files have correct permissions (0600)"
+      - "✓ Basic certificate validated (test-basic.local)"
+      - "✓ Advanced certificate with full X.509 fields validated (test-advanced.local)"
+      - "✓ SAN certificate with multiple domains and IPs validated (test-san.local)"
+      - "✓ Multi-domain wildcard certificate validated (test-multidomain.local)"
+      - "✓ All private keys match their certificates"
+      - "✓ CSR files properly cleaned up"
+      - "=========================================="
