@@ -37,6 +37,7 @@
           --dry-run
           {% else %}
           --keep-until-expiring
+          --expand
           {% endif %}
 
     - name: Obtain certificate with HTTP-01 challenge {{ certificates_item.name }}
@@ -101,6 +102,7 @@
               --dry-run
               {% else %}
               --keep-until-expiring
+              --expand
               {% endif %}
 
         - name: Obtain certificate with DNS-01 standard provider {{ certificates_item.name }}
@@ -155,6 +157,7 @@
               --dry-run
               {% else %}
               --keep-until-expiring
+              --expand
               {% endif %}
 
         - name: Obtain certificate with DNS-01 custom hooks {{ certificates_item.name }}
