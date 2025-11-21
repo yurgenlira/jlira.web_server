@@ -1,0 +1,17 @@
+---
+- name: Initialize prepared certificates list
+  ansible.builtin.set_fact:
+    certificates_prepared_items: []
+
+- name: Normalize certificate modes
+  ansible.builtin.set_fact:
+    certificates_prepared_items: >-
+      {{ certificates_prepared_items + [certificates_item | combine({'mode': _mode})] }}
+  vars:
+    _tld: "{{ certificates_item.name.split('.')[-1] }}"
+    _auto_mode: >-
+      {{ 'selfsigned' if _tld in ['test', 'example', 'local', 'invalid', 'localhost'] else 'letsencrypt' }}
+    _mode: "{{ certificates_item.mode | default(_auto_mode) }}"
+  loop: "{{ certificates_items }}"
+  loop_control:
+    loop_var: certificates_item

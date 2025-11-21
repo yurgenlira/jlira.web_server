@@ -1,0 +1,38 @@
+---
+# General Configuration
+certificates_cert_dir: "/etc/ssl/certs"
+certificates_key_dir: "/etc/ssl/private"
+
+# Global Defaults for Certificates
+certificates_global_defaults:
+  country_name: "US"
+  state_or_province_name: "California"
+  locality_name: "San Francisco"
+  organization_name: "Example Corp"
+  organizational_unit_name: "IT"
+  email_address: "admin@example.com"
+
+# Self-Signed Defaults
+certificates_selfsigned_defaults:
+  key_size: 4096
+  validity_days: 365
+  key_type: "RSA"
+  digest: "sha256"
+
+# Let's Encrypt (ACME) Defaults
+certificates_acme_environment: "production" # or "staging"
+certificates_acme_defaults:
+  acme_directory_production: "https://acme-v02.api.letsencrypt.org/directory"
+  acme_directory_staging: "https://acme-staging-v02.api.letsencrypt.org/directory"
+  account_key_src: "/etc/ssl/private/account.key"
+  account_email: "{{ certificates_global_defaults.email_address }}"
+  challenge_type: "http-01"
+  remaining_days: 10
+
+# List of certificates to manage
+# Format:
+# certificates_items:
+#   - name: example.com
+#     mode: selfsigned | letsencrypt | imported  (optional, auto-detected if missing)
+#     ... specific params ...
+certificates_items: []

@@ -1,0 +1,42 @@
+---
+- name: Ensure private key exists (Self-Signed)
+  community.crypto.openssl_privatekey:
+    path: "{{ certificates_key_dir }}/{{ certificates_item.name }}.key"
+    size: "{{ certificates_item.key_size | default(certificates_selfsigned_defaults.key_size) }}"
+    type: "{{ certificates_item.key_type | default(certificates_selfsigned_defaults.key_type) }}"
+  register: certificates_selfsigned_key
+
+- name: Generate CSR (Self-Signed)
+  community.crypto.openssl_csr:
+    path: "/tmp/{{ certificates_item.name }}.csr"
+    privatekey_path: "{{ certificates_key_dir }}/{{ certificates_item.name }}.key"
+    common_name: "{{ certificates_item.common_name | default(certificates_item.name) }}"
+    country_name: >-
+      {{ certificates_item.country_name | default(certificates_global_defaults.country_name) }}
+    state_or_province_name: >-
+      {{ certificates_item.state_or_province_name | default(certificates_global_defaults.state_or_province_name) }}
+    locality_name: >-
+      {{ certificates_item.locality_name | default(certificates_global_defaults.locality_name) }}
+    organization_name: >-
+      {{ certificates_item.organization_name | default(certificates_global_defaults.organization_name) }}
+    organizational_unit_name: >-
+      {{ certificates_item.organizational_unit_name | default(certificates_global_defaults.organizational_unit_name) }}
+    email_address: >-
+      {{ certificates_item.email_address | default(certificates_global_defaults.email_address) }}
+    subject_alt_name: "{{ certificates_item.san | default(omit) }}"
+  register: certificates_selfsigned_csr
+
+- name: Generate Self-Signed Certificate
+  community.crypto.x509_certificate:
+    path: "{{ certificates_cert_dir }}/{{ certificates_item.name }}.crt"
+    privatekey_path: "{{ certificates_key_dir }}/{{ certificates_item.name }}.key"
+    csr_path: "/tmp/{{ certificates_item.name }}.csr"
+    provider: selfsigned
+    selfsigned_not_after: >-
+      +{{ certificates_item.validity_days | default(certificates_selfsigned_defaults.validity_days) }}d
+  register: certificates_selfsigned_cert
+
+- name: Remove CSR file (Self-Signed)
+  ansible.builtin.file:
+    path: "/tmp/{{ certificates_item.name }}.csr"
+    state: absent

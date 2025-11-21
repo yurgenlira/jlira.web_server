@@ -1,0 +1,9 @@
+---
+- name: Ensure certificate directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ certificates_cert_dir }}"
+    - "{{ certificates_key_dir }}"

@@ -1,0 +1,87 @@
+---
+- name: Set ACME directory based on environment
+  ansible.builtin.set_fact:
+    certificates_acme_directory: >-
+      {%- if certificates_acme_environment == 'production' -%}
+        {{ certificates_acme_defaults.acme_directory_production }}
+      {%- else -%}
+        {{ certificates_acme_defaults.acme_directory_staging }}
+      {%- endif -%}
+
+- name: Ensure ACME account key exists
+  community.crypto.openssl_privatekey:
+    path: "{{ certificates_acme_defaults.account_key_src }}"
+    size: 4096
+    type: RSA
+  run_once: true
+
+- name: Register ACME account
+  community.crypto.acme_account:
+    account_key_src: "{{ certificates_acme_defaults.account_key_src }}"
+    state: present
+    contact:
+      - "mailto:{{ certificates_acme_defaults.account_email }}"
+    acme_directory: "{{ certificates_acme_directory }}"
+    acme_version: 2
+    terms_agreed: true
+  run_once: true
+
+- name: Ensure private key exists (Let's Encrypt)
+  community.crypto.openssl_privatekey:
+    path: "{{ certificates_key_dir }}/{{ certificates_item.name }}.key"
+    size: "{{ certificates_item.key_size | default(certificates_selfsigned_defaults.key_size) }}"
+    type: "{{ certificates_item.key_type | default(certificates_selfsigned_defaults.key_type) }}"
+
+- name: Generate CSR (Let's Encrypt)
+  community.crypto.openssl_csr:
+    path: "/tmp/{{ certificates_item.name }}.csr"
+    privatekey_path: "{{ certificates_key_dir }}/{{ certificates_item.name }}.key"
+    common_name: "{{ certificates_item.common_name | default(certificates_item.name) }}"
+    subject_alt_name: "{{ certificates_item.san | default(omit) }}"
+
+- name: Create challenge directory
+  ansible.builtin.file:
+    path: "{{ certificates_item.webroot | default('/var/www/html') }}/.well-known/acme-challenge"
+    state: directory
+    mode: '0755'
+  when: >
+    certificates_item.challenge_type | default(certificates_acme_defaults.challenge_type) == 'http-01'
+
+- name: Create certificate (Let's Encrypt) - Step 1 (Challenge)
+  community.crypto.acme_certificate:
+    account_key_src: "{{ certificates_acme_defaults.account_key_src }}"
+    csr: "/tmp/{{ certificates_item.name }}.csr"
+    dest: "{{ certificates_cert_dir }}/{{ certificates_item.name }}.crt"
+    acme_directory: "{{ certificates_acme_directory }}"
+    acme_version: 2
+    challenge: "{{ certificates_item.challenge_type | default(certificates_acme_defaults.challenge_type) }}"
+    remaining_days: "{{ certificates_acme_defaults.remaining_days }}"
+  register: certificates_acme_challenge
+
+- name: Implement http-01 challenge
+  ansible.builtin.copy:
+    dest: >-
+      {{ certificates_item.webroot | default('/var/www/html') }}/{{
+      certificates_acme_challenge.challenge_data[certificates_item.name]['http-01']['resource'] }}
+    content: >-
+      {{ certificates_acme_challenge.challenge_data[certificates_item.name]['http-01']['resource_value'] }}
+  when:
+    - certificates_acme_challenge is changed
+    - >
+      certificates_item.challenge_type | default(certificates_acme_defaults.challenge_type) == 'http-01'
+
+- name: Create certificate (Let's Encrypt) - Step 2 (Validation)
+  community.crypto.acme_certificate:
+    account_key_src: "{{ certificates_acme_defaults.account_key_src }}"
+    csr: "/tmp/{{ certificates_item.name }}.csr"
+    dest: "{{ certificates_cert_dir }}/{{ certificates_item.name }}.crt"
+    acme_directory: "{{ certificates_acme_directory }}"
+    acme_version: 2
+    challenge: "{{ certificates_item.challenge_type | default(certificates_acme_defaults.challenge_type) }}"
+    data: "{{ certificates_acme_challenge }}"
+  when: certificates_acme_challenge is changed
+
+- name: Remove CSR file (Let's Encrypt)
+  ansible.builtin.file:
+    path: "/tmp/{{ certificates_item.name }}.csr"
+    state: absent

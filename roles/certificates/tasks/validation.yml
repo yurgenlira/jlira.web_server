@@ -1,0 +1,21 @@
+---
+- name: Validate certificate configuration
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.mode | default('auto') in ['auto', 'selfsigned', 'letsencrypt', 'imported']
+    fail_msg: "Invalid configuration for certificate {{ item.name | default('undefined') }}"
+  loop: "{{ certificates_items }}"
+  loop_control:
+    label: "{{ item.name | default('undefined') }}"
+
+- name: Validate imported certificate requirements
+  ansible.builtin.assert:
+    that:
+      - item.src_cert is defined
+      - item.src_key is defined
+    fail_msg: "Imported certificate {{ item.name }} requires src_cert and src_key"
+  loop: "{{ certificates_items }}"
+  when: item.mode | default('auto') == 'imported'
+  loop_control:
+    label: "{{ item.name }}"

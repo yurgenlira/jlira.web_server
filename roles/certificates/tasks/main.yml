@@ -1,0 +1,93 @@
+---
+- name: Validate configuration
+  ansible.builtin.include_tasks: validation.yml
+  args:
+    apply:
+      tags:
+        - certificates
+        - validation
+  tags:
+    - certificates
+    - validation
+
+- name: Setup certificate directories
+  ansible.builtin.include_tasks: setup.yml
+  args:
+    apply:
+      tags:
+        - certificates
+        - setup
+  tags:
+    - certificates
+    - setup
+
+- name: Prepare certificates (Normalize modes)
+  ansible.builtin.include_tasks: prepare.yml
+  args:
+    apply:
+      tags:
+        - certificates
+        - process
+  tags:
+    - certificates
+    - process
+
+- name: Process Self-Signed Certificates
+  ansible.builtin.include_tasks: selfsigned.yml
+  loop: "{{ certificates_prepared_items | selectattr('mode', 'equalto', 'selfsigned') }}"
+  loop_control:
+    loop_var: certificates_item
+  args:
+    apply:
+      tags:
+        - certificates
+        - selfsigned
+  tags:
+    - certificates
+    - selfsigned
+
+- name: Process Let's Encrypt Certificates
+  ansible.builtin.include_tasks: letsencrypt.yml
+  loop: "{{ certificates_prepared_items | selectattr('mode', 'equalto', 'letsencrypt') }}"
+  loop_control:
+    loop_var: certificates_item
+  args:
+    apply:
+      tags:
+        - certificates
+        - letsencrypt
+  tags:
+    - certificates
+    - letsencrypt
+
+- name: Process Imported Certificates
+  ansible.builtin.include_tasks: imported.yml
+  loop: "{{ certificates_prepared_items | selectattr('mode', 'equalto', 'imported') }}"
+  loop_control:
+    loop_var: certificates_item
+  args:
+    apply:
+      tags:
+        - certificates
+        - imported
+  tags:
+    - certificates
+    - imported
+
+- name: Certificate Management Summary
+  ansible.builtin.debug:
+    msg:
+      - "Total certificates managed: {{ certificates_prepared_items | default([]) | length }}"
+      - >-
+        Self-Signed:
+        {{ certificates_prepared_items | default([]) | selectattr('mode', 'equalto', 'selfsigned') | list | length }}
+      - >-
+        Let's Encrypt:
+        {{ certificates_prepared_items | default([]) | selectattr('mode', 'equalto', 'letsencrypt') | list | length }}
+      - >-
+        Imported:
+        {{ certificates_prepared_items | default([]) | selectattr('mode', 'equalto', 'imported') | list | length }}
+  when: certificates_prepared_items is defined
+  tags:
+    - certificates
+    - summary

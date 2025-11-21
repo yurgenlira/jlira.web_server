@@ -1,0 +1,19 @@
+---
+- name: Import Certificate File
+  ansible.builtin.copy:
+    src: "{{ certificates_item.src_cert }}"
+    dest: "{{ certificates_cert_dir }}/{{ certificates_item.name }}.crt"
+    mode: '0644'
+
+- name: Import Private Key File
+  ansible.builtin.copy:
+    src: "{{ certificates_item.src_key }}"
+    dest: "{{ certificates_key_dir }}/{{ certificates_item.name }}.key"
+    mode: '0600'
+
+- name: Import Chain File (Optional)
+  ansible.builtin.copy:
+    src: "{{ certificates_item.src_chain }}"
+    dest: "{{ certificates_cert_dir }}/{{ certificates_item.name }}.chain.crt"
+    mode: '0644'
+  when: certificates_item.src_chain is defined
