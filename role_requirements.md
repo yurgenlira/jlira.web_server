@@ -45,6 +45,7 @@ etc
 - Environment Selection: Ability to switch between production, staging, and dry-run environments for testing and validation. Allow to change acme URL to test (for use pebble).
 - Credentials Management: Secure handling of DNS provider credentials via environment variables.
 - Hooks: Support for pre/post-hooks (auth, cleanup, deploy) to handle complex validation scenarios and service reloads.
+- Renewal: The role must support automatic certificate renewal (e.g., via systemd timers or cron) without requiring manual intervention.
 
 2.3 Imported Certificates
 - External Files: Ability to import existing certificate files (cert, key, chain) from the control node to the target machine.

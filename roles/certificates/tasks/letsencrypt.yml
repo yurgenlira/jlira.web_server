@@ -1,87 +1,64 @@
 ---
-- name: Set ACME directory based on environment
-  ansible.builtin.set_fact:
-    certificates_acme_directory: >-
-      {%- if certificates_acme_environment == 'production' -%}
-        {{ certificates_acme_defaults.acme_directory_production }}
-      {%- else -%}
-        {{ certificates_acme_defaults.acme_directory_staging }}
-      {%- endif -%}
+- name: Issue Certificate (HTTP-01)
+  ansible.builtin.command:
+    cmd: >-
+      certbot certonly --non-interactive --agree-tos
+      --email {{ certificates_certbot_defaults.email }}
+      --server {{ certificates_certbot_defaults.server_url }}
+      --webroot -w {{ certificates_item.webroot | default('/var/www/html') }}
+      {% set deploy = certificates_item.deploy_hook | default(certificates_certbot_defaults.deploy_hook) %}
+      {{ '--deploy-hook "' + deploy + '"' if deploy else '' }}
+      -d {{ certificates_item.name }}
+      {{ '-d ' + certificates_item.san | join(' -d ') if certificates_item.san is defined else '' }}
+  args:
+    creates: "/etc/letsencrypt/live/{{ certificates_item.name }}/cert.pem"
+  when: certificates_item.challenge_type | default('http-01') == 'http-01'
 
-- name: Ensure ACME account key exists
-  community.crypto.openssl_privatekey:
-    path: "{{ certificates_acme_defaults.account_key_src }}"
-    size: 4096
-    type: RSA
-  run_once: true
-
-- name: Register ACME account
-  community.crypto.acme_account:
-    account_key_src: "{{ certificates_acme_defaults.account_key_src }}"
-    state: present
-    contact:
-      - "mailto:{{ certificates_acme_defaults.account_email }}"
-    acme_directory: "{{ certificates_acme_directory }}"
-    acme_version: 2
-    terms_agreed: true
-  run_once: true
-
-- name: Ensure private key exists (Let's Encrypt)
-  community.crypto.openssl_privatekey:
-    path: "{{ certificates_key_dir }}/{{ certificates_item.name }}.key"
-    size: "{{ certificates_item.key_size | default(certificates_selfsigned_defaults.key_size) }}"
-    type: "{{ certificates_item.key_type | default(certificates_selfsigned_defaults.key_type) }}"
-
-- name: Generate CSR (Let's Encrypt)
-  community.crypto.openssl_csr:
-    path: "/tmp/{{ certificates_item.name }}.csr"
-    privatekey_path: "{{ certificates_key_dir }}/{{ certificates_item.name }}.key"
-    common_name: "{{ certificates_item.common_name | default(certificates_item.name) }}"
-    subject_alt_name: "{{ certificates_item.san | default(omit) }}"
-
-- name: Create challenge directory
-  ansible.builtin.file:
-    path: "{{ certificates_item.webroot | default('/var/www/html') }}/.well-known/acme-challenge"
-    state: directory
-    mode: '0755'
-  when: >
-    certificates_item.challenge_type | default(certificates_acme_defaults.challenge_type) == 'http-01'
-
-- name: Create certificate (Let's Encrypt) - Step 1 (Challenge)
-  community.crypto.acme_certificate:
-    account_key_src: "{{ certificates_acme_defaults.account_key_src }}"
-    csr: "/tmp/{{ certificates_item.name }}.csr"
-    dest: "{{ certificates_cert_dir }}/{{ certificates_item.name }}.crt"
-    acme_directory: "{{ certificates_acme_directory }}"
-    acme_version: 2
-    challenge: "{{ certificates_item.challenge_type | default(certificates_acme_defaults.challenge_type) }}"
-    remaining_days: "{{ certificates_acme_defaults.remaining_days }}"
-  register: certificates_acme_challenge
-
-- name: Implement http-01 challenge
-  ansible.builtin.copy:
-    dest: >-
-      {{ certificates_item.webroot | default('/var/www/html') }}/{{
-      certificates_acme_challenge.challenge_data[certificates_item.name]['http-01']['resource'] }}
-    content: >-
-      {{ certificates_acme_challenge.challenge_data[certificates_item.name]['http-01']['resource_value'] }}
+- name: Issue Certificate (DNS-01 with plugin)
+  ansible.builtin.command:
+    cmd: >-
+      certbot certonly --non-interactive --agree-tos
+      --email {{ certificates_certbot_defaults.email }}
+      --server {{ certificates_certbot_defaults.server_url }}
+      --dns-{{ certificates_item.dns_provider | default(certificates_certbot_defaults.dns_provider) }}
+      --dns-{{ certificates_item.dns_provider | default(certificates_certbot_defaults.dns_provider) }}-credentials
+      {{ certificates_item.dns_credentials | default(certificates_certbot_defaults.dns_credentials) }}
+      {% set deploy = certificates_item.deploy_hook | default(certificates_certbot_defaults.deploy_hook) %}
+      {{ '--deploy-hook "' + deploy + '"' if deploy else '' }}
+      -d {{ certificates_item.name }}
+      {{ '-d ' + certificates_item.san | join(' -d ') if certificates_item.san is defined else '' }}
+  args:
+    creates: "/etc/letsencrypt/live/{{ certificates_item.name }}/cert.pem"
   when:
-    - certificates_acme_challenge is changed
-    - >
-      certificates_item.challenge_type | default(certificates_acme_defaults.challenge_type) == 'http-01'
+    - certificates_item.challenge_type | default('http-01') == 'dns-01'
+    - (certificates_item.dns_provider | default(certificates_certbot_defaults.dns_provider)) != 'custom'
 
-- name: Create certificate (Let's Encrypt) - Step 2 (Validation)
-  community.crypto.acme_certificate:
-    account_key_src: "{{ certificates_acme_defaults.account_key_src }}"
-    csr: "/tmp/{{ certificates_item.name }}.csr"
-    dest: "{{ certificates_cert_dir }}/{{ certificates_item.name }}.crt"
-    acme_directory: "{{ certificates_acme_directory }}"
-    acme_version: 2
-    challenge: "{{ certificates_item.challenge_type | default(certificates_acme_defaults.challenge_type) }}"
-    data: "{{ certificates_acme_challenge }}"
-  when: certificates_acme_challenge is changed
+- name: Issue Certificate (DNS-01 with custom hooks)
+  ansible.builtin.command:
+    cmd: >-
+      certbot certonly --non-interactive --agree-tos
+      --email {{ certificates_certbot_defaults.email }}
+      --server {{ certificates_certbot_defaults.server_url }}
+      --manual
+      --manual-auth-hook "{{ certificates_item.auth_hook | default(certificates_certbot_defaults.auth_hook) }}"
+      --manual-cleanup-hook "{{ certificates_item.cleanup_hook | default(certificates_certbot_defaults.cleanup_hook) }}"
+      --preferred-challenges dns
+      {% set deploy = certificates_item.deploy_hook | default(certificates_certbot_defaults.deploy_hook) %}
+      {{ '--deploy-hook "' + deploy + '"' if deploy else '' }}
+      -d {{ certificates_item.name }}
+      {{ '-d ' + certificates_item.san | join(' -d ') if certificates_item.san is defined else '' }}
+  args:
+    creates: "/etc/letsencrypt/live/{{ certificates_item.name }}/cert.pem"
+  when:
+    - certificates_item.challenge_type | default('http-01') == 'dns-01'
+    - (certificates_item.dns_provider | default(certificates_certbot_defaults.dns_provider)) == 'custom'
 
-- name: Remove CSR file (Let's Encrypt)
+- name: Link Certificate Files
   ansible.builtin.file:
-    path: "/tmp/{{ certificates_item.name }}.csr"
-    state: absent
+    src: "/etc/letsencrypt/live/{{ certificates_item.name }}/{{ item.src }}"
+    dest: "{{ item.dest }}"
+    state: link
+  loop:
+    - { src: 'cert.pem', dest: "{{ certificates_cert_dir }}/{{ certificates_item.name }}.crt" }
+    - { src: 'privkey.pem', dest: "{{ certificates_key_dir }}/{{ certificates_item.name }}.key" }
+    - { src: 'chain.pem', dest: "{{ certificates_cert_dir }}/{{ certificates_item.name }}.chain.crt" }

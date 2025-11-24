@@ -11,18 +11,15 @@
     path: "/tmp/{{ certificates_item.name }}.csr"
     privatekey_path: "{{ certificates_key_dir }}/{{ certificates_item.name }}.key"
     common_name: "{{ certificates_item.common_name | default(certificates_item.name) }}"
-    country_name: >-
-      {{ certificates_item.country_name | default(certificates_global_defaults.country_name) }}
-    state_or_province_name: >-
-      {{ certificates_item.state_or_province_name | default(certificates_global_defaults.state_or_province_name) }}
-    locality_name: >-
-      {{ certificates_item.locality_name | default(certificates_global_defaults.locality_name) }}
-    organization_name: >-
-      {{ certificates_item.organization_name | default(certificates_global_defaults.organization_name) }}
-    organizational_unit_name: >-
-      {{ certificates_item.organizational_unit_name | default(certificates_global_defaults.organizational_unit_name) }}
-    email_address: >-
-      {{ certificates_item.email_address | default(certificates_global_defaults.email_address) }}
+    country_name: "{{ certificates_item.country | default(certificates_selfsigned_defaults.country) }}"
+    state_or_province_name: "{{ certificates_item.state | default(certificates_selfsigned_defaults.state) }}"
+    locality_name: "{{ certificates_item.locality | default(certificates_selfsigned_defaults.locality) }}"
+    organization: >-
+      {{ certificates_item.organization | default(certificates_selfsigned_defaults.organization) }}
+    organizational_unit: >-
+      {{ certificates_item.organizational_unit
+      | default(certificates_selfsigned_defaults.organizational_unit) }}
+    email: "{{ certificates_item.email | default(certificates_selfsigned_defaults.email) }}"
     subject_alt_name: "{{ certificates_item.san | default(omit) }}"
   register: certificates_selfsigned_csr
 
