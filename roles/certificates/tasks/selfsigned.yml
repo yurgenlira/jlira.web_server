@@ -1,27 +1,37 @@
 ---
-- name: Ensure private key exists (Self-Signed)
+- name: Generate private key (Self-Signed)
   community.crypto.openssl_privatekey:
     path: "{{ certificates_key_dir }}/{{ certificates_item.name }}.key"
-    size: "{{ certificates_item.key_size | default(certificates_selfsigned_defaults.key_size) }}"
-    type: "{{ certificates_item.key_type | default(certificates_selfsigned_defaults.key_type) }}"
+    size: "{{ certificates_item.key_size | default(certificates_selfsigned_key_params.size) }}"
+    type: "{{ certificates_item.key_type | default(certificates_selfsigned_key_params.type) }}"
+    mode: "0600"
+    owner: root
+    group: root
   register: certificates_selfsigned_key
+
+- name: Check if certificate file (.crt) already exist
+  ansible.builtin.stat:
+    path: "{{ certificates_cert_dir }}/{{ certificates_item.name }}.crt"
+  register: certificates_existing_cert
 
 - name: Generate CSR (Self-Signed)
   community.crypto.openssl_csr:
     path: "/tmp/{{ certificates_item.name }}.csr"
     privatekey_path: "{{ certificates_key_dir }}/{{ certificates_item.name }}.key"
     common_name: "{{ certificates_item.common_name | default(certificates_item.name) }}"
-    country_name: "{{ certificates_item.country | default(certificates_selfsigned_defaults.country) }}"
-    state_or_province_name: "{{ certificates_item.state | default(certificates_selfsigned_defaults.state) }}"
-    locality_name: "{{ certificates_item.locality | default(certificates_selfsigned_defaults.locality) }}"
-    organization: >-
-      {{ certificates_item.organization | default(certificates_selfsigned_defaults.organization) }}
-    organizational_unit: >-
+    country_name: "{{ certificates_item.country | default(certificates_selfsigned_subject.country) }}"
+    state_or_province_name: "{{ certificates_item.state | default(certificates_selfsigned_subject.state) }}"
+    locality_name: "{{ certificates_item.locality | default(certificates_selfsigned_subject.locality) }}"
+    organization_name: >-
+      {{ certificates_item.organization | default(certificates_selfsigned_subject.organization) }}
+    organizational_unit_name: >-
       {{ certificates_item.organizational_unit
-      | default(certificates_selfsigned_defaults.organizational_unit) }}
-    email: "{{ certificates_item.email | default(certificates_selfsigned_defaults.email) }}"
+      | default(certificates_selfsigned_subject.organizational_unit) }}
+    email_address: "{{ certificates_item.email | default(certificates_selfsigned_subject.email) }}"
+    digest: "{{ certificates_item.digest | default(certificates_selfsigned_key_params.digest) }}"
     subject_alt_name: "{{ certificates_item.san | default(omit) }}"
   register: certificates_selfsigned_csr
+  when: not certificates_existing_cert.stat.exists
 
 - name: Generate Self-Signed Certificate
   community.crypto.x509_certificate:
@@ -30,8 +40,9 @@
     csr_path: "/tmp/{{ certificates_item.name }}.csr"
     provider: selfsigned
     selfsigned_not_after: >-
-      +{{ certificates_item.validity_days | default(certificates_selfsigned_defaults.validity_days) }}d
+      +{{ certificates_item.validity_days | default(certificates_selfsigned_validity_days) }}d
   register: certificates_selfsigned_cert
+  when: not certificates_existing_cert.stat.exists
 
 - name: Remove CSR file (Self-Signed)
   ansible.builtin.file:

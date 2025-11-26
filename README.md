@@ -27,7 +27,8 @@ The `jlira.web_server` collection simplifies web server deployment and managemen
 
 - **Apache HTTP Server Management**: Complete lifecycle management including installation, configuration, virtual hosts, SSL/TLS, security hardening, and monitoring
 - **PHP Management**: Multi-version PHP support with PHP-FPM, extensive configuration options, and optional components like Composer and MSSQL drivers
-- **Integration**: Seamless Apache-PHP integration with automatic PHP-FPM configuration
+- **Certificate Management**: Automated SSL/TLS certificate management with support for self-signed certificates, Let's Encrypt (via Certbot), and certificate import
+- **Integration**: Seamless Apache-PHP integration with automatic PHP-FPM configuration and certificate deployment
 - **Ready-to-Use Playbooks**: Pre-built playbooks for common deployment scenarios
 - **Production-Ready**: Security-hardened defaults, comprehensive validation, and idempotent operations
 
@@ -73,6 +74,22 @@ The `jlira.web_server` collection simplifies web server deployment and managemen
 - ✅ **Status Monitoring**: PHP-FPM status and ping endpoints
 - ✅ **Upgrade Support**: Clean migration between PHP versions
 - ✅ **Idempotent Operations**: All tasks support check mode and are fully idempotent
+
+### Certificates Role Features
+
+- ✅ **Self-Signed Certificates**: Generate self-signed certificates with customizable parameters (key size, validity, SANs, subject fields)
+- ✅ **Let's Encrypt Integration**: Automated certificate issuance and renewal via Certbot
+  - HTTP-01 challenge support for standard domains
+  - DNS-01 challenge support for wildcard certificates
+  - Support for multiple DNS providers (Cloudflare, Route53, etc.)
+  - Custom DNS authentication hooks
+  - Automatic renewal via systemd timer
+- ✅ **Certificate Import**: Import existing certificates, private keys, and chain files
+- ✅ **Auto-Detection**: Automatically selects appropriate mode based on domain TLD
+- ✅ **Flexible Configuration**: Per-certificate customization of all parameters
+- ✅ **Security**: Proper file permissions and ownership for certificates and keys
+- ✅ **Idempotent**: Safe to run multiple times without unnecessary changes
+- ✅ **Comprehensive Testing**: Full Molecule test suite with Pebble ACME server
 
 ## Requirements
 
@@ -198,6 +215,34 @@ Modern PHP installation and configuration with multi-version support.
 | `php_pool_settings` | dict | See defaults | FPM pool settings |
 
 **Documentation:** [PHP Role README](roles/php/README.md)
+
+### Certificates Role (`jlira.web_server.certificates`)
+
+Automated SSL/TLS certificate management for web servers.
+
+**Key Variables:**
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `certificates_items` | list | `[]` | List of certificates to manage |
+| `certificates_cert_dir` | string | `/etc/ssl/certs` | Certificate directory |
+| `certificates_key_dir` | string | `/etc/ssl/private` | Private key directory |
+| `certificates_certbot_email` | string | `admin@example.com` | Let's Encrypt email |
+| `certificates_certbot_environment` | string | `production` | Certbot environment |
+
+**Certificate Item Variables:**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `name` | Yes | Certificate name |
+| `mode` | No | Mode: `auto`, `selfsigned`, `letsencrypt`, or `imported` |
+| `challenge_type` | For LE | Challenge type: `http-01` or `dns-01` |
+| `webroot` | For HTTP-01 | Webroot path |
+| `dns_provider` | For DNS-01 | DNS provider name |
+| `src_cert` | For import | Source certificate file |
+| `src_key` | For import | Source private key file |
+
+**Documentation:** [Certificates Role README](roles/certificates/README.md)
 
 ## Playbooks
 
@@ -378,6 +423,41 @@ The collection includes several pre-built playbooks for common scenarios:
             type: bool
 ```
 
+### 6. Automated Let's Encrypt Certificates
+
+```yaml
+---
+- name: Web server with automated Let's Encrypt certificates
+  hosts: webservers
+  become: true
+  roles:
+    # First, generate Let's Encrypt certificates
+    - role: jlira.web_server.certificates
+      vars:
+        certificates_certbot_email: admin@example.com
+        certificates_items:
+          - name: example.com
+            mode: letsencrypt
+            challenge_type: http-01
+            webroot: /var/www/html
+            san:
+              - www.example.com
+
+    # Then configure Apache with the certificates
+    - role: jlira.web_server.apache
+      vars:
+        apache_server_name: example.com
+        apache_ssl_enabled: true
+        apache_virtual_hosts:
+          - name: example.com
+            server_name: example.com
+            document_root: /var/www/example
+            https:
+              enabled: true
+              certificate_file: /etc/letsencrypt/live/example.com/fullchain.pem
+              certificate_key_file: /etc/letsencrypt/live/example.com/privkey.pem
+```
+
 ## Testing
 
 The collection uses [Molecule](https://molecule.readthedocs.io/) for role testing.
@@ -393,6 +473,9 @@ molecule test -s apache
 
 # Test PHP role
 molecule test -s php
+
+# Test Certificates role
+molecule test -s certificates
 ```
 
 ### Development Testing
@@ -510,5 +593,6 @@ This collection is licensed under the [GPL-2.0-or-later](https://spdx.org/licens
 **Project Links:**
 - [Apache Role Documentation](roles/apache/README.md)
 - [PHP Role Documentation](roles/php/README.md)
+- [Certificates Role Documentation](roles/certificates/README.md)
 - [Playbook Examples](playbooks/README.md)
 - [Development Guide](CLAUDE.md)

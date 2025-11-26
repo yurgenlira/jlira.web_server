@@ -113,55 +113,66 @@ certificates_items: []
 # ============================================================================
 # Selfsigned Defaults for Certificates
 # ============================================================================
-# Default values for self-signed certificates including subject fields and technical parameters.
-# These can be overridden per certificate in `certificates_items`.
-# Keys:
-# - country: Country Name (2 letter code)
-# - state: State or Province Name (full name)
-# - locality: Locality Name (eg, city)
-# - organization: Organization Name (eg, company)
-# - organizational_unit: Organizational Unit Name (eg, section)
-# - email: Email Address
-# - key_size: Size of the private key in bits.
-# - validity_days: Number of days the certificate is valid.
-# - key_type: Type of key to generate (e.g., RSA).
-# - digest: Message digest to use (e.g., sha256).
+# ============================================================================
+# Selfsigned Defaults for Certificates
+# ============================================================================
+# Default values for self-signed certificates.
+
+# Subject Information (grouped as they are related)
 # Type: Dictionary
-certificates_selfsigned_defaults:
+certificates_selfsigned_subject:
   country: ""
   state: ""
   locality: ""
   organization: ""
   organizational_unit: ""
   email: ""
-  key_size: 4096
-  validity_days: 365
-  key_type: "RSA"
+
+# Technical Parameters (grouped)
+# Type: Dictionary
+certificates_selfsigned_key_params:
+  size: 4096
+  type: "RSA"
   digest: "sha256"
+
+# Type: Integer
+certificates_selfsigned_validity_days: 365
 
 # ============================================================================
 # Let's Encrypt (Certbot) Defaults
 # ============================================================================
 # Default values for Let's Encrypt certificates using Certbot.
-# These can be overridden per certificate in `certificates_items`.
-# Keys:
-# - environment: ACME environment ('production', 'staging', or 'test')
-# - email: Email address for ACME registration and recovery
-# - server_url: ACME Directory URL (required if environment is 'test', auto-selected otherwise)
-# - dns_provider: DNS provider for dns-01 challenges (e.g., 'cloudflare', 'route53', 'custom')
-# - dns_credentials: Path to DNS provider credentials file (not used for 'custom')
-# - auth_hook: Path to authentication hook script (only for dns_provider: 'custom')
-# - cleanup_hook: Path to cleanup hook script (only for dns_provider: 'custom')
-# - deploy_hook: Path to deploy hook script (runs after cert issuance)
-# Type: Dictionary
-certificates_certbot_defaults:
-  environment: "production"
-  email: "{{ certificates_selfsigned_defaults.email }}"
-  server_url: >-
-    {{ 'https://acme-v02.api.letsencrypt.org/directory' if certificates_certbot_defaults.environment == 'production'
-    else 'https://acme-staging-v02.api.letsencrypt.org/directory' }}
-  dns_provider: ""
-  dns_credentials: ""
-  auth_hook: ""
-  cleanup_hook: ""
-  deploy_hook: ""
+
+# ACME Environment ('production', 'staging', or 'test')
+# Type: String
+certificates_certbot_environment: "production"
+
+# Email address for ACME registration and recovery
+# Type: String
+certificates_certbot_email: "{{ certificates_selfsigned_subject.email }}"
+
+# ACME Directory URL (required if environment is 'test', auto-selected otherwise)
+# Type: String
+certificates_certbot_server_url: >-
+  {{ 'https://acme-v02.api.letsencrypt.org/directory' if certificates_certbot_environment == 'production'
+  else 'https://acme-staging-v02.api.letsencrypt.org/directory' }}
+
+# DNS provider for dns-01 challenges (e.g., 'cloudflare', 'route53', 'custom')
+# Type: String
+certificates_certbot_dns_provider: ""
+
+# Path to DNS provider credentials file (not used for 'custom')
+# Type: String
+certificates_certbot_dns_credentials: ""
+
+# Path to authentication hook script (only for dns_provider: 'custom')
+# Type: String
+certificates_certbot_auth_hook: ""
+
+# Path to cleanup hook script (only for dns_provider: 'custom')
+# Type: String
+certificates_certbot_cleanup_hook: ""
+
+# Path to deploy hook script (runs after cert issuance)
+# Type: String
+certificates_certbot_deploy_hook: ""

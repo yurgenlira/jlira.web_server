@@ -1,0 +1,12 @@
+---
+- name: Test - Certbot is installed
+  ansible.builtin.command: which certbot
+  register: certbot_check
+  changed_when: false
+  failed_when: certbot_check.rc != 0
+
+- name: Test - Certbot timer is enabled
+  ansible.builtin.systemd:
+    name: certbot.timer
+  register: certbot_timer
+  failed_when: not certbot_timer.status.ActiveState == "active"

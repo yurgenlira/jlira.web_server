@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: certificates-instance
+  become: true
+
+  roles:
+    - role: jlira.web_server.certificates

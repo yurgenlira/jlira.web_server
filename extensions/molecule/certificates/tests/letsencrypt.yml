@@ -1,0 +1,47 @@
+---
+- name: Test - Auto-detected Let's Encrypt certificate exists
+  ansible.builtin.stat:
+    path: /etc/letsencrypt/live/autodetect.com/cert.pem
+  register: autodetect_le_cert
+  failed_when: not autodetect_le_cert.stat.exists
+
+- name: Test - HTTP-01 certificate exists
+  ansible.builtin.stat:
+    path: /etc/letsencrypt/live/http01.example.com/cert.pem
+  register: http01_cert
+  failed_when: not http01_cert.stat.exists
+
+- name: Test - HTTP-01 certificate has SANs
+  ansible.builtin.command: >
+    openssl x509 -in /etc/letsencrypt/live/http01.example.com/cert.pem -noout -text
+  register: http01_sans
+  changed_when: false
+  failed_when: >
+    'DNS:http01.example.com' not in http01_sans.stdout or
+    'DNS:www.http01.example.com' not in http01_sans.stdout
+
+- name: Test - DNS-01 certificate exists
+  ansible.builtin.stat:
+    path: /etc/letsencrypt/live/dns01.example.com/cert.pem
+  register: dns01_cert
+  failed_when: not dns01_cert.stat.exists
+
+- name: Test - DNS-01 wildcard certificate has SANs
+  ansible.builtin.command: >
+    openssl x509 -in /etc/letsencrypt/live/dns01.example.com/cert.pem -noout -text
+  register: dns01_sans
+  changed_when: false
+  failed_when: >
+    'DNS:dns01.example.com' not in dns01_sans.stdout or
+    'DNS:*.dns01.example.com' not in dns01_sans.stdout
+
+- name: Test - All Let's Encrypt certificates are from Pebble
+  ansible.builtin.command: >
+    openssl x509 -in {{ item }} -noout -issuer
+  register: cert_issuer
+  changed_when: false
+  failed_when: "'Pebble' not in cert_issuer.stdout"
+  loop:
+    - /etc/letsencrypt/live/autodetect.com/cert.pem
+    - /etc/letsencrypt/live/http01.example.com/cert.pem
+    - /etc/letsencrypt/live/dns01.example.com/cert.pem

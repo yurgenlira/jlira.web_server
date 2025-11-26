@@ -1,0 +1,249 @@
+---
+- name: Prepare
+  hosts: certificates-instance
+  become: true
+  gather_facts: true
+  tasks:
+    # =============================================================================
+    # Configure Pebble ACME Server Trust
+    # =============================================================================
+    - name: Update package cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      become: true
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - apache2
+          - ca-certificates
+          - curl
+        state: present
+        update_cache: true
+
+    - name: Ensure Apache service is started
+      ansible.builtin.service:
+        name: apache2
+        state: started
+        enabled: true
+      become: true
+
+    - name: Ensure webroot directory exists
+      ansible.builtin.file:
+        path: /var/www/html
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      become: true
+
+    - name: Download Pebble root CA certificate
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/letsencrypt/pebble/main/test/certs/pebble.minica.pem
+        dest: /usr/local/share/ca-certificates/pebble-root.crt
+        mode: '0644'
+      become: true
+      register: pebble_ca_download
+      retries: 3
+      delay: 5
+      until: pebble_ca_download is succeeded
+
+    - name: Update CA certificates trust store
+      ansible.builtin.command: update-ca-certificates
+      become: true
+      changed_when: false
+
+    - name: Wait for Pebble ACME server to be ready
+      ansible.builtin.uri:
+        url: https://pebble:14000/dir
+        validate_certs: false
+        return_content: true
+      register: pebble_health
+      until: pebble_health.status == 200
+      retries: 30
+      delay: 10
+
+
+    # =============================================================================
+    # Create dummy hook scripts for testing
+    # =============================================================================
+    - name: Create directory for certbot hooks
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /usr/local/bin
+        - /data/certbot
+
+    - name: Create dummy deploy hook script
+      ansible.builtin.copy:
+        dest: /usr/local/bin/deploy.sh
+        content: |
+          #!/bin/bash
+          # Dummy deploy hook for testing
+          echo "Deploy hook called for domain: ${RENEWED_DOMAINS}"
+          exit 0
+        mode: '0755'
+
+    - name: Create DNS authentication hook script for challtestsrv
+      ansible.builtin.copy:
+        dest: /data/certbot/authenticator.sh
+        content: |
+          #!/bin/bash
+          # DNS authentication hook for challtestsrv
+          set -e
+          echo "Setting TXT record for ${CERTBOT_DOMAIN}"
+          echo "Validation token: ${CERTBOT_VALIDATION}"
+
+          # Add TXT record via challtestsrv API
+          curl -X POST http://challtestsrv:8055/set-txt \
+            -H "Content-Type: application/json" \
+            -d "{\"host\":\"_acme-challenge.${CERTBOT_DOMAIN}.\",\"value\":\"${CERTBOT_VALIDATION}\"}"
+
+          # Wait for DNS propagation
+          sleep 2
+          exit 0
+        mode: '0755'
+
+    - name: Create DNS cleanup hook script for challtestsrv
+      ansible.builtin.copy:
+        dest: /data/certbot/cleanup.sh
+        content: |
+          #!/bin/bash
+          # DNS cleanup hook for challtestsrv
+          set -e
+          echo "Clearing TXT record for ${CERTBOT_DOMAIN}"
+
+          # Clear TXT record via challtestsrv API
+          curl -X POST http://challtestsrv:8055/clear-txt \
+            -H "Content-Type: application/json" \
+            -d "{\"host\":\"_acme-challenge.${CERTBOT_DOMAIN}.\"}"
+
+          exit 0
+        mode: '0755'
+
+    - name: Create dummy deploy hook for custom DNS test
+      ansible.builtin.copy:
+        dest: /data/certbot/deploy.sh
+        content: |
+          #!/bin/bash
+          # Dummy deploy hook for custom DNS testing
+          echo "Deploy hook called for domain: ${RENEWED_DOMAINS}"
+          exit 0
+        mode: '0755'
+
+    # =============================================================================
+    # Create dummy hook scripts for testing
+    # =============================================================================
+    - name: Create directory for certbot hooks
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /usr/local/bin
+        - /data/certbot
+
+    - name: Create dummy deploy hook script
+      ansible.builtin.copy:
+        dest: /usr/local/bin/deploy.sh
+        content: |
+          #!/bin/bash
+          # Dummy deploy hook for testing
+          echo "Deploy hook called for domain: ${RENEWED_DOMAINS}"
+          exit 0
+        mode: '0755'
+
+    - name: Create DNS authentication hook script for challtestsrv
+      ansible.builtin.copy:
+        dest: /usr/local/bin/authenticator.sh
+        content: |
+          #!/bin/bash
+          # DNS authentication hook for challtestsrv
+          set -e
+          echo "Setting TXT record for ${CERTBOT_DOMAIN}"
+          echo "Validation token: ${CERTBOT_VALIDATION}"
+
+          # Add TXT record via challtestsrv API
+          curl -X POST http://challtestsrv:8055/set-txt \
+            -H "Content-Type: application/json" \
+            -d "{\"host\":\"_acme-challenge.${CERTBOT_DOMAIN}.\",\"value\":\"${CERTBOT_VALIDATION}\"}"
+
+          # Wait for DNS propagation
+          sleep 2
+          exit 0
+        mode: '0755'
+
+    - name: Create DNS cleanup hook script for challtestsrv
+      ansible.builtin.copy:
+        dest: /usr/local/bin/cleanup.sh
+        content: |
+          #!/bin/bash
+          # DNS cleanup hook for challtestsrv
+          set -e
+          echo "Clearing TXT record for ${CERTBOT_DOMAIN}"
+
+          # Clear TXT record via challtestsrv API
+          curl -X POST http://challtestsrv:8055/clear-txt \
+            -H "Content-Type: application/json" \
+            -d "{\"host\":\"_acme-challenge.${CERTBOT_DOMAIN}.\"}"
+
+          exit 0
+        mode: '0755'
+
+    # =============================================================================
+    # Create dummy certificates for import testing
+    # =============================================================================
+    - name: Create directory for import test certificates
+      ansible.builtin.file:
+        path: /tmp/import-certs
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      run_once: true
+
+    - name: Generate private key for import test
+      community.crypto.openssl_privatekey:
+        path: /tmp/import-certs/imported.test.key
+        size: 2048
+        mode: '0644'
+      delegate_to: localhost
+      run_once: true
+
+    - name: Generate CSR for import test
+      community.crypto.openssl_csr:
+        path: /tmp/import-certs/imported.test.csr
+        privatekey_path: /tmp/import-certs/imported.test.key
+        common_name: imported.test
+        organization_name: Import Test Corp
+        country_name: US
+      delegate_to: localhost
+      run_once: true
+
+    - name: Generate self-signed certificate for import test
+      community.crypto.x509_certificate:
+        path: /tmp/import-certs/imported.test.crt
+        privatekey_path: /tmp/import-certs/imported.test.key
+        csr_path: /tmp/import-certs/imported.test.csr
+        provider: selfsigned
+        mode: '0644'
+      delegate_to: localhost
+      run_once: true
+
+    - name: Create dummy chain file for import test
+      ansible.builtin.copy:
+        dest: /tmp/import-certs/imported.test.chain.crt
+        content: |
+          -----BEGIN CERTIFICATE-----
+          MIIDXTCCAkWgAwIBAgIJAKL0UG+mRKKzMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
+          BAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
+          aWRnaXRzIFB0eSBMdGQwHhcNMjQwMTAxMDAwMDAwWhcNMjUwMTAxMDAwMDAwWjBF
+          MQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50
+          ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
+          CgKCAQEAw8eP1pLnXKI02aek1N2P+yV4WiKC1mYhCYelAbN9vcwRgZQp7Z7K5Qrq
+          -----END CERTIFICATE-----
+        mode: '0644'
+      delegate_to: localhost
+      run_once: true

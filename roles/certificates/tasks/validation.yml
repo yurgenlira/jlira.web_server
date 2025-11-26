@@ -1,5 +1,5 @@
 ---
-- name: Validate certificate configuration
+- name: Validate certificate mode
   ansible.builtin.assert:
     that:
       - item.name is defined
@@ -16,15 +16,15 @@
       - item.src_key is defined
     fail_msg: "Imported certificate {{ item.name }} requires src_cert and src_key"
   loop: "{{ certificates_items }}"
-  when: item.mode | default('auto') == 'imported'
+  when: item.mode | default('auto') == 'import'
   loop_control:
     label: "{{ item.name }}"
 
 - name: Validate DNS provider configuration (DNS-01 with plugin)
   ansible.builtin.assert:
     that:
-      - item.dns_provider is defined or certificates_certbot_defaults.dns_provider != ''
-      - item.dns_credentials is defined or certificates_certbot_defaults.dns_credentials != ''
+      - item.dns_provider is defined or certificates_certbot_dns_provider != ''
+      - item.dns_credentials is defined or certificates_certbot_dns_credentials != ''
     fail_msg: >-
       DNS-01 challenge for {{ item.name }} requires 'dns_provider' and 'dns_credentials' (or defaults).
   loop: "{{ certificates_items }}"
@@ -34,15 +34,15 @@
       (item.name.split('.')[-1] not in ['test', 'example', 'local', 'invalid', 'localhost']
       and item.mode is not defined)
     - item.challenge_type | default('http-01') == 'dns-01'
-    - (item.dns_provider | default(certificates_certbot_defaults.dns_provider)) != 'custom'
+    - (item.dns_provider | default(certificates_certbot_dns_provider)) != 'custom'
   loop_control:
     label: "{{ item.name }}"
 
 - name: Validate DNS custom hooks configuration (DNS-01 with custom)
   ansible.builtin.assert:
     that:
-      - item.auth_hook is defined or certificates_certbot_defaults.auth_hook != ''
-      - item.cleanup_hook is defined or certificates_certbot_defaults.cleanup_hook != ''
+      - item.auth_hook is defined or certificates_certbot_auth_hook != ''
+      - item.cleanup_hook is defined or certificates_certbot_cleanup_hook != ''
     fail_msg: >-
       DNS-01 challenge with custom provider for {{ item.name }} requires 'auth_hook' and 'cleanup_hook'.
   loop: "{{ certificates_items }}"
@@ -52,6 +52,45 @@
       (item.name.split('.')[-1] not in ['test', 'example', 'local', 'invalid', 'localhost']
       and item.mode is not defined)
     - item.challenge_type | default('http-01') == 'dns-01'
-    - (item.dns_provider | default(certificates_certbot_defaults.dns_provider)) == 'custom'
+    - (item.dns_provider | default(certificates_certbot_dns_provider)) == 'custom'
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Validate SAN content for HTTP-01 challenge
+  ansible.builtin.assert:
+    that:
+      - >-
+        item.san is not defined or
+        item.san == ['www.' + item.name]
+    fail_msg: >-
+      HTTP-01 challenge for {{ item.name }} requires SAN to be ['www.{{ item.name }}'],
+      but got {{ item.san | default('undefined') }}.
+  loop: "{{ certificates_items }}"
+  when:
+    - >-
+      item.mode | default('auto') == 'letsencrypt' or
+      (item.name.split('.')[-1] not in ['test', 'example', 'local', 'invalid', 'localhost']
+      and item.mode is not defined)
+    - item.challenge_type | default('http-01') == 'http-01'
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Validate SAN content for DNS-01 challenge
+  ansible.builtin.assert:
+    that:
+      - >-
+        item.san is not defined or
+        (item.san | length == 1 and
+        item.san[0] is match('^(\*|[a-zA-Z0-9-]+)\.' + item.name | regex_escape() + '$'))
+    fail_msg: >-
+      DNS-01 challenge for {{ item.name }} requires SAN to be ['*.<domain>'] or ['<subdomain>.<domain>'],
+      but got {{ item.san | default('undefined') }}.
+  loop: "{{ certificates_items }}"
+  when:
+    - >-
+      item.mode | default('auto') == 'letsencrypt' or
+      (item.name.split('.')[-1] not in ['test', 'example', 'local', 'invalid', 'localhost']
+      and item.mode is not defined)
+    - item.challenge_type | default('http-01') == 'dns-01'
   loop_control:
     label: "{{ item.name }}"

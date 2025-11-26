@@ -1,5 +1,5 @@
 ---
-- name: Validate configuration
+- name: Include jlira.web_server.certificates.validation.yml
   ansible.builtin.include_tasks: validation.yml
   args:
     apply:
@@ -10,7 +10,16 @@
     - certificates
     - validation
 
-- name: Setup certificate directories
+- name: Include jlira.web_server.certificates.prepare.yml
+  ansible.builtin.include_tasks: prepare.yml
+  args:
+    apply:
+      tags:
+        - always
+  tags:
+    - always
+
+- name: Include jlira.web_server.certificates.setup.yml
   ansible.builtin.include_tasks: setup.yml
   args:
     apply:
@@ -21,18 +30,7 @@
     - certificates
     - setup
 
-- name: Prepare certificates (Normalize modes)
-  ansible.builtin.include_tasks: prepare.yml
-  args:
-    apply:
-      tags:
-        - certificates
-        - process
-  tags:
-    - certificates
-    - process
-
-- name: Process Self-Signed Certificates
+- name: Include jlira.web_server.certificates.selfsigned.yml
   ansible.builtin.include_tasks: selfsigned.yml
   loop: "{{ certificates_prepared_items | selectattr('mode', 'equalto', 'selfsigned') }}"
   loop_control:
@@ -46,7 +44,7 @@
     - certificates
     - selfsigned
 
-- name: Process Let's Encrypt Certificates
+- name: Include jlira.web_server.certificates.letsencrypt.yml
   ansible.builtin.include_tasks: letsencrypt.yml
   loop: "{{ certificates_prepared_items | selectattr('mode', 'equalto', 'letsencrypt') }}"
   loop_control:
@@ -60,7 +58,7 @@
     - certificates
     - letsencrypt
 
-- name: Process Imported Certificates
+- name: Include jlira.web_server.certificates.imported.yml
   ansible.builtin.include_tasks: imported.yml
   loop: "{{ certificates_prepared_items | selectattr('mode', 'equalto', 'imported') }}"
   loop_control:
