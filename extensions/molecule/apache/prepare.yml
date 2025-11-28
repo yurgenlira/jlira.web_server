@@ -1,0 +1,8 @@
+---
+- name: Prepare
+  hosts: web_server
+  gather_facts: true
+  tasks:
+    - name: Include PHP role (required for integration tests)
+      ansible.builtin.include_role:
+        name: php

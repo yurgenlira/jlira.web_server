@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: MIT-0
 ---
-- name: Install apache
+- name: Install apache and required utilities
   ansible.builtin.package:
     name:
       - apache2
       - apache2-utils
+      - gettext-base  # Provides envsubst for environment variable substitution
     state: present
     update_cache: true
 

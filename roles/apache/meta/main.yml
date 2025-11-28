@@ -2,7 +2,9 @@
 galaxy_info:
   author: Julio Lira
   description: Setup and manage apache server
-  company: jlira
+  company: Personal Project
+  namespace: jlira
+  role_name: apache
 
   # If the issue tracker for your role is not on github, uncomment the
   # next line and provide a value

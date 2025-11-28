@@ -11,7 +11,7 @@
     that:
       - apache_custom_log_dir_check.stat.exists
       - apache_custom_log_dir_check.stat.isdir
-      - apache_custom_log_dir_check.stat.mode == "0755"
+      - apache_custom_log_dir_check.stat.mode == "0750"
     fail_msg: "Custom log directory does not exist or has incorrect permissions"
 
 - name: Verify DocumentRoot was created with expanded variables
@@ -182,16 +182,16 @@
     path: /etc/apache2/templates/landing_site-ssl.template.conf
   register: apache_landing1_https_template_content
 
-- name: Verify landing1 HTTPS template has SSL certificates with variables
+- name: Verify landing1 HTTPS template has SSL certificates
   ansible.builtin.assert:
     that:
       - >-
-        'SSLCertificateFile /letsencrypt/live/${SUBDOMAIN}.${DOMAIN}/fullchain.pem'
+        'SSLCertificateFile /etc/ssl/certs/ssl-cert-snakeoil.pem'
         in (apache_landing1_https_template_content.content | b64decode)
       - >-
-        'SSLCertificateKeyFile /letsencrypt/live/${SUBDOMAIN}.${DOMAIN}/privkey.pem'
+        'SSLCertificateKeyFile /etc/ssl/private/ssl-cert-snakeoil.key'
         in (apache_landing1_https_template_content.content | b64decode)
-    fail_msg: "landing1 HTTPS template does not have SSL certificate configuration with variables"
+    fail_msg: "landing1 HTTPS template does not have SSL certificate configuration"
 
 - name: Check if landing1 HTTP is enabled
   ansible.builtin.stat:

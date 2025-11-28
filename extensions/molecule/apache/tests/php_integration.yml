@@ -127,7 +127,7 @@
 
 - name: Test PHP-FPM status endpoint
   ansible.builtin.uri:
-    url: "http://127.0.0.1{{ apache_php_status_page.status_path | default('/status-php') }}"
+    url: "http://127.0.0.1{{ apache_php_status_page.status_path | default('/status') }}"
     method: GET
     status_code: 200
     return_content: true

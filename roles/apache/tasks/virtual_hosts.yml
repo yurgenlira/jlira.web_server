@@ -11,6 +11,7 @@
   when:
     - apache_virtual_hosts | length > 0
     - item.http is defined
+    - apache_execution_phase in ['all', 'http_only']
   notify: Reload apache
 
 - name: Create HTTPS virtual host configuration files
@@ -24,103 +25,209 @@
   when:
     - apache_virtual_hosts | length > 0
     - item.https is defined
+    - apache_execution_phase in ['all', 'https_only']
   notify: Reload apache
 
-- name: Create document root directories for virtual hosts
-  ansible.builtin.shell: |
-    set -o pipefail
-    source /etc/apache2/envvars
-    {% for envvar in apache_envvars | default([]) %}
-    export {{ envvar.name }}="{{ envvar.value }}"
-    {% endfor %}
-    path=$(echo "{{ item.document_root }}" | envsubst)
-    mkdir -p "$path"
-  args:
-    executable: /bin/bash
-  loop: "{{ apache_virtual_hosts }}"
+- name: Create Virtual Host DocumentRoot Directory
   when:
     - apache_virtual_hosts | length > 0
-  changed_when: false
+    - apache_execution_phase in ['all', 'http_only']
+  block:
+    - name: 1. Extract and Expand virtualhost DocumentRoot
+      ansible.builtin.shell: |
+        set -o pipefail
+        source /etc/apache2/envvars
+        echo "{{ item.document_root }}" | envsubst
+      args:
+        executable: /bin/bash
+      loop: "{{ apache_virtual_hosts }}"
+      register: _apache_document_root
+      changed_when: false
+      when:
+        - apache_virtual_hosts | length > 0
 
-- name: Create HTTP error log directories for virtual hosts
-  ansible.builtin.shell: |
-    set -o pipefail
-    source /etc/apache2/envvars
-    {% for envvar in apache_envvars | default([]) %}
-    export {{ envvar.name }}="{{ envvar.value }}"
-    {% endfor %}
-    logpath=$(echo "{{ item.http.error_log }}" | envsubst)
-    logdir=$(dirname "$logpath")
-    mkdir -p "$logdir"
-    echo "$logdir"
-  args:
-    executable: /bin/bash
-  loop: "{{ apache_virtual_hosts }}"
-  when:
-    - apache_virtual_hosts | length > 0
-    - item.http is defined
-    - item.http.error_log is defined
-  changed_when: false
+    - name: 2. Consolidate and make DocumentRoot directories unique
+      ansible.builtin.set_fact:
+        # 1. Map the 'results' list to extract only the 'stdout' attribute (the path string)
+        # 2. Select('truthy') removes any empty lines/null values
+        # 3. Trim removes any leading/trailing whitespace
+        # 4. Unique ensures no duplicate paths are processed
+        _apache_document_root_dirs: >
+          {{ _apache_document_root.results |
+            map(attribute='stdout') |
+            select('truthy') |
+            map('trim') |
+            unique | list }}
+      when: _apache_document_root.results | length > 0
 
-- name: Create HTTP custom log directories for virtual hosts
-  ansible.builtin.shell: |
-    set -o pipefail
-    source /etc/apache2/envvars
-    {% for envvar in apache_envvars | default([]) %}
-    export {{ envvar.name }}="{{ envvar.value }}"
-    {% endfor %}
-    logpath=$(echo "{{ item.http.access_log }}" | envsubst | awk '{print $1}')
-    logdir=$(dirname "$logpath")
-    mkdir -p "$logdir"
-    echo "$logdir"
-  args:
-    executable: /bin/bash
-  loop: "{{ apache_virtual_hosts }}"
-  when:
-    - apache_virtual_hosts | length > 0
-    - item.http is defined
-    - item.http.access_log is defined
-  changed_when: false
+    - name: 3. Create virtualhost DocumentRoot directory
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+        owner: root
+        group: root
+      loop: "{{ _apache_document_root_dirs }}"
 
-- name: Create HTTPS error log directories for virtual hosts
-  ansible.builtin.shell: |
-    set -o pipefail
-    source /etc/apache2/envvars
-    {% for envvar in apache_envvars | default([]) %}
-    export {{ envvar.name }}="{{ envvar.value }}"
-    {% endfor %}
-    logpath=$(echo "{{ item.https.error_log }}" | envsubst)
-    logdir=$(dirname "$logpath")
-    mkdir -p "$logdir"
-    echo "$logdir"
-  args:
-    executable: /bin/bash
-  loop: "{{ apache_virtual_hosts }}"
+- name: Create Virtual Host HTTP ErrorLog Directory
   when:
     - apache_virtual_hosts | length > 0
-    - item.https is defined
-    - item.https.error_log is defined
-  changed_when: false
+    - apache_execution_phase in ['all', 'http_only']
+  block:
+    - name: 1. Extract and Expand virtualhost HTTP ErrorLog
+      ansible.builtin.shell: |
+        set -o pipefail
+        source /etc/apache2/envvars
+        logpath=$(echo "{{ item.http.error_log }}" | envsubst)
+        echo $(dirname "$logpath")
+      args:
+        executable: /bin/bash
+      loop: "{{ apache_virtual_hosts }}"
+      register: _apache_http_error_log
+      changed_when: false
 
-- name: Create HTTPS custom log directories for virtual hosts
-  ansible.builtin.shell: |
-    set -o pipefail
-    source /etc/apache2/envvars
-    {% for envvar in apache_envvars | default([]) %}
-    export {{ envvar.name }}="{{ envvar.value }}"
-    {% endfor %}
-    logpath=$(echo "{{ item.https.access_log }}" | envsubst | awk '{print $1}')
-    logdir=$(dirname "$logpath")
-    mkdir -p "$logdir"
-    echo "$logdir"
-  args:
-    executable: /bin/bash
-  loop: "{{ apache_virtual_hosts }}"
+    - name: 2. Consolidate and make HTTP ErrorLog directories unique
+      ansible.builtin.set_fact:
+        # 1. Map the 'results' list to extract only the 'stdout' attribute (the path string)
+        # 2. Select('truthy') removes any empty lines/null values
+        # 3. Trim removes any leading/trailing whitespace
+        # 4. Unique ensures no duplicate paths are processed
+        _apache_http_error_log_dirs: >
+          {{ _apache_http_error_log.results |
+            map(attribute='stdout') |
+            select('truthy') |
+            map('trim') |
+            unique | list }}
+      when: _apache_http_error_log.results | length > 0
+
+    - name: 3. Create virtualhost HTTP ErrorLog directory
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0750"
+        owner: root
+        group: root
+      loop: "{{ _apache_http_error_log_dirs }}"
+
+- name: Create Virtual Host HTTP CustomLog Directory
   when:
     - apache_virtual_hosts | length > 0
-    - item.https is defined
-    - item.https.access_log is defined
-  changed_when: false
+    - apache_execution_phase in ['all', 'http_only']
+  block:
+    - name: 1. Extract and Expand virtualhost HTTP CustomLog
+      ansible.builtin.shell: |
+        set -o pipefail
+        source /etc/apache2/envvars
+        logpath=$(echo "{{ item.http.custom_log }}" | envsubst)
+        echo $(dirname "$logpath")
+      args:
+        executable: /bin/bash
+      loop: "{{ apache_virtual_hosts }}"
+      register: _apache_http_custom_log
+      changed_when: false
+
+    - name: 2. Consolidate and make HTTP CustomLog directories unique
+      ansible.builtin.set_fact:
+        # 1. Map the 'results' list to extract only the 'stdout' attribute (the path string)
+        # 2. Select('truthy') removes any empty lines/null values
+        # 3. Trim removes any leading/trailing whitespace
+        # 4. Unique ensures no duplicate paths are processed
+        _apache_http_custom_log_dirs: >
+          {{ _apache_http_custom_log.results |
+            map(attribute='stdout') |
+            select('truthy') |
+            map('trim') |
+            unique | list }}
+      when: _apache_http_custom_log.results | length > 0
+
+    - name: 3. Create virtualhost HTTP CustomLog directory
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0750"
+        owner: root
+        group: root
+      loop: "{{ _apache_http_custom_log_dirs }}"
+
+- name: Create Virtual Host HTTPS ErrorLog Directory
+  when:
+    - apache_virtual_hosts | length > 0
+    - apache_execution_phase in ['all', 'https_only']
+  block:
+    - name: 1. Extract and Expand virtualhost HTTPS ErrorLog
+      ansible.builtin.shell: |
+        set -o pipefail
+        source /etc/apache2/envvars
+        logpath=$(echo "{{ item.https.error_log }}" | envsubst)
+        echo $(dirname "$logpath")
+      args:
+        executable: /bin/bash
+      loop: "{{ apache_virtual_hosts }}"
+      register: _apache_https_error_log
+      changed_when: false
+
+    - name: 2. Consolidate and make HTTPS ErrorLog directories unique
+      ansible.builtin.set_fact:
+        # 1. Map the 'results' list to extract only the 'stdout' attribute (the path string)
+        # 2. Select('truthy') removes any empty lines/null values
+        # 3. Trim removes any leading/trailing whitespace
+        # 4. Unique ensures no duplicate paths are processed
+        _apache_https_error_log_dirs: >
+          {{ _apache_https_error_log.results |
+            map(attribute='stdout') |
+            select('truthy') |
+            map('trim') |
+            unique | list }}
+      when: _apache_https_error_log.results | length > 0
+
+    - name: 3. Create virtualhost HTTPS ErrorLog directory
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0750"
+        owner: root
+        group: root
+      loop: "{{ _apache_https_error_log_dirs }}"
+
+- name: Create Virtual Host HTTPS CustomLog Directory
+  when:
+    - apache_virtual_hosts | length > 0
+    - apache_execution_phase in ['all', 'https_only']
+  block:
+    - name: 1. Extract and Expand virtualhost HTTPS CustomLog
+      ansible.builtin.shell: |
+        set -o pipefail
+        source /etc/apache2/envvars
+        logpath=$(echo "{{ item.https.custom_log }}" | envsubst)
+        echo $(dirname "$logpath")
+      args:
+        executable: /bin/bash
+      loop: "{{ apache_virtual_hosts }}"
+      register: _apache_https_custom_log
+      changed_when: false
+
+    - name: 2. Consolidate and make HTTPS CustomLog directories unique
+      ansible.builtin.set_fact:
+        # 1. Map the 'results' list to extract only the 'stdout' attribute (the path string)
+        # 2. Select('truthy') removes any empty lines/null values
+        # 3. Trim removes any leading/trailing whitespace
+        # 4. Unique ensures no duplicate paths are processed
+        _apache_https_custom_log_dirs: >
+          {{ _apache_https_custom_log.results |
+            map(attribute='stdout') |
+            select('truthy') |
+            map('trim') |
+            unique | list }}
+      when: _apache_https_custom_log.results | length > 0
+
+    - name: 3. Create virtualhost HTTPS CustomLog directory
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0750"
+        owner: root
+        group: root
+      loop: "{{ _apache_https_custom_log_dirs }}"
 
 - name: Enable HTTP virtual hosts
   ansible.builtin.command:
@@ -131,21 +238,7 @@
   when:
     - apache_virtual_hosts | length > 0
     - item.http is defined
-    - item.http.enabled | default(true)
-  notify: Reload apache
-
-- name: Disable HTTP virtual hosts
-  ansible.builtin.command:
-    cmd: "a2dissite {{ item.name }}"
-  register: apache_disable_http_vhost_result
-  changed_when:
-    - "'Site' in apache_disable_http_vhost_result.stdout"
-    - "'disabled' in apache_disable_http_vhost_result.stdout"
-  loop: "{{ apache_virtual_hosts }}"
-  when:
-    - apache_virtual_hosts | length > 0
-    - item.http is defined
-    - not (item.http.enabled | default(true))
+    - apache_execution_phase in ['all', 'http_only']
   notify: Reload apache
 
 - name: Enable HTTPS virtual hosts
@@ -157,19 +250,5 @@
   when:
     - apache_virtual_hosts | length > 0
     - item.https is defined
-    - item.https.enabled | default(true)
-  notify: Reload apache
-
-- name: Disable HTTPS virtual hosts
-  ansible.builtin.command:
-    cmd: "a2dissite {{ item.name }}-ssl"
-  register: apache_disable_https_vhost_result
-  changed_when:
-    - "'Site' in apache_disable_https_vhost_result.stdout"
-    - "'disabled' in apache_disable_https_vhost_result.stdout"
-  loop: "{{ apache_virtual_hosts }}"
-  when:
-    - apache_virtual_hosts | length > 0
-    - item.https is defined
-    - not (item.https.enabled | default(true))
+    - apache_execution_phase in ['all', 'https_only']
   notify: Reload apache

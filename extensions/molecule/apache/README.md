@@ -2,26 +2,45 @@
 
 This Molecule scenario comprehensively tests the `jlira.web_server.apache` role, including installation, configuration, virtual hosts, PHP-FPM integration, status pages, and authentication.
 
+## Architecture
+
+The test scenario reflects this architecture:
+
+- **`prepare.yml`**: Sets up PHP dependency (installs and configures PHP-FPM using the PHP role)
+- **`converge.yml`**: Tests the Apache role independently with PHP-FPM integration
+- **`verify.yml`**: Validates both Apache configuration and PHP-FPM integration
+
+This separation ensures that:
+- The Apache role focuses solely on Apache HTTP Server management
+- PHP installation and configuration is handled by the dedicated PHP role (included explicitly in prepare.yml)
+- Integration between Apache and PHP is configured through variables
+- The Apache role no longer automatically includes the PHP role as a dependency
+
 ## Test Flow
 
 The scenario uses Molecule's test sequence to validate different aspects of the Apache role:
 
-### 1. **converge.yml** - Initial Installation & Configuration
-- Installs Apache web server
+### 1. **prepare.yml** - Dependency Setup
+- Explicitly includes and configures the PHP role (required for PHP-FPM integration tests)
+- Configures PHP-FPM with status page enabled
+- Variables are inherited from `inventory/hosts.yml`
+- This step is necessary because the Apache role no longer automatically includes the PHP role
+
+### 2. **converge.yml** - Apache Installation & Configuration
+- Installs Apache web server with required utilities (Apache itself includes `envsubst` dependencies)
 - Configures main Apache settings (security, limits, modules)
 - Sets up custom configuration files
-- Configures virtual hosts with HTTP and HTTPS
-- Creates virtual hosts from templates
-- Integrates with PHP-FPM
+- Configures virtual hosts with HTTP and HTTPS (using `apache_execution_phase: "all"`)
+- Creates virtual hosts from templates with variable substitution
+- Configures Apache-side PHP-FPM integration (proxy modules, FPM configuration)
 - Enables Apache status page
-- Enables PHP-FPM status proxy
-- Configures HTTP authentication
+- Configures HTTP authentication with htpasswd files
 
-### 2. **idempotence** - Idempotency Check
+### 3. **idempotence** - Idempotency Check
 - Re-runs converge.yml to ensure no changes occur
 - Validates that the role is truly idempotent
 
-### 3. **verify.yml** - Comprehensive Verification
+### 4. **verify.yml** - Comprehensive Verification
 Tests are organized by task file:
 
 #### **install.yml tests**
@@ -32,9 +51,10 @@ Tests are organized by task file:
 
 #### **php_integration.yml tests**
 - ✅ PHP-FPM integration modules loaded (proxy_fcgi, setenvif)
-- ✅ PHP-FPM configuration file exists
+- ✅ PHP-FPM configuration file exists in Apache
 - ✅ PHP-FPM is set as default handler
 - ✅ PHP-FPM service is running
+- ✅ PHP status endpoints are accessible
 
 #### **configure.yml tests**
 - ✅ Main Apache configuration settings applied
@@ -58,17 +78,18 @@ Tests are organized by task file:
 - ✅ Authentication configured
 
 #### **virtual_hosts_from_templates.yml tests**
-- ✅ Template-based virtual hosts created
-- ✅ Variables substituted correctly
+- ✅ Template directory created
+- ✅ Template files generated in templates directory
+- ✅ Virtual host configuration files created from templates
+- ✅ Variables substituted correctly using envsubst
 - ✅ HTTP and HTTPS configurations present
 - ✅ Environment variables resolved
+- ✅ Virtual hosts enabled correctly
 
 #### **status_page.yml tests**
 - ✅ Apache status module enabled
 - ✅ Status page accessible from allowed hosts
 - ✅ Status page restricted from unauthorized hosts
-- ✅ PHP-FPM status proxy configured (if enabled)
-- ✅ PHP-FPM status accessible
 
 #### **authentication.yml tests**
 - ✅ htpasswd files created
@@ -118,6 +139,9 @@ molecule destroy -s apache
 # Create instance
 molecule create -s apache
 
+# Prepare dependencies
+molecule prepare -s apache
+
 # Apply changes and test
 molecule converge -s apache
 molecule verify -s apache
@@ -137,11 +161,25 @@ molecule converge -s apache && molecule verify -s apache
 The test uses custom variables defined in `inventory/hosts.yml`:
 
 ```yaml
-# PHP-FPM Integration
+# PHP Configuration (for prepare.yml)
+php_version: "8.4"
+php_fpm_enabled: true
+php_status_page:
+  enabled: true
+  status_path: /status-php
+  allowed_hosts:
+    - 127.0.0.1
+    - 172.17.0.1
+
+# Apache Execution Phase
+apache_execution_phase: "all"  # Options: "all", "http_only", "https_only"
+
+# Apache PHP-FPM Integration
 apache_php_fpm_integration: true
-apache_php_fpm_version: "8.3"
+apache_php_fpm_version: "{{ php_version }}"
 apache_php_fpm_set_default: true
 apache_php_fpm_proxy_timeout: 300
+apache_php_status_page: "{{ php_status_page }}"
 
 # Main Apache Settings
 apache_main_settings:
@@ -183,10 +221,32 @@ apache_security_settings:
 apache_virtual_hosts:
   - name: secure.example.local
     server_name: secure.example.local
+    server_alias:
+      - www.secure.example.local
+      - www3.secure.example.local
+    server_admin: admin@example.local
+    document_root: /var/www/secure.example.local
     http:
-      enabled: true
+      listen:
+        - "*:80"
+        - "*:8080"
+      error_log: ${APACHE_LOG_DIR}/secure.example.local-error.log
+      custom_log: ${APACHE_LOG_DIR}/secure.example.local-access.log combined
+      custom_directives: |
+        Redirect permanent / https://secure.example.local/
     https:
-      enabled: true
+      listen:
+        - "*:443"
+        - "*:8443"
+      error_log: ${APACHE_LOG_DIR}/secure.example.local-ssl-error.log
+      custom_log: ${APACHE_LOG_DIR}/secure.example.local-ssl-access.log combined
+      certificate_file: /etc/ssl/certs/ssl-cert-snakeoil.pem
+      certificate_key_file: /etc/ssl/private/ssl-cert-snakeoil.key
+      custom_directives: |
+        <Directory /var/www/secure.example.local>
+            Options -Indexes +FollowSymLinks
+            AllowOverride All
+        </Directory>
 
 # Status Page
 apache_status_page:
@@ -195,12 +255,49 @@ apache_status_page:
     - 127.0.0.1
     - 172.17.0.1
 
+# Virtual Host Templates
+apache_vhost_templates:
+  - name: landing_site
+    server_name: ${SUBDOMAIN}.${DOMAIN}
+    document_root: /var/www/${SUBDOMAIN}
+    http:
+      error_log: ${CUSTOM_LOG_DIR}/${SUBDOMAIN}.${DOMAIN}.error_log
+      custom_log: ${CUSTOM_LOG_DIR}/${SUBDOMAIN}.${DOMAIN}.access_log common
+      custom_directives: |
+        RewriteEngine on
+        RewriteCond %{HTTPS} off
+        RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+    https:
+      document_root: /var/www/${SUBDOMAIN}/public
+      error_log: ${CUSTOM_LOG_DIR}/${SUBDOMAIN}.${DOMAIN}.error_log
+      custom_log: ${CUSTOM_LOG_DIR}/${SUBDOMAIN}.${DOMAIN}.access_log common
+      certificate_file: /etc/ssl/certs/ssl-cert-snakeoil.pem
+      certificate_key_file: /etc/ssl/private/ssl-cert-snakeoil.key
+
+apache_vhosts_from_template:
+  - name: landing1.example.local
+    template: landing_site
+    vars:
+      - name: SUBDOMAIN
+        value: landing1
+      - name: DOMAIN
+        value: ${DEFAULT_DOMAIN}
+  - name: landing2.example.local
+    template: landing_site
+    vars:
+      - name: SUBDOMAIN
+        value: landing2
+      - name: DOMAIN
+        value: example.local
+
 # Authentication
 apache_htpasswd_files:
   - path: /etc/apache2/.htpasswd
     users:
       - name: admin
         password: adminpass123
+      - name: testuser
+        password: testpass456
 ```
 
 ## Test Coverage
@@ -211,11 +308,12 @@ apache_htpasswd_files:
 - ✅ Main configuration settings
 - ✅ Security hardening
 - ✅ Environment variables
-- ✅ Port configuration
+- ✅ Port configuration (multiple HTTP and HTTPS ports)
 - ✅ Custom configuration files
-- ✅ Virtual host creation (direct)
-- ✅ Virtual host creation (from templates)
-- ✅ PHP-FPM integration
+- ✅ Virtual host creation (direct configuration)
+- ✅ Virtual host creation (from templates with variable substitution)
+- ✅ Execution phase control (`all`, `http_only`, `https_only`)
+- ✅ PHP-FPM integration (Apache-side configuration)
 - ✅ Apache status page
 - ✅ PHP-FPM status proxy
 - ✅ HTTP Basic authentication
@@ -223,14 +321,18 @@ apache_htpasswd_files:
 - ✅ Service management (start, enable, restart)
 - ✅ Idempotency
 - ✅ Configuration syntax validation
-- ✅ Directory creation
+- ✅ Directory creation (document roots, log directories)
+- ✅ Environment variable substitution using `envsubst`
+- ✅ Template variable inheritance and merging
 
 ### Scenarios Covered
 1. **Fresh Installation** - First time Apache installation
 2. **Configuration Changes** - Modifying Apache settings
-3. **Virtual Host Management** - Creating and managing vhosts
-4. **PHP Integration** - Setting up PHP-FPM with Apache
-5. **Security Configuration** - Hardening and authentication
+3. **Virtual Host Management** - Creating and managing vhosts (direct and template-based)
+4. **Execution Phase Control** - Testing split execution workflows
+5. **PHP Integration** - Configuring Apache to work with PHP-FPM (explicit role inclusion)
+6. **Security Configuration** - Hardening and authentication
+7. **Variable Substitution** - Testing envsubst with Apache and custom environment variables
 
 ## Platform
 

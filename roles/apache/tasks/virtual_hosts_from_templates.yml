@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: MIT-0
 ---
-- name: Create apache virtualhost from template folders
+- name: Create apache virtualhost templates directory
   ansible.builtin.file:
     path: "{{ apache_vhost_templates_dir }}"
     state: directory
     mode: '0755'
 
-- name: Create HTTP virtual host templates
+- name: Create HTTP virtual host configuration template files
   ansible.builtin.template:
-    src: vhost_template.j2
+    src: vhost.conf.j2
     dest: "{{ apache_vhost_templates_dir }}/{{ item.name }}.template.conf"
     owner: root
     group: root
@@ -17,11 +17,12 @@
   when:
     - apache_vhost_templates | length > 0
     - item.http is defined
+    - apache_execution_phase in ['all', 'http_only']
   notify: Reload apache
 
-- name: Create HTTPS virtual host templates
+- name: Create HTTPS virtual host configuration template files
   ansible.builtin.template:
-    src: vhost-ssl_template.j2
+    src: vhost-ssl.conf.j2
     dest: "{{ apache_vhost_templates_dir }}/{{ item.name }}-ssl.template.conf"
     owner: root
     group: root
@@ -30,6 +31,7 @@
   when:
     - apache_vhost_templates | length > 0
     - item.https is defined
+    - apache_execution_phase in ['all', 'https_only']
   notify: Reload apache
 
 - name: Create HTTP virtual host configuration files from template
@@ -42,6 +44,7 @@
   loop: "{{ apache_vhosts_from_template }}"
   when:
     - apache_vhosts_from_template | length > 0
+    - apache_execution_phase in ['all', 'http_only']
   notify: Reload apache
 
 - name: Create HTTPS virtual host configuration files from template
@@ -54,75 +57,253 @@
   loop: "{{ apache_vhosts_from_template }}"
   when:
     - apache_vhosts_from_template | length > 0
+    - apache_execution_phase in ['all', 'https_only']
   notify: Reload apache
 
-- name: Create directories for template-based virtual hosts
-  ansible.builtin.shell: |
-    set -o pipefail
-    source /etc/apache2/envvars
-    {% for envvar in apache_envvars | default([]) %}
-    export {{ envvar.name }}="{{ envvar.value }}"
-    {% endfor %}
-    {% for var in item.vars | default([]) %}
-    export {{ var.name }}="{{ var.value | replace('${', '$') | replace('}', '') }}"
-    {% endfor %}
-
-    # Function to extract and create directories from a config file
-    process_config() {
-      local config_file="$1"
-
-      if [ ! -f "$config_file" ]; then
-        return
-      fi
-
-      # Find template file if config contains Include directive
-      template_file=$(grep -E '^\s*Include' "$config_file" | \
-                      awk '{print $2}' | head -1)
-
-      if [ -n "$template_file" ] && [ -f "$template_file" ]; then
-        # Read from the template file
-        config_to_process="$template_file"
-      else
-        # Read from the config file itself
-        config_to_process="$config_file"
-      fi
-
-      # Extract and create DocumentRoot directories
-      grep -E '^\s*DocumentRoot' "$config_to_process" | \
-        awk '{print $2}' | while read -r docroot; do
-        expanded_path=$(echo "$docroot" | envsubst)
-        mkdir -p "$expanded_path"
-        echo "$expanded_path"
-      done || true
-
-      # Extract and create ErrorLog directories
-      grep -E '^\s*ErrorLog' "$config_to_process" | \
-        awk '{print $2}' | while read -r logpath; do
-        expanded_path=$(echo "$logpath" | envsubst)
-        logdir=$(dirname "$expanded_path")
-        mkdir -p "$logdir"
-        echo "$logdir"
-      done || true
-
-      # Extract and create CustomLog directories
-      grep -E '^\s*CustomLog' "$config_to_process" | \
-        awk '{print $2}' | while read -r logpath; do
-        expanded_path=$(echo "$logpath" | envsubst)
-        logdir=$(dirname "$expanded_path")
-        mkdir -p "$logdir"
-        echo "$logdir"
-      done || true
-    }
-
-    # Process both HTTP and HTTPS configs
-    process_config "/etc/apache2/sites-available/{{ item.name }}.conf"
-    process_config "/etc/apache2/sites-available/{{ item.name }}-ssl.conf"
-  args:
-    executable: /bin/bash
+- name: Merge apache_vhost_templates with apache_vhosts_from_template
+  ansible.builtin.set_fact:
+    # Find the template definition using selectattr and equalto
+    # Combine the template with the override data
+    # Add the combined data to the final list
+    _apache_vhosts_from_template: >
+      {{ _apache_vhosts_from_template | default([]) + [
+          (
+            apache_vhost_templates |
+            selectattr('name', 'equalto', item.template) |
+            first |
+            combine(item, recursive=True)
+          )
+      ] }}
   loop: "{{ apache_vhosts_from_template }}"
   when:
     - apache_vhosts_from_template | length > 0
-  changed_when: false
+
+- name: Create Virtual Host DocumentRoot Directory
+  when:
+    - apache_vhosts_from_template | length > 0
+    - apache_execution_phase in ['all', 'http_only']
+  block:
+    - name: 1. Extract and Expand DocumentRoot from virtualhost templates
+      ansible.builtin.shell: |
+        set -o pipefail
+        source /etc/apache2/envvars
+        {% for envvar in item.vars | default([]) %}
+            export {{ envvar.name }}="{{ envvar.value }}"
+        {% endfor %}
+        echo "{{ item.document_root }}" | envsubst
+      args:
+        executable: /bin/bash
+      loop: "{{ _apache_vhosts_from_template }}"
+      register: _apache_vhost_from_template_document_root
+      changed_when: false
+      when:
+        - apache_vhosts_from_template | length > 0
+
+    - name: 2. Consolidate and make DocumentRoot directories unique
+      ansible.builtin.set_fact:
+        # 1. Map the 'results' list to extract only the 'stdout' attribute (the path string)
+        # 2. Select('truthy') removes any empty lines/null values
+        # 3. Trim removes any leading/trailing whitespace
+        # 4. Unique ensures no duplicate paths are processed
+        _apache_vhost_from_template_document_root_dirs: >
+          {{ _apache_vhost_from_template_document_root.results |
+            map(attribute='stdout') |
+            select('truthy') |
+            map('trim') |
+            unique | list }}
+      when: _apache_vhost_from_template_document_root.results | length > 0
+
+    - name: 3. Create virtualhost DocumentRoot directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+        owner: root
+        group: root
+      loop: "{{ _apache_vhost_from_template_document_root_dirs }}"
+
+- name: Create Virtual Host HTTP ErrorLog Directory
+  when:
+    - apache_vhosts_from_template | length > 0
+    - apache_execution_phase in ['all', 'http_only']
+  block:
+    - name: 1. Extract and Expand virtualhost HTTP ErrorLog
+      ansible.builtin.shell: |
+        set -o pipefail
+        source /etc/apache2/envvars
+        {% for envvar in item.vars | default([]) %}
+            export {{ envvar.name }}="{{ envvar.value }}"
+        {% endfor %}
+        logpath=$(echo "{{ item.http.error_log }}" | envsubst)
+        echo $(dirname "$logpath")
+      args:
+        executable: /bin/bash
+      loop: "{{ _apache_vhosts_from_template }}"
+      register: _apache_vhost_from_template_http_error_log
+      changed_when: false
+
+    - name: 2. Consolidate and make HTTP ErrorLog directories unique
+      ansible.builtin.set_fact:
+        # 1. Map the 'results' list to extract only the 'stdout' attribute (the path string)
+        # 2. Select('truthy') removes any empty lines/null values
+        # 3. Trim removes any leading/trailing whitespace
+        # 4. Unique ensures no duplicate paths are processed
+        _apache_vhost_from_template_http_error_log_dirs: >
+          {{ _apache_vhost_from_template_http_error_log.results |
+            map(attribute='stdout') |
+            select('truthy') |
+            map('trim') |
+            unique | list }}
+      when: _apache_vhost_from_template_http_error_log.results | length > 0
+
+    - name: 3. Create virtualhost HTTP ErrorLog directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0750"
+        owner: root
+        group: root
+      loop: "{{ _apache_vhost_from_template_http_error_log_dirs }}"
+      when:
+        - _apache_vhost_from_template_http_error_log_dirs | length > 0
+
+- name: Create Virtual Host HTTP CustomLog Directory
+  when:
+    - apache_vhosts_from_template | length > 0
+    - apache_execution_phase in ['all', 'http_only']
+  block:
+    - name: 1. Extract and Expand virtualhost HTTP CustomLog
+      ansible.builtin.shell: |
+        set -o pipefail
+        source /etc/apache2/envvars
+        {% for envvar in item.vars | default([]) %}
+            export {{ envvar.name }}="{{ envvar.value }}"
+        {% endfor %}
+        logpath=$(echo "{{ item.http.custom_log }}" | envsubst)
+        echo $(dirname "$logpath")
+      args:
+        executable: /bin/bash
+      loop: "{{ _apache_vhosts_from_template }}"
+      register: _apache_vhost_from_template_http_custom_log
+      changed_when: false
+
+    - name: 2. Consolidate and make HTTP CustomLog directories unique
+      ansible.builtin.set_fact:
+        # 1. Map the 'results' list to extract only the 'stdout' attribute (the path string)
+        # 2. Select('truthy') removes any empty lines/null values
+        # 3. Trim removes any leading/trailing whitespace
+        # 4. Unique ensures no duplicate paths are processed
+        _apache_vhost_from_template_http_custom_log_dirs: >
+          {{ _apache_vhost_from_template_http_custom_log.results |
+            map(attribute='stdout') |
+            select('truthy') |
+            map('trim') |
+            unique | list }}
+      when: _apache_vhost_from_template_http_custom_log.results | length > 0
+
+    - name: 3. Create virtualhost HTTP CustomLog directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0750"
+        owner: root
+        group: root
+      loop: "{{ _apache_vhost_from_template_http_custom_log_dirs }}"
+      when:
+        - _apache_vhost_from_template_http_custom_log_dirs | length > 0
+
+- name: Create Virtual Host HTTPS ErrorLog Directory
+  when:
+    - apache_vhosts_from_template | length > 0
+    - apache_execution_phase in ['all', 'https_only']
+  block:
+    - name: 1. Extract and Expand virtualhost HTTPS ErrorLog
+      ansible.builtin.shell: |
+        set -o pipefail
+        source /etc/apache2/envvars
+        {% for envvar in item.vars | default([]) %}
+            export {{ envvar.name }}="{{ envvar.value }}"
+        {% endfor %}
+        logpath=$(echo "{{ item.https.error_log }}" | envsubst)
+        echo $(dirname "$logpath")
+      args:
+        executable: /bin/bash
+      loop: "{{ _apache_vhosts_from_template }}"
+      register: _apache_vhost_from_template_https_error_log
+      changed_when: false
+      when:
+        - _apache_vhosts_from_template | length > 0
+        - apache_execution_phase in ['all', 'https_only']
+
+    - name: 2. Consolidate and make HTTPS ErrorLog directories unique
+      ansible.builtin.set_fact:
+        # 1. Map the 'results' list to extract only the 'stdout' attribute (the path string)
+        # 2. Select('truthy') removes any empty lines/null values
+        # 3. Trim removes any leading/trailing whitespace
+        # 4. Unique ensures no duplicate paths are processed
+        _apache_vhost_from_template_https_error_log_dirs: >
+          {{ _apache_vhost_from_template_https_error_log.results |
+            map(attribute='stdout') |
+            select('truthy') |
+            map('trim') |
+            unique | list }}
+      when: _apache_vhost_from_template_https_error_log.results | length > 0
+
+    - name: 3. Create virtualhost HTTPS ErrorLog directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0750"
+        owner: root
+        group: root
+      loop: "{{ _apache_vhost_from_template_https_error_log_dirs }}"
+      when:
+        - _apache_vhost_from_template_https_error_log_dirs | length > 0
+
+- name: Create Virtual Host HTTPS CustomLog Directory
+  when:
+    - apache_vhosts_from_template | length > 0
+    - apache_execution_phase in ['all', 'https_only']
+  block:
+    - name: 1. Extract and Expand virtualhost HTTPS CustomLog
+      ansible.builtin.shell: |
+        set -o pipefail
+        source /etc/apache2/envvars
+        {% for envvar in item.vars | default([]) %}
+            export {{ envvar.name }}="{{ envvar.value }}"
+        {% endfor %}
+        logpath=$(echo "{{ item.https.custom_log }}" | envsubst)
+        echo $(dirname "$logpath")
+      args:
+        executable: /bin/bash
+      loop: "{{ _apache_vhosts_from_template }}"
+      register: _apache_vhost_from_template_https_custom_log
+      changed_when: false
+
+    - name: 2. Consolidate and make HTTPS CustomLog directories unique
+      ansible.builtin.set_fact:
+        # 1. Map the 'results' list to extract only the 'stdout' attribute (the path string)
+        # 2. Select('truthy') removes any empty lines/null values
+        # 3. Trim removes any leading/trailing whitespace
+        # 4. Unique ensures no duplicate paths are processed
+        _apache_vhost_from_template_https_custom_log_dirs: >
+          {{ _apache_vhost_from_template_https_custom_log.results |
+            map(attribute='stdout') |
+            select('truthy') |
+            map('trim') |
+            unique | list }}
+      when: _apache_vhost_from_template_https_custom_log.results | length > 0
+
+    - name: 3. Create virtualhost HTTPS CustomLog directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0750"
+        owner: root
+        group: root
+      loop: "{{ _apache_vhost_from_template_https_custom_log_dirs }}"
+      when:
+        - _apache_vhost_from_template_https_custom_log_dirs | length > 0
 
 - name: Enable HTTP virtual hosts from template
   ansible.builtin.command:
@@ -134,22 +315,22 @@
   loop: "{{ apache_vhosts_from_template }}"
   when:
     - apache_vhosts_from_template | length > 0
-    - item.http_enabled | default(true)
+    - apache_execution_phase in ['all', 'http_only']
   notify: Reload apache
 
-- name: Disable HTTP virtual hosts from template
+- name: Ensure HTTPS virtual hosts from template are disabled (http_only phase)
   ansible.builtin.command:
-    cmd: "a2dissite {{ item.name }}"
+    cmd: "a2dissite {{ item.name }}-ssl"
   args:
-    removes: /etc/apache2/sites-enabled/{{ item.name }}.conf
-  register: apache_disable_template_http_vhost_result
+    removes: /etc/apache2/sites-enabled/{{ item.name }}-ssl.conf
+  register: apache_disable_template_https_vhost_http_phase_result
   changed_when:
-    - "'Site' in apache_disable_template_vhost_result.stdout"
-    - "'disabled' in apache_disable_template_vhost_result.stdout"
+    - "'Site' in apache_disable_template_https_vhost_http_phase_result.stdout"
+    - "'disabled' in apache_disable_template_https_vhost_http_phase_result.stdout"
   loop: "{{ apache_vhosts_from_template }}"
   when:
     - apache_vhosts_from_template | length > 0
-    - not (item.http_enabled | default(true))
+    - apache_execution_phase == 'http_only'
   notify: Reload apache
 
 - name: Enable HTTPS virtual hosts from template
@@ -162,20 +343,5 @@
   loop: "{{ apache_vhosts_from_template }}"
   when:
     - apache_vhosts_from_template | length > 0
-    - item.https_enabled | default(true)
-  notify: Reload apache
-
-- name: Disable HTTPS virtual hosts from template
-  ansible.builtin.command:
-    cmd: "a2dissite {{ item.name }}-ssl"
-  args:
-    removes: /etc/apache2/sites-enabled/{{ item.name }}-ssl.conf
-  register: apache_disable_template_https_vhost_result
-  changed_when:
-    - "'Site' in apache_disable_template_https_vhost_result.stdout"
-    - "'disabled' in apache_disable_template_https_vhost_result.stdout"
-  loop: "{{ apache_vhosts_from_template }}"
-  when:
-    - apache_vhosts_from_template | length > 0
-    - not (item.https_enabled | default(true))
+    - apache_execution_phase in ['all', 'https_only']
   notify: Reload apache
