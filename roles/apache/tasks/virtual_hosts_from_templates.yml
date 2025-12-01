@@ -318,21 +318,6 @@
     - apache_execution_phase in ['all', 'http_only']
   notify: Reload apache
 
-- name: Ensure HTTPS virtual hosts from template are disabled (http_only phase)
-  ansible.builtin.command:
-    cmd: "a2dissite {{ item.name }}-ssl"
-  args:
-    removes: /etc/apache2/sites-enabled/{{ item.name }}-ssl.conf
-  register: apache_disable_template_https_vhost_http_phase_result
-  changed_when:
-    - "'Site' in apache_disable_template_https_vhost_http_phase_result.stdout"
-    - "'disabled' in apache_disable_template_https_vhost_http_phase_result.stdout"
-  loop: "{{ apache_vhosts_from_template }}"
-  when:
-    - apache_vhosts_from_template | length > 0
-    - apache_execution_phase == 'http_only'
-  notify: Reload apache
-
 - name: Enable HTTPS virtual hosts from template
   ansible.builtin.command:
     cmd: "a2ensite {{ item.name }}-ssl"

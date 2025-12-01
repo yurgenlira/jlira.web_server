@@ -75,4 +75,4 @@ php_versions:
       - "php8.4-bcmath"
 
 # Skip confirmation prompt for automated deployments
-web_server_skip_confirm: false
+skip_confirm: false

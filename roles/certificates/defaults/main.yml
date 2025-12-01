@@ -113,9 +113,6 @@ certificates_items: []
 # ============================================================================
 # Selfsigned Defaults for Certificates
 # ============================================================================
-# ============================================================================
-# Selfsigned Defaults for Certificates
-# ============================================================================
 # Default values for self-signed certificates.
 
 # Subject Information (grouped as they are related)

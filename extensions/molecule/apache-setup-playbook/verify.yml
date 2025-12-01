@@ -1,0 +1,149 @@
+---
+- name: Verify Orchestrated Setup
+  hosts: webservers
+  gather_facts: true
+  tasks:
+    # ========================================================================
+    # Phase 0: Verify PHP Installation
+    # ========================================================================
+    - name: Check PHP-FPM service status
+      ansible.builtin.service_facts:
+
+    - name: Verify PHP-FPM is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['php8.3-fpm.service'] is defined
+          - ansible_facts.services['php8.3-fpm.service'].state == 'running'
+        fail_msg: "PHP-FPM service is not running"
+        success_msg: "PHP-FPM service is running"
+
+    # ========================================================================
+    # Phase 1: Verify HTTP Configuration
+    # ========================================================================
+    - name: Check if HTTP virtual host exists
+      ansible.builtin.stat:
+        path: /etc/apache2/sites-available/secure.example.local.conf
+      register: http_vhost
+
+    - name: Verify HTTP virtual host was created
+      ansible.builtin.assert:
+        that:
+          - http_vhost.stat.exists
+        fail_msg: "HTTP virtual host configuration not found"
+        success_msg: "HTTP virtual host configuration exists"
+
+    - name: Check if HTTP site is enabled
+      ansible.builtin.stat:
+        path: /etc/apache2/sites-enabled/secure.example.local.conf
+      register: http_enabled
+
+    - name: Verify HTTP site is enabled
+      ansible.builtin.assert:
+        that:
+          - http_enabled.stat.exists
+        fail_msg: "HTTP site is not enabled"
+        success_msg: "HTTP site is enabled"
+
+    # ========================================================================
+    # Phase 2: Verify Certificate Generation
+    # ========================================================================
+    - name: Check if certificate exists
+      ansible.builtin.stat:
+        path: /etc/ssl/certs/secure.example.local.crt
+      register: cert_file
+
+    - name: Check if private key exists
+      ansible.builtin.stat:
+        path: /etc/ssl/private/secure.example.local.key
+      register: key_file
+
+    - name: Verify certificate files exist
+      ansible.builtin.assert:
+        that:
+          - cert_file.stat.exists
+          - key_file.stat.exists
+        fail_msg: "Certificate or key file not found"
+        success_msg: "Certificate and key files exist"
+
+    - name: Verify certificate is valid
+      ansible.builtin.command: openssl x509 -in /etc/ssl/certs/secure.example.local.crt -noout -text
+      register: cert_info
+      changed_when: false
+
+    - name: Check certificate contains correct CN
+      ansible.builtin.assert:
+        that:
+          - "'secure.example.local' in cert_info.stdout"
+        fail_msg: "Certificate does not contain correct CN"
+        success_msg: "Certificate is valid for secure.example.local"
+
+    # ========================================================================
+    # Phase 3: Verify HTTPS Configuration
+    # ========================================================================
+    - name: Check if HTTPS virtual host exists
+      ansible.builtin.stat:
+        path: /etc/apache2/sites-available/secure.example.local-ssl.conf
+      register: https_vhost
+
+    - name: Verify HTTPS virtual host was created
+      ansible.builtin.assert:
+        that:
+          - https_vhost.stat.exists
+        fail_msg: "HTTPS virtual host configuration not found"
+        success_msg: "HTTPS virtual host configuration exists"
+
+    - name: Check if HTTPS site is enabled
+      ansible.builtin.stat:
+        path: /etc/apache2/sites-enabled/secure.example.local-ssl.conf
+      register: https_enabled
+
+    - name: Verify HTTPS site is enabled
+      ansible.builtin.assert:
+        that:
+          - https_enabled.stat.exists
+        fail_msg: "HTTPS site is not enabled"
+        success_msg: "HTTPS site is enabled"
+
+    - name: Read HTTPS virtual host configuration
+      ansible.builtin.slurp:
+        src: /etc/apache2/sites-available/secure.example.local-ssl.conf
+      register: https_config
+
+    - name: Verify HTTPS configuration references certificates
+      ansible.builtin.assert:
+        that:
+          - "'/etc/ssl/certs/secure.example.local.crt' in (https_config.content | b64decode)"
+          - "'/etc/ssl/private/secure.example.local.key' in (https_config.content | b64decode)"
+        fail_msg: "HTTPS configuration does not reference correct certificates"
+        success_msg: "HTTPS configuration references correct certificates"
+
+    # ========================================================================
+    # Integration: Verify Apache Service
+    # ========================================================================
+    - name: Verify Apache is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['apache2.service'] is defined
+          - ansible_facts.services['apache2.service'].state == 'running'
+        fail_msg: "Apache service is not running"
+        success_msg: "Apache service is running"
+
+    - name: Check Apache is listening on port 80
+      ansible.builtin.wait_for:
+        port: 80
+        timeout: 5
+
+    - name: Check Apache is listening on port 443
+      ansible.builtin.wait_for:
+        port: 443
+        timeout: 5
+
+    - name: Display verification summary
+      ansible.builtin.debug:
+        msg:
+          - "✅ All orchestration phases verified successfully"
+          - "✅ PHP-FPM: Running"
+          - "✅ Apache HTTP: Configured and enabled"
+          - "✅ Certificates: Generated and valid"
+          - "✅ Apache HTTPS: Configured and enabled"
+          - "✅ Services: All running"

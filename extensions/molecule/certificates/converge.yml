@@ -3,5 +3,16 @@
   hosts: certificates-instance
   become: true
 
-  roles:
-    - role: jlira.web_server.certificates
+  tasks:
+    - name: Apply certificates role under test
+      ansible.builtin.include_role:
+        name: jlira.web_server.certificates
+      tags:
+        - certificates_setup
+        - setup
+        - certificates_selfsigned
+        - selfsigned
+        - certificates_letsencrypt
+        - letsencrypt
+        - certificates_imported
+        - imported

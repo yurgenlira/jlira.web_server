@@ -1,0 +1,325 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Playbook: Apache Web Server Setup
+#
+# This playbook provides intelligent orchestration for setting up a web server
+# with Apache and PHP, with optional SSL certificate generation.
+#
+# Execution Strategy:
+# - If certificate generation is disabled: Single-phase Apache setup (execution_phase: all)
+# - If certificate generation is enabled: Multi-phase setup to handle Let's Encrypt HTTP-01 challenges
+#   1. Phase 0 (PHP): Set up PHP-FPM if needed for the application
+#   2. Phase 1 (HTTP): Configure Apache with HTTP-only virtual hosts to serve challenges
+#      (Skipped if certificates already exist to ensure idempotence)
+#   3. Phase 2 (Certs): Generate certificates using the Certificates role
+#   4. Phase 3 (HTTPS): Re-configure Apache with full HTTP/HTTPS virtual hosts using the new certs
+#
+# Usage Examples:
+#
+# Basic installation (Apache + PHP 8.4 with FPM, auto-generated certificates):
+#   ansible-playbook -i inventory playbooks/apache-setup.yml
+#
+# Without certificate generation (single-phase):
+#   ansible-playbook -i inventory playbooks/apache-setup.yml \
+#     -e "certificate_generation=false"
+#
+# With custom PHP version:
+#   ansible-playbook -i inventory playbooks/apache-setup.yml \
+#     -e "php_version=8.3"
+#
+# Without PHP-FPM integration:
+#   ansible-playbook -i inventory playbooks/apache-setup.yml \
+#     -e "apache_php_fpm_integration=false" \
+#     -e "php_fpm_enabled=false"
+#
+# Skip confirmation prompts:
+#   ansible-playbook -i inventory playbooks/apache-setup.yml \
+#     -e "skip_confirm=true"
+
+- name: Setup Apache Web Server
+  hosts: webservers
+  become: true
+
+  pre_tasks:
+    - name: Display web server setup parameters
+      ansible.builtin.debug:
+        msg:
+          - "===================================================================="
+          - "                   Apache Web Server Setup Details                  "
+          - "===================================================================="
+          - ""
+          - "  Apache Configuration:"
+          - "    • Server Name:        {{ apache_server_name }}"
+          - "    • SSL Enabled:        {{ apache_ssl_enabled }}"
+          - "    • HTTP Ports:         {{ apache_http_ports | join(', ') }}"
+          - "    • HTTPS Ports:        {{ apache_https_ports | join(', ')
+            if apache_ssl_enabled else 'N/A' }}"
+          - "    • Cert Generation:    {{ certificate_generation }}"
+          - "    • Execution Mode:     {{ 'Multi-phase (HTTP→Certs→HTTPS)'
+            if certificate_generation
+            else 'Single-phase (All-in-one)' }}"
+          - ""
+          - "  PHP Configuration:"
+          - "    • PHP Version:        {{ php_version }}"
+          - "    • PHP-FPM Enabled:    {{ php_fpm_enabled }}"
+          - "    • PHP-FPM Integration: {{ apache_php_fpm_integration }}"
+          - "    • Set as Default CLI: {{ php_cli_set_as_default_version }}"
+          - "    • Composer Enabled:   {{ php_composer_enabled }}"
+          - ""
+          - "  This playbook will install and configure a complete web server."
+          - "  Review the parameters above before proceeding."
+          - ""
+          - "===================================================================="
+      tags: always
+
+    - name: Confirm web server setup
+      ansible.builtin.pause:
+        prompt: "Press Enter to continue with web server setup, or Ctrl+C and then 'a' to abort."
+      when: not skip_confirm
+      tags: always
+
+  tasks:
+    # Phase 0: Setup PHP (if enabled)
+    - name: Phase 0 - Setup PHP
+      ansible.builtin.include_role:
+        name: jlira.web_server.php
+      when: apache_php_fpm_integration
+      tags:
+        - apache_phase_0
+        - php
+        - php_install
+        - php_configure_cli
+        - php_set_default_cli_version
+        - php_install_mssql_extension
+        - php_logrotate_cli
+        - php_configure_fpm
+        - php_logrotate_fpm
+
+    # Single-phase Apache setup (when certificate generation is disabled)
+    - name: Single-phase Apache Setup
+      ansible.builtin.include_role:
+        name: jlira.web_server.apache
+      vars:
+        apache_execution_phase: all
+      when: not certificate_generation
+      tags:
+        - apache_single_phase
+        - apache_install
+        - apache_configure
+        - apache_custom_configs
+        - apache_virtual_hosts
+        - apache_virtual_hosts_from_templates
+        - apache_status_page
+        - apache_php_fpm_status_proxy
+        - apache_authentication
+
+    # Multi-phase setup (when certificate generation is enabled)
+    # Phase 1: Configure HTTP virtual hosts
+    - name: Phase 1 - Configure Apache HTTP
+      ansible.builtin.include_role:
+        name: jlira.web_server.apache
+      vars:
+        apache_execution_phase: http_only
+      when: certificate_generation
+      tags:
+        - apache_phase_1
+        - apache_install
+        - apache_configure
+        - apache_custom_configs
+        - apache_virtual_hosts
+        - apache_virtual_hosts_from_templates
+        - apache_status_page
+        - apache_php_fpm_status_proxy
+        - apache_authentication
+
+    # Intermediate Step: Generate Certificate List
+    - name: Resolve template variables for certificates
+      ansible.builtin.shell: |
+        set -o pipefail
+        # Load Apache envvars if they exist
+        if [ -f /etc/apache2/envvars ]; then
+          source /etc/apache2/envvars
+        fi
+
+        # Export item variables
+        {% for var in item.vars | default([]) %}
+        export {{ var.name }}="{{ var.value }}"
+        {% endfor %}
+
+        # Get Template
+        {% set tpl = apache_vhost_templates | selectattr('name', 'equalto', item.template) | first %}
+
+        # Resolve DocumentRoot
+        docroot=$(echo "{{ tpl.document_root }}" | envsubst)
+
+        # Resolve Server Aliases
+        aliases=""
+        {% for alias in tpl.server_alias | default([]) %}
+        resolved_alias=$(echo "{{ alias }}" | envsubst)
+        aliases="$aliases $resolved_alias"
+        {% endfor %}
+
+        # Output as JSON fields
+        echo "webroot=$docroot"
+        echo "aliases=$aliases"
+      args:
+        executable: /bin/bash
+      loop: "{{ apache_vhosts_from_template | default([]) }}"
+      register: resolved_template_vhosts
+      changed_when: false
+      when: certificate_generation
+
+    - name: Generate certificate list from Apache config
+      ansible.builtin.set_fact:
+        certificates_items: >-
+          {%- set certs = [] -%}
+          {%- set vhosts = apache_virtual_hosts | default([]) -%}
+
+          {# Process Standard VHosts #}
+          {%- for vhost in vhosts -%}
+            {%- if vhost.https is defined -%}
+              {%- set is_local = vhost.server_name.endswith('.local') -%}
+              {%- set mode = 'selfsigned' if is_local else 'letsencrypt' -%}
+              {%- set san = [] -%}
+              {%- for alias in vhost.server_alias | default([]) -%}
+                {%- if is_local -%}
+                  {%- set _ = san.append('DNS: ' ~ alias) -%}
+                {%- else -%}
+                  {%- set _ = san.append(alias) -%}
+                {%- endif -%}
+              {%- endfor -%}
+
+              {%- set cert_item = {
+                  'name': vhost.server_name,
+                  'mode': mode,
+                  'san': san
+              } -%}
+
+              {%- if mode == 'letsencrypt' -%}
+                  {%- set _ = cert_item.update({'webroot': vhost.document_root}) -%}
+              {%- endif -%}
+
+              {%- set _ = certs.append(cert_item) -%}
+            {%- endif -%}
+          {%- endfor -%}
+
+          {# Process Template VHosts using Resolved Results #}
+          {%- for res in resolved_template_vhosts.results | default([]) -%}
+             {%- if not res.get('skipped', False) -%}
+                {%- set vhost = res.item -%}
+                {%- set lines = res.stdout_lines -%}
+                {%- set webroot = lines[0].split('=')[1] -%}
+                {%- set aliases_str = lines[1].split('=')[1] | default('') -%}
+                {%- set aliases = aliases_str.split() -%}
+
+                {%- set is_local = vhost.name.endswith('.local') -%}
+                {%- set mode = 'selfsigned' if is_local else 'letsencrypt' -%}
+
+                {%- set san = [] -%}
+                {%- for alias in aliases -%}
+                    {%- if is_local -%}
+                        {%- set _ = san.append('DNS: ' ~ alias) -%}
+                    {%- else -%}
+                        {%- set _ = san.append(alias) -%}
+                    {%- endif -%}
+                {%- endfor -%}
+
+                {%- set cert_item = {
+                    'name': vhost.name,
+                    'mode': mode,
+                    'san': san
+                } -%}
+
+                {%- if mode == 'letsencrypt' -%}
+                    {%- set _ = cert_item.update({'webroot': webroot}) -%}
+                {%- endif -%}
+
+                {%- set _ = certs.append(cert_item) -%}
+             {%- endif -%}
+          {%- endfor -%}
+
+          {{ certs }}
+      when:
+        - certificate_generation
+        - certificates_items is not defined or certificates_items | length == 0
+      tags:
+        - certificates
+        - certificates_selfsigned
+        - certificates_letsencrypt
+
+    # Phase 2: Generate certificates (if enabled)
+    - name: Phase 2 - Generate Certificates
+      ansible.builtin.include_role:
+        name: jlira.web_server.certificates
+      when: certificate_generation
+      tags:
+        - apache_phase_2
+        - certificates
+        - certificates_setup
+        - certificates_selfsigned
+        - certificates_letsencrypt
+        - certificates_imported
+
+    # Phase 3: Configure HTTPS virtual hosts
+    - name: Phase 3 - Configure Apache HTTPS
+      ansible.builtin.include_role:
+        name: jlira.web_server.apache
+      vars:
+        apache_execution_phase: https_only
+      when: certificate_generation
+      tags:
+        - apache_phase_3
+        - apache_install
+        - apache_configure
+        - apache_custom_configs
+        - apache_virtual_hosts
+        - apache_virtual_hosts_from_templates
+        - apache_status_page
+        - apache_php_fpm_status_proxy
+        - apache_authentication
+
+  post_tasks:
+    - name: Verify Apache installation
+      ansible.builtin.command: apache2 -v
+      register: apache_version_check
+      changed_when: false
+
+    - name: Verify PHP installation
+      ansible.builtin.command: php --version
+      register: php_version_check
+      changed_when: false
+      when: php_fpm_enabled
+
+    - name: Check Apache service status
+      ansible.builtin.service_facts:
+
+    - name: Display installation summary
+      ansible.builtin.debug:
+        msg:
+          - "═══════════════════════════════════════════════════════════════════════"
+          - "                   Web Server Setup Complete                           "
+          - "═══════════════════════════════════════════════════════════════════════"
+          - ""
+          - "  Apache Configuration:"
+          - "    • Version:            {{ apache_version_check.stdout_lines[0] | default('Unknown') }}"
+          - "    • Service Status:     {{ ansible_facts.services['apache2.service'].state | default('Unknown') }}"
+          - "    • Server Name:        {{ apache_server_name }}"
+          - "    • SSL Enabled:        {{ 'Yes' if apache_ssl_enabled else 'No' }}"
+          - >-
+                • Execution Mode:     {{ 'Multi-phase (HTTP→Certs→HTTPS)'
+                if certificate_generation else 'Single-phase' }}
+          - >-
+                • Virtual Hosts:      {{ (apache_virtual_hosts | default([]) | length) +
+                (apache_vhosts_from_template | default([]) | length) }}
+          - ""
+          - "  PHP Configuration:"
+          - "    • Version:            {{ php_version_check.stdout_lines[0] | default('Not installed') }}"
+          - "    • PHP-FPM:            {{ 'Enabled' if php_fpm_enabled else 'Disabled' }}"
+          - "    • Apache Integration: {{ 'Enabled' if apache_php_fpm_integration else 'Disabled' }}"
+          - "    • Default CLI:        {{ 'Yes' if php_cli_set_as_default_version else 'No' }}"
+          - ""
+          - "  Certificates:"
+          - "    • Generation:         {{ 'Enabled' if certificate_generation else 'Disabled' }}"
+          - "    • Count:              {{ certificates_items | length if certificate_generation else 0 }}"
+          - ""
+          - "═══════════════════════════════════════════════════════════════════════"

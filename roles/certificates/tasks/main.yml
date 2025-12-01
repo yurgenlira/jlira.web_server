@@ -4,11 +4,9 @@
   args:
     apply:
       tags:
-        - certificates
-        - validation
+        - always
   tags:
-    - certificates
-    - validation
+    - always
 
 - name: Include jlira.web_server.certificates.prepare.yml
   ansible.builtin.include_tasks: prepare.yml
@@ -24,10 +22,10 @@
   args:
     apply:
       tags:
-        - certificates
+        - certificates_setup
         - setup
   tags:
-    - certificates
+    - certificates_setup
     - setup
 
 - name: Include jlira.web_server.certificates.selfsigned.yml
@@ -38,10 +36,10 @@
   args:
     apply:
       tags:
-        - certificates
+        - certificates_selfsigned
         - selfsigned
   tags:
-    - certificates
+    - certificates_selfsigned
     - selfsigned
 
 - name: Include jlira.web_server.certificates.letsencrypt.yml
@@ -52,10 +50,10 @@
   args:
     apply:
       tags:
-        - certificates
+        - certificates_letsencrypt
         - letsencrypt
   tags:
-    - certificates
+    - certificates_letsencrypt
     - letsencrypt
 
 - name: Include jlira.web_server.certificates.imported.yml
@@ -66,26 +64,25 @@
   args:
     apply:
       tags:
-        - certificates
+        - certificates_imported
         - imported
   tags:
-    - certificates
+    - certificates_imported
     - imported
 
-- name: Certificate Management Summary
-  ansible.builtin.debug:
-    msg:
-      - "Total certificates managed: {{ certificates_prepared_items | default([]) | length }}"
-      - >-
-        Self-Signed:
-        {{ certificates_prepared_items | default([]) | selectattr('mode', 'equalto', 'selfsigned') | list | length }}
-      - >-
-        Let's Encrypt:
-        {{ certificates_prepared_items | default([]) | selectattr('mode', 'equalto', 'letsencrypt') | list | length }}
-      - >-
-        Imported:
-        {{ certificates_prepared_items | default([]) | selectattr('mode', 'equalto', 'imported') | list | length }}
-  when: certificates_prepared_items is defined
-  tags:
-    - certificates
-    - summary
+# - name: Certificate Management Summary
+#   ansible.builtin.debug:
+#     msg:
+#       - "Total certificates managed: {{ certificates_prepared_items | default([]) | length }}"
+#       - >-
+#         Self-Signed:
+#         {{ certificates_prepared_items | default([]) | selectattr('mode', 'equalto', 'selfsigned') | list | length }}
+#       - >-
+#         Let's Encrypt:
+#         {{ certificates_prepared_items | default([]) | selectattr('mode', 'equalto', 'letsencrypt') | list | length }}
+#       - >-
+#         Imported:
+#         {{ certificates_prepared_items | default([]) | selectattr('mode', 'equalto', 'imported') | list | length }}
+#   when: certificates_prepared_items is defined
+#   tags:
+#     - always

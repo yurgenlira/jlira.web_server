@@ -1,0 +1,65 @@
+name: CI - Apache Setup Playbook
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'playbooks/apache-setup.yml'
+      - 'extensions/molecule/apache-setup-playbook/**'
+      - 'roles/apache/**'
+      - 'roles/php/**'
+      - 'roles/certificates/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'playbooks/apache-setup.yml'
+      - 'extensions/molecule/apache-setup-playbook/**'
+      - 'roles/apache/**'
+      - 'roles/php/**'
+      - 'roles/certificates/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint Apache Setup Playbook
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the codebase
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: extensions/requirements-lint.txt
+
+      - name: Install lint dependencies
+        run: pip install -r extensions/requirements-lint.txt
+
+      - name: Run ansible lint
+        run: ansible-lint playbooks/apache-setup.yml extensions/molecule/apache-setup-playbook
+
+  test:
+    name: Run molecule test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: extensions/requirements-test.txt
+
+      - name: Install molecule test dependencies
+        run: pip install -r extensions/requirements-test.txt
+
+      - name: Run molecule test
+        working-directory: extensions
+        run: molecule test -s apache-setup-playbook

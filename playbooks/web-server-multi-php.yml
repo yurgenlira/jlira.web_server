@@ -21,7 +21,7 @@
 #
 # Skip confirmation prompts:
 #   ansible-playbook -i inventory playbooks/web-server-multi-php.yml \
-#     -e "web_server_skip_confirm=true"
+#     -e "skip_confirm=true"
 #
 # Example variable file (playbooks/vars/multi-php-example.yml):
 # ---
@@ -148,7 +148,7 @@
     - name: Confirm web server setup
       ansible.builtin.pause:
         prompt: "Press Enter to continue with multi-PHP web server setup, or Ctrl+C and then 'a' to abort."
-      when: not (web_server_skip_confirm | default(false))
+      when: not (skip_confirm | default(false))
       tags: always
 
   tasks:
