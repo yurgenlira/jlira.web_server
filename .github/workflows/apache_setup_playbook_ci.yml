@@ -23,7 +23,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  call-role-ci:
-    uses: ./.github/workflows/role_ci.yml
+  call-test-ci:
+    uses: ./.github/workflows/test_ci.yml
     with:
-      role-name: 'apache_setup_playbook'
+      test-name: 'apache-setup'
+      test-type: 'playbook'
