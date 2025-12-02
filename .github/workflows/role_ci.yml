@@ -59,6 +59,12 @@ jobs:
       - name: Install molecule test dependencies
         run: pip install -r extensions/requirements-test.txt
 
+      - name: Build collection
+        run: ansible-galaxy collection build --force
+
+      - name: Install collection from build
+        run: ansible-galaxy collection install jlira-web_server-*.tar.gz --force
+
       # The 'extensions' directory contains Ansible roles for Molecule testing.
       - name: Run molecule test for ${{ inputs.role-name }} role
         working-directory: extensions
