@@ -20,11 +20,7 @@ on:
       role-name:
         description: 'Role name to test (e.g., apache, php, certificates)'
         required: true
-        type: choice
-        options:
-          - apache
-          - php
-          - certificates
+        type: string
       runner-os:
         description: 'Runner OS'
         required: false
