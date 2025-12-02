@@ -106,6 +106,3 @@
       args:
         creates: /etc/apache2/conf-enabled/security.conf
       notify: Reload apache
-
-# - name: Flush handlers
-#   ansible.builtin.meta: flush_handlers

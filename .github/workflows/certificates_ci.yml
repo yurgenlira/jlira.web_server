@@ -1,0 +1,24 @@
+name: CI - certificates
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'roles/certificates/**'
+      - 'extensions/molecule/certificates/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'roles/certificates/**'
+      - 'extensions/molecule/certificates/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  call-test-ci:
+    uses: ./.github/workflows/test_ci.yml
+    with:
+      test-name: 'certificates'
+      test-type: 'role'

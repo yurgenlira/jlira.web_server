@@ -1,0 +1,30 @@
+name: CI - Apache Setup Playbook
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'playbooks/apache-setup.yml'
+      - 'extensions/molecule/apache-setup-playbook/**'
+      - 'roles/apache/**'
+      - 'roles/php/**'
+      - 'roles/certificates/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'playbooks/apache-setup.yml'
+      - 'extensions/molecule/apache-setup-playbook/**'
+      - 'roles/apache/**'
+      - 'roles/php/**'
+      - 'roles/certificates/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  call-test-ci:
+    uses: ./.github/workflows/test_ci.yml
+    with:
+      test-name: 'apache-setup'
+      test-type: 'playbook'

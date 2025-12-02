@@ -1,0 +1,76 @@
+---
+- name: Test - Auto-detected self-signed certificate exists
+  ansible.builtin.stat:
+    path: /etc/ssl/certs/autodetect.test.crt
+  register: autodetect_cert
+  failed_when: not autodetect_cert.stat.exists
+
+- name: Test - Auto-detected private key exists
+  ansible.builtin.stat:
+    path: /etc/ssl/private/autodetect.test.key
+  register: autodetect_key
+  failed_when: not autodetect_key.stat.exists or autodetect_key.stat.mode != '0600'
+
+- name: Test - Custom self-signed certificate exists
+  ansible.builtin.stat:
+    path: /etc/ssl/certs/custom.local.crt
+  register: custom_cert
+  failed_when: not custom_cert.stat.exists
+
+- name: Test - Custom certificate has correct subject fields
+  ansible.builtin.command: >
+    openssl x509 -in /etc/ssl/certs/custom.local.crt -noout -subject -issuer
+  register: custom_cert_info
+  changed_when: false
+  failed_when: >
+    'O = Test Corp' not in custom_cert_info.stdout or
+    'OU = DevOps' not in custom_cert_info.stdout or
+    'C = US' not in custom_cert_info.stdout
+
+- name: Test - Custom certificate has correct key size
+  ansible.builtin.command: >
+    openssl x509 -in /etc/ssl/certs/custom.local.crt -noout -text
+  register: custom_cert_text
+  changed_when: false
+  failed_when: "'Public-Key: (2048 bit)' not in custom_cert_text.stdout"
+
+- name: Test - Custom certificate has SANs
+  ansible.builtin.command: >
+    openssl x509 -in /etc/ssl/certs/custom.local.crt -noout -text
+  register: custom_cert_sans
+  changed_when: false
+  failed_when: >
+    'DNS:custom.local' not in custom_cert_sans.stdout or
+    'DNS:*.custom.local' not in custom_cert_sans.stdout or
+    'IP Address:127.0.0.1' not in custom_cert_sans.stdout
+
+- name: Test - Certificate with defaults exists
+  ansible.builtin.stat:
+    path: /etc/ssl/certs/defaults.test.crt
+  register: defaults_cert
+  failed_when: not defaults_cert.stat.exists
+
+- name: Test - Certificate with defaults has only CN (no other subject fields)
+  ansible.builtin.command: >
+    openssl x509 -in /etc/ssl/certs/defaults.test.crt -noout -subject
+  register: defaults_cert_subject
+  changed_when: false
+  failed_when: >
+    'CN = defaults.test' not in defaults_cert_subject.stdout
+
+- name: Test - SANs certificate exists
+  ansible.builtin.stat:
+    path: /etc/ssl/certs/sans.test.crt
+  register: sans_cert
+  failed_when: not sans_cert.stat.exists
+
+- name: Test - SANs certificate has all specified SANs
+  ansible.builtin.command: >
+    openssl x509 -in /etc/ssl/certs/sans.test.crt -noout -text
+  register: sans_cert_check
+  changed_when: false
+  failed_when: >
+    'DNS:alt.test' not in sans_cert_check.stdout or
+    'DNS:www.alt.test' not in sans_cert_check.stdout or
+    'IP Address:127.0.0.1' not in sans_cert_check.stdout or
+    'IP Address:192.168.1.1' not in sans_cert_check.stdout

@@ -1,10 +1,15 @@
-name: CI - Generic Role
+name: CI - Generic Test
 
-# This makes the workflow reusable
+# This makes the workflow reusable for both roles and playbooks
 on:
   workflow_call:
     inputs:
-      role-name:
+      test-name:
+        description: 'Name of the role or playbook to test'
+        required: true
+        type: string
+      test-type:
+        description: 'Type of test: role or playbook'
         required: true
         type: string
       runner-os:
@@ -17,10 +22,17 @@ on:
         default: '3.12'
   workflow_dispatch:
     inputs:
-      role-name:
-        description: 'Role name to test (e.g., apache, php, certificates)'
+      test-name:
+        description: 'Name of the role or playbook to test (e.g., apache, php, certificates, apache-setup)'
         required: true
         type: string
+      test-type:
+        description: 'Type of test'
+        required: true
+        type: choice
+        options:
+          - role
+          - playbook
       runner-os:
         description: 'Runner OS'
         required: false
@@ -34,11 +46,11 @@ on:
 
 jobs:
   lint:
-    name: Lint code for ${{ inputs.role-name }} role
+    name: Lint ${{ inputs.test-type }} - ${{ inputs.test-name }}
     runs-on: ${{ inputs.runner-os }}
 
     steps:
-      - name: Check out the codebase.
+      - name: Check out the codebase
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -48,17 +60,20 @@ jobs:
           cache: 'pip'
           cache-dependency-path: extensions/requirements-lint.txt
 
-      - run: echo '${{ steps.cp312.outputs.cache-hit }}' # true if cache-hit occurred on the primary key
-
-      - name: Install lint dependencies.
+      - name: Install lint dependencies
         run: pip install -r extensions/requirements-lint.txt
 
-      - name: Run ansible lint
-        run: ansible-lint roles/${{ inputs.role-name }} extensions/molecule/${{ inputs.role-name }}
+      - name: Run ansible lint for role
+        if: inputs.test-type == 'role'
+        run: ansible-lint roles/${{ inputs.test-name }} extensions/molecule/${{ inputs.test-name }}
+
+      - name: Run ansible lint for playbook
+        if: inputs.test-type == 'playbook'
+        run: ansible-lint playbooks/${{ inputs.test-name }}.yml extensions/molecule/${{ inputs.test-name }}-playbook
 
 
   test:
-    name: Run molecule tests for ${{ inputs.role-name }} role
+    name: Run molecule test for ${{ inputs.test-type }} - ${{ inputs.test-name }}
     runs-on: ${{ inputs.runner-os }}
 
     steps:
@@ -81,7 +96,12 @@ jobs:
       - name: Install collection from build
         run: ansible-galaxy collection install jlira-web_server-*.tar.gz --force
 
-      # The 'extensions' directory contains Ansible roles for Molecule testing.
-      - name: Run molecule test for ${{ inputs.role-name }} role
+      - name: Run molecule test for role
+        if: inputs.test-type == 'role'
         working-directory: extensions
-        run: molecule test -s ${{ inputs.role-name }}
+        run: molecule test -s ${{ inputs.test-name }}
+
+      - name: Run molecule test for playbook
+        if: inputs.test-type == 'playbook'
+        working-directory: extensions
+        run: molecule test -s ${{ inputs.test-name }}-playbook

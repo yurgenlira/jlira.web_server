@@ -1,0 +1,75 @@
+---
+- name: Issue Certificate (HTTP-01)
+  ansible.builtin.command:
+    cmd: >-
+      certbot certonly --non-interactive --agree-tos
+      --email {{ certificates_certbot_email }}
+      --server {{ certificates_certbot_server_url }}
+      {% if certificates_certbot_environment == 'test' %}
+      --no-verify-ssl
+      {% endif %}
+      --webroot -w {{ certificates_item.webroot }}
+      {% if certificates_item.deploy_hook %}
+      --deploy-hook "{{ certificates_item.deploy_hook }}"
+      {% endif %}
+      -d {{ certificates_item.name }}
+      {{ '-d ' + certificates_item.san | join(' -d ') if certificates_item.san is defined else '' }}
+  args:
+    creates: "/etc/letsencrypt/live/{{ certificates_item.name }}/cert.pem"
+  when: certificates_item.challenge_type == 'http-01'
+
+- name: Issue Certificate (DNS-01 with plugin)
+  ansible.builtin.command:
+    cmd: >-
+      certbot certonly --non-interactive --agree-tos
+      --email {{ certificates_certbot_email }}
+      --server {{ certificates_certbot_server_url }}
+      {% if certificates_certbot_environment == 'test' %}
+      --no-verify-ssl
+      {% endif %}
+      --dns-{{ certificates_item.dns_provider }}
+      --dns-{{ certificates_item.dns_provider }}-credentials {{ certificates_item.dns_credentials }}
+      {% if certificates_item.deploy_hook %}
+      --deploy-hook "{{ certificates_item.deploy_hook }}"
+      {% endif %}
+      -d {{ certificates_item.name }}
+      {{ '-d ' + certificates_item.san | join(' -d ') if certificates_item.san is defined else '' }}
+  args:
+    creates: "/etc/letsencrypt/live/{{ certificates_item.name }}/cert.pem"
+  when:
+    - certificates_item.challenge_type == 'dns-01'
+    - certificates_item.dns_provider != 'custom'
+
+- name: Issue Certificate (DNS-01 with custom hooks)
+  ansible.builtin.command:
+    cmd: >-
+      certbot certonly --non-interactive --agree-tos
+      --email {{ certificates_certbot_email }}
+      --server {{ certificates_certbot_server_url }}
+      {% if certificates_certbot_environment == 'test' %}
+      --no-verify-ssl
+      {% endif %}
+      --manual
+      --manual-auth-hook "{{ certificates_item.auth_hook }}"
+      --manual-cleanup-hook "{{ certificates_item.cleanup_hook }}"
+      --preferred-challenges dns
+      {% if certificates_item.deploy_hook %}
+      --deploy-hook "{{ certificates_item.deploy_hook }}"
+      {% endif %}
+      -d {{ certificates_item.name }}
+      {{ '-d ' + certificates_item.san | join(' -d ') if certificates_item.san is defined else '' }}
+  args:
+    creates: "/etc/letsencrypt/live/{{ certificates_item.name }}/cert.pem"
+  when:
+    - certificates_item.challenge_type == 'dns-01'
+    - certificates_item.dns_provider == 'custom'
+
+# - name: Link Certificate Files
+#   ansible.builtin.file:
+#     src: "/etc/letsencrypt/live/{{ certificates_item.name }}/{{ item.src }}"
+#     dest: "{{ item.dest }}"
+#     state: link
+#   loop:
+#     - { src: 'cert.pem', dest: "{{ certificates_cert_dir }}/{{ certificates_item.name }}.crt" }
+#     - { src: 'privkey.pem', dest: "{{ certificates_key_dir }}/{{ certificates_item.name }}.key" }
+#     - { src: 'chain.pem', dest: "{{ certificates_cert_dir }}/{{ certificates_item.name }}.chain.crt" }

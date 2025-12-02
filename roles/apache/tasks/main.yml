@@ -16,38 +16,12 @@
       tags:
         - install
         - apache_install
+  when: apache_execution_phase in ['all', 'http_only']
   tags:
     - install
     - apache_install
 
-- name: Include php role
-  ansible.builtin.include_role:
-    name: php
-    apply:
-      tags:
-        - php_integration
-        - apache_php_integration
-        - apache_php_status_page
-        - php_status_page
-  when: apache_php_fpm_integration
-  vars:
-    php_version: "{{ apache_php_fpm_version }}"
-    php_fpm_enabled: true
-    php_status_page: "{{ apache_php_status_page }}"
-  tags:
-    - php_integration
-    - apache_php_integration
-    - apache_php_status_page
-    - php_status_page
-    - php_uninstall
-    - php_install
-    - php_configure_cli
-    - php_set_default_cli_version
-    - php_install_mssql_extension
-    - php_logrotate_cli
-    - php_configure_fpm
-    - php_logrotate_fpm
-
+# Users must include jlira.web_server.php explicitly before this role if PHP is needed.
 - name: Include jlira.web_server.apache.php_integration.yml
   ansible.builtin.include_tasks:
     file: php_integration.yml
@@ -57,7 +31,9 @@
         - apache_php_integration
         - apache_php_status_page
         - php_status_page
-  when: apache_php_fpm_integration
+  when:
+    - apache_php_fpm_integration
+    - apache_execution_phase in ['all', 'http_only']
   tags:
     - php_integration
     - apache_php_integration
@@ -71,6 +47,7 @@
       tags:
         - configure
         - apache_configure
+  when: apache_execution_phase in ['all', 'http_only']
   tags:
     - configure
     - apache_configure
@@ -82,7 +59,9 @@
       tags:
         - custom_configs
         - apache_custom_configs
-  when: apache_custom_configs | length > 0
+  when:
+    - apache_custom_configs | length > 0
+    - apache_execution_phase in ['all', 'http_only']
   tags:
     - custom_configs
     - apache_custom_configs
@@ -122,6 +101,7 @@
       tags:
         - status_page
         - apache_status_page
+  when: apache_execution_phase in ['all', 'http_only']
   tags:
     - status_page
     - apache_status_page
@@ -133,7 +113,9 @@
       tags:
         - authentication
         - apache_authentication
-  when: apache_htpasswd_files | length > 0
+  when:
+    - apache_htpasswd_files | length > 0
+    - apache_execution_phase in ['all', 'http_only']
   tags:
     - authentication
     - apache_authentication

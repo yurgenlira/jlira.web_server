@@ -14,6 +14,19 @@ apache_server_name: "{{ ansible_hostname }}"
 apache_ssl_enabled: true
 
 # ============================================================================
+# Execution Phase Configuration
+# ============================================================================
+
+# Control which parts of the role are executed.
+# Useful for split execution (e.g., configure HTTP -> generate certs -> configure HTTPS).
+# Options:
+# - "all": Execute everything (default)
+# - "http_only": Configure only HTTP virtual hosts and basic settings
+# - "https_only": Configure only HTTPS virtual hosts
+# Type: String
+apache_execution_phase: "all"
+
+# ============================================================================
 # PHP-FPM Integration Configuration
 # ============================================================================
 
@@ -212,23 +225,20 @@ apache_custom_configs: []
 #
 # HTTP Configuration:
 # - `http`: HTTP-specific configuration (optional)
-#   - `enabled`: Whether to enable the HTTP virtual host. Default: true
 #   - `listen`: List of the address:port or port to listen on. Default: "*:80"
 #   - `error_log`: Path to the error log file. Default: ${APACHE_LOG_DIR}/<name>-error.log
-#   - `access_log`: Path to the access log file. Default: ${APACHE_LOG_DIR}/<name>-access.log combined
+#   - `custom_log`: Path to the access log file. Default: ${APACHE_LOG_DIR}/<name>-access.log combined
 #   - `custom_directives`: Additional Apache directives for HTTP only (optional).
-#  apache_virtual_hosts:
 #
 # HTTPS Configuration:
 # - `https`: HTTPS-specific configuration (optional)
-#   - `enabled`: Whether to enable the HTTP virtual host. Default: true
-#   - `listen`: List of the address:port or port to listen on. Default: "*:80"
-#   - `error_log`: Path to the error log file. Default: ${APACHE_LOG_DIR}/<name>-error.log
-#   - `access_log`: Path to the access log file. Default: ${APACHE_LOG_DIR}/<name>-access.log combined
+#   - `listen`: List of the address:port or port to listen on. Default: "*:443"
+#   - `error_log`: Path to the error log file. Default: ${APACHE_LOG_DIR}/<name>-ssl-error.log
+#   - `custom_log`: Path to the access log file. Default: ${APACHE_LOG_DIR}/<name>-ssl-access.log combined
 #   - `certificate_file`: Path to the SSL certificate file (required for HTTPS).
 #   - `certificate_key_file`: Path to the SSL certificate key file (required for HTTPS).
 #   - `certificate_chain_file`: Path to the SSL certificate chain file (optional).
-#   - `custom_directives`: Additional Apache directives for HTTP only (optional).
+#   - `custom_directives`: Additional Apache directives for HTTPS only (optional).
 #
 # Example - Simple HTTP virtual host:
 # apache_virtual_hosts:
@@ -239,7 +249,6 @@ apache_custom_configs: []
 #     server_admin: admin@example.com
 #     document_root: /var/www/example.com
 #     http:
-#       enabled: true
 #       custom_directives: |
 #         DirectoryIndex index.html index.php
 #
@@ -249,12 +258,10 @@ apache_custom_configs: []
 #     server_name: secure.example.com
 #     document_root: /var/www/secure.example.com
 #     http:
-#       enabled: true
 #       custom_directives: |
 #         # Redirect all HTTP to HTTPS
 #         Redirect permanent / https://secure.example.com/
 #     https:
-#       enabled: true
 #       certificate_file: /etc/ssl/certs/example.com.crt
 #       certificate_key_file: /etc/ssl/private/example.com.key
 #       certificate_chain_file: /etc/ssl/certs/example.com-chain.crt
@@ -264,11 +271,6 @@ apache_custom_configs: []
 #             AllowOverride All
 #             Require all granted
 #         </Directory>
-#
-# Example - Disable a virtual host:
-# apache_virtual_hosts:
-#   - name: old-site.com
-#     enabled: false
 #
 # Type: List of Dictionaries
 apache_virtual_hosts: []
@@ -283,31 +285,32 @@ apache_vhost_templates_dir: /etc/apache2/templates
 
 # List of reusable virtual host templates.
 # Templates define a base configuration that can be reused by multiple virtual hosts
-# with variable substitution. Each template is defined as a dictionary with:
+# with variable substitution. Each template is defined as a dictionary with the same
+# structure as `apache_virtual_hosts`.
 #
 # - `name`: A descriptive name for the virtual host config template file like
 #           {{ name }}.template.conf or {{ name }}-ssl.template.conf.
-# - `http`: HTTP virtual host template content (optional)
-#   - `content`: Jinja2 template content for HTTP configuration
-# - `https`: HTTPS virtual host template content (optional)
-#   - `content`: Jinja2 template content for HTTPS configuration
+# - `server_name`: The primary server name (FQDN) (optional).
+# - `document_root`: The document root directory.
+# - `http`: HTTP-specific configuration (optional)
+#   - `custom_directives`: Additional Apache directives for HTTP only (optional).
+# - `https`: HTTPS-specific configuration (optional)
+#   - `custom_directives`: Additional Apache directives for HTTPS only (optional).
 #
 # Templates can use variables that will be substituted when creating virtual hosts.
-# Variables are referenced using Jinja2 syntax: {{ variable_name }}
+# Variables are referenced using Apache Define syntax: ${VARIABLE_NAME}
 #
 # Example:
 # apache_vhost_templates:
 #   - name: wordpress_site
+#     server_name: ${SERVER_NAME}
+#     document_root: ${DOCUMENT_ROOT}
 #     http:
-#       content: |
-#         <VirtualHost *:80>
-#             ServerName {{ server_name }}
-#             DocumentRoot {{ document_root }}
-#             <Directory {{ document_root }}>
-#                 AllowOverride All
-#                 Require all granted
-#             </Directory>
-#         </VirtualHost>
+#       custom_directives: |
+#         <Directory ${DOCUMENT_ROOT}>
+#             AllowOverride All
+#             Require all granted
+#         </Directory>
 #
 # Type: List of Dictionaries
 apache_vhost_templates: []

@@ -29,13 +29,13 @@
 - name: Check if HTTP access log directory exists (expanded from ${APACHE_LOG_DIR})
   ansible.builtin.stat:
     path: /var/log/apache2
-  register: apache_http_access_log_dir_check
+  register: apache_http_custom_log_dir_check
 
 - name: Verify HTTP access log directory exists
   ansible.builtin.assert:
     that:
-      - apache_http_access_log_dir_check.stat.exists
-      - apache_http_access_log_dir_check.stat.isdir
+      - apache_http_custom_log_dir_check.stat.exists
+      - apache_http_custom_log_dir_check.stat.isdir
     fail_msg: "HTTP access log directory does not exist"
 
 - name: Check if HTTPS error log directory exists (expanded from ${APACHE_LOG_DIR})
@@ -53,13 +53,13 @@
 - name: Check if HTTPS access log directory exists (expanded from ${APACHE_LOG_DIR})
   ansible.builtin.stat:
     path: /var/log/apache2
-  register: apache_https_access_log_dir_check
+  register: apache_https_custom_log_dir_check
 
 - name: Verify HTTPS access log directory exists
   ansible.builtin.assert:
     that:
-      - apache_https_access_log_dir_check.stat.exists
-      - apache_https_access_log_dir_check.stat.isdir
+      - apache_https_custom_log_dir_check.stat.exists
+      - apache_https_custom_log_dir_check.stat.isdir
     fail_msg: "HTTPS access log directory does not exist"
 
 # Test HTTP Virtual Host Configuration

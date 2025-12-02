@@ -17,7 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  call-role-ci:
-    uses: ./.github/workflows/role_ci.yml
+  call-test-ci:
+    uses: ./.github/workflows/test_ci.yml
     with:
-      role-name: 'php'
+      test-name: 'php'
+      test-type: 'role'

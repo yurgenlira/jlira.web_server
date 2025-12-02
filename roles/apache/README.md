@@ -9,6 +9,7 @@ A comprehensive Ansible role for installing, configuring, and managing the Apach
 - [Requirements](#requirements)
 - [Role Variables](#role-variables)
   - [Basic Configuration](#basic-configuration)
+  - [Execution Phase Configuration](#execution-phase-configuration)
   - [PHP-FPM Integration](#php-fpm-integration)
   - [Port Configuration](#port-configuration)
   - [Module Management](#module-management)
@@ -84,6 +85,47 @@ apache_server_name: "example.com"
 apache_ssl_enabled: true
 ```
 
+### Execution Phase Configuration
+
+#### `apache_execution_phase`
+- **Type**: String
+- **Default**: `all`
+- **Options**: `all`, `http_only`, `https_only`
+- **Description**: Control which parts of the role are executed. Useful for split execution workflows (e.g., configure HTTP → generate certificates → configure HTTPS).
+
+```yaml
+# Execute everything (default)
+apache_execution_phase: "all"
+
+# Configure only HTTP virtual hosts and basic settings
+apache_execution_phase: "http_only"
+
+# Configure only HTTPS virtual hosts (requires HTTP to be configured first)
+apache_execution_phase: "https_only"
+```
+
+**Use Case Example:**
+```yaml
+# Step 1: Configure HTTP and request certificates
+- hosts: webservers
+  roles:
+    - role: jlira.web_server.apache
+      vars:
+        apache_execution_phase: "http_only"
+
+# Step 2: Generate Let's Encrypt certificates (requires HTTP for verification)
+- hosts: webservers
+  roles:
+    - role: jlira.web_server.certificates
+
+# Step 3: Configure HTTPS with the generated certificates
+- hosts: webservers
+  roles:
+    - role: jlira.web_server.apache
+      vars:
+        apache_execution_phase: "https_only"
+```
+
 #### `apache_main_settings`
 - **Type**: List of Dictionaries
 - **Default**: `[]`
@@ -117,7 +159,9 @@ apache_envvars:
 #### `apache_php_fpm_integration`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable PHP-FPM integration. Automatically includes the PHP role.
+- **Description**: Enable PHP-FPM integration with Apache. When enabled, Apache will be configured to proxy PHP requests to PHP-FPM.
+
+**Important:** You must include the PHP role before the Apache role in your playbook.
 
 ```yaml
 apache_php_fpm_integration: true
@@ -240,7 +284,6 @@ apache_virtual_hosts:
     server_admin: admin@example.com
     document_root: /var/www/example.com
     http:
-      enabled: true
       custom_directives: |
         DirectoryIndex index.html index.php
 ```
@@ -252,11 +295,9 @@ apache_virtual_hosts:
     server_name: secure.example.com
     document_root: /var/www/secure.example.com
     http:
-      enabled: true
       custom_directives: |
         Redirect permanent / https://secure.example.com/
     https:
-      enabled: true
       certificate_file: /etc/ssl/certs/example.com.crt
       certificate_key_file: /etc/ssl/private/example.com.key
       certificate_chain_file: /etc/ssl/certs/example.com-chain.crt
@@ -278,21 +319,30 @@ apache_virtual_hosts:
 #### `apache_vhost_templates`
 - **Type**: List of Dictionaries
 - **Default**: `[]`
-- **Description**: Reusable virtual host templates
+- **Description**: Reusable virtual host templates with structured configuration
+
+**Note:** Templates use the same structure as `apache_virtual_hosts` but with `${VARIABLE}` syntax for variable substitution.
 
 ```yaml
 apache_vhost_templates:
   - name: wordpress_site
+    server_name: ${SERVER_NAME}
+    document_root: ${DOCUMENT_ROOT}
     http:
-      content: |
-        <VirtualHost *:80>
-            ServerName {{ server_name }}
-            DocumentRoot {{ document_root }}
-            <Directory {{ document_root }}>
-                AllowOverride All
-                Require all granted
-            </Directory>
-        </VirtualHost>
+      custom_directives: |
+        <Directory ${DOCUMENT_ROOT}>
+            AllowOverride All
+            Require all granted
+        </Directory>
+    https:
+      certificate_file: /etc/ssl/certs/${SERVER_NAME}.crt
+      certificate_key_file: /etc/ssl/private/${SERVER_NAME}.key
+      custom_directives: |
+        <Directory ${DOCUMENT_ROOT}>
+            Options -Indexes +FollowSymLinks
+            AllowOverride All
+            Require all granted
+        </Directory>
 ```
 
 #### `apache_vhosts_from_template`
@@ -304,11 +354,17 @@ apache_vhost_templates:
 apache_vhosts_from_template:
   - name: myblog.com
     template: wordpress_site
-    enabled: true
     vars:
-      server_name: myblog.com
-      document_root: /var/www/myblog
+      - name: SERVER_NAME
+        value: myblog.com
+      - name: DOCUMENT_ROOT
+        value: /var/www/myblog
 ```
+
+**Variable Substitution:**
+- Variables defined in `vars` are exported as shell environment variables during virtual host creation
+- Template variables use `${VARIABLE}` syntax and are substituted using `envsubst`
+- Variables can reference other environment variables (e.g., `${DEFAULT_DOMAIN}` can reference an Apache environment variable)
 
 ### Status Pages
 
@@ -367,7 +423,7 @@ apache_custom_configs:
 
 ## Dependencies
 
-- **jlira.web_server.php**: Automatically included when `apache_php_fpm_integration: true`
+- **jlira.web_server.php**: Must be explicitly included in your playbook before the Apache role when `apache_php_fpm_integration: true`
 
 ## Example Playbooks
 
@@ -384,26 +440,36 @@ apache_custom_configs:
 
 ### Apache with PHP-FPM
 
+**Note:** You must explicitly include the PHP role before the Apache role.
+
 ```yaml
 ---
 - name: Install Apache with PHP-FPM
   hosts: webservers
   become: true
   roles:
+    - role: jlira.web_server.php
+      vars:
+        php_version: "8.4"
+        php_fpm_enabled: true
     - role: jlira.web_server.apache
       vars:
         apache_php_fpm_integration: true
         apache_php_fpm_version: "8.4"
 ```
 
-### Complete Configuration
+### Complete Configuration with PHP-FPM
 
 ```yaml
 ---
-- name: Configure Apache with virtual hosts
+- name: Configure Apache with virtual hosts and PHP-FPM
   hosts: webservers
   become: true
   roles:
+    - role: jlira.web_server.php
+      vars:
+        php_version: "8.4"
+        php_fpm_enabled: true
     - role: jlira.web_server.apache
       vars:
         apache_server_name: "webserver.example.com"
@@ -425,9 +491,9 @@ apache_custom_configs:
               - www.example.com
             document_root: /var/www/example.com
             http:
-              enabled: true
+              custom_directives: |
+                DirectoryIndex index.html index.php
             https:
-              enabled: true
               certificate_file: /etc/ssl/certs/example.com.crt
               certificate_key_file: /etc/ssl/private/example.com.key
         apache_status_page:
@@ -435,6 +501,46 @@ apache_custom_configs:
           endpoint: /server-status
           allowed_hosts:
             - 127.0.0.1
+```
+
+### Split Execution with Certificate Generation
+
+```yaml
+---
+- name: Configure Apache with Let's Encrypt certificates
+  hosts: webservers
+  become: true
+  tasks:
+    # Step 1: Configure Apache HTTP-only
+    - name: Configure Apache HTTP
+      ansible.builtin.include_role:
+        name: jlira.web_server.apache
+      vars:
+        apache_execution_phase: "http_only"
+        apache_virtual_hosts:
+          - name: example.com
+            server_name: example.com
+            document_root: /var/www/example.com
+            http: {}
+            https:
+              certificate_file: /etc/letsencrypt/live/example.com/fullchain.pem
+              certificate_key_file: /etc/letsencrypt/live/example.com/privkey.pem
+
+    # Step 2: Generate certificates (requires HTTP for ACME validation)
+    - name: Generate Let's Encrypt certificates
+      ansible.builtin.include_role:
+        name: jlira.web_server.certificates
+      vars:
+        certificates:
+          - domain: example.com
+            method: acme
+
+    # Step 3: Configure Apache HTTPS with generated certificates
+    - name: Configure Apache HTTPS
+      ansible.builtin.include_role:
+        name: jlira.web_server.apache
+      vars:
+        apache_execution_phase: "https_only"
 ```
 
 ## Tags

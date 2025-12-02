@@ -27,7 +27,9 @@ The `jlira.web_server` collection simplifies web server deployment and managemen
 
 - **Apache HTTP Server Management**: Complete lifecycle management including installation, configuration, virtual hosts, SSL/TLS, security hardening, and monitoring
 - **PHP Management**: Multi-version PHP support with PHP-FPM, extensive configuration options, and optional components like Composer and MSSQL drivers
-- **Integration**: Seamless Apache-PHP integration with automatic PHP-FPM configuration
+- **Certificate Management**: Automated SSL/TLS certificate management with support for self-signed certificates, Let's Encrypt (via Certbot), and certificate import
+- **Decoupled Architecture**: Roles follow single-purpose design - Apache and PHP are independent, allowing flexible deployment patterns
+- **Integration Support**: Seamless Apache-PHP integration when both roles are used together
 - **Ready-to-Use Playbooks**: Pre-built playbooks for common deployment scenarios
 - **Production-Ready**: Security-hardened defaults, comprehensive validation, and idempotent operations
 
@@ -37,15 +39,18 @@ The `jlira.web_server` collection simplifies web server deployment and managemen
 
 - ✅ **Installation & Service Management**: Automated Apache installation and service lifecycle management
 - ✅ **SSL/TLS Support**: Built-in SSL configuration with support for custom certificates
+- ✅ **Execution Phases**: Split execution for certificate generation workflows (http_only, https_only, all)
 - ✅ **Virtual Host Management**:
   - Direct virtual host configuration
   - Template-based virtual hosts for reusability
-  - HTTP and HTTPS support
+  - HTTP and HTTPS support with phase-aware configuration
   - Custom directives and includes
-- ✅ **PHP-FPM Integration**:
-  - Automatic PHP-FPM configuration
+  - Environment variable substitution in paths
+- ✅ **PHP-FPM Integration** (when used with PHP role):
+  - Apache-side proxy configuration
   - Multiple PHP version support
   - Version-specific configuration
+  - **Note**: PHP installation handled by separate PHP role
 - ✅ **Security Hardening**:
   - Secure defaults (ServerTokens, ServerSignature, TraceEnable)
   - Custom security configurations
@@ -73,6 +78,22 @@ The `jlira.web_server` collection simplifies web server deployment and managemen
 - ✅ **Status Monitoring**: PHP-FPM status and ping endpoints
 - ✅ **Upgrade Support**: Clean migration between PHP versions
 - ✅ **Idempotent Operations**: All tasks support check mode and are fully idempotent
+
+### Certificates Role Features
+
+- ✅ **Self-Signed Certificates**: Generate self-signed certificates with customizable parameters (key size, validity, SANs, subject fields)
+- ✅ **Let's Encrypt Integration**: Automated certificate issuance and renewal via Certbot
+  - HTTP-01 challenge support for standard domains
+  - DNS-01 challenge support for wildcard certificates
+  - Support for multiple DNS providers (Cloudflare, Route53, etc.)
+  - Custom DNS authentication hooks
+  - Automatic renewal via systemd timer
+- ✅ **Certificate Import**: Import existing certificates, private keys, and chain files
+- ✅ **Auto-Detection**: Automatically selects appropriate mode based on domain TLD
+- ✅ **Flexible Configuration**: Per-certificate customization of all parameters
+- ✅ **Security**: Proper file permissions and ownership for certificates and keys
+- ✅ **Idempotent**: Safe to run multiple times without unnecessary changes
+- ✅ **Comprehensive Testing**: Full Molecule test suite with Pebble ACME server
 
 ## Requirements
 
@@ -129,19 +150,23 @@ Create a playbook (`webserver.yml`):
   become: true
 
   roles:
-    - role: jlira.web_server.apache
-      vars:
-        apache_server_name: "example.com"
-        apache_ssl_enabled: true
-        apache_modules_enabled:
-          - rewrite
-          - headers
-
+    # Install PHP first
     - role: jlira.web_server.php
       vars:
         php_version: "8.4"
         php_fpm_enabled: true
         php_composer_enabled: true
+
+    # Then configure Apache with PHP-FPM integration
+    - role: jlira.web_server.apache
+      vars:
+        apache_server_name: "example.com"
+        apache_ssl_enabled: true
+        apache_php_fpm_integration: true
+        apache_php_fpm_version: "8.4"
+        apache_modules_enabled:
+          - rewrite
+          - headers
 ```
 
 Run the playbook:
@@ -156,7 +181,7 @@ The collection includes ready-to-use playbooks:
 
 ```bash
 # Basic web server (Apache + PHP)
-ansible-playbook -i inventory jlira.web_server.playbooks.web-server-setup
+ansible-playbook -i inventory jlira.web_server.playbooks.apache-setup
 
 # Multi-PHP version setup
 ansible-playbook -i inventory jlira.web_server.playbooks.web-server-multi-php
@@ -174,9 +199,10 @@ Comprehensive Apache HTTP Server management.
 |----------|------|---------|-------------|
 | `apache_server_name` | string | `{{ ansible_hostname }}` | Server hostname |
 | `apache_ssl_enabled` | boolean | `true` | Enable SSL support |
+| `apache_execution_phase` | string | `"all"` | Execution phase: `all`, `http_only`, `https_only` |
 | `apache_http_ports` | list | `[80]` | HTTP ports |
 | `apache_https_ports` | list | `[443]` | HTTPS ports |
-| `apache_php_fpm_integration` | boolean | `false` | Enable PHP-FPM |
+| `apache_php_fpm_integration` | boolean | `false` | Configure Apache for PHP-FPM |
 | `apache_virtual_hosts` | list | `[]` | Virtual hosts config |
 | `apache_modules_enabled` | list | `[]` | Modules to enable |
 
@@ -199,6 +225,34 @@ Modern PHP installation and configuration with multi-version support.
 
 **Documentation:** [PHP Role README](roles/php/README.md)
 
+### Certificates Role (`jlira.web_server.certificates`)
+
+Automated SSL/TLS certificate management for web servers.
+
+**Key Variables:**
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `certificates_items` | list | `[]` | List of certificates to manage |
+| `certificates_cert_dir` | string | `/etc/ssl/certs` | Certificate directory |
+| `certificates_key_dir` | string | `/etc/ssl/private` | Private key directory |
+| `certificates_certbot_email` | string | `admin@example.com` | Let's Encrypt email |
+| `certificates_certbot_environment` | string | `production` | Certbot environment |
+
+**Certificate Item Variables:**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `name` | Yes | Certificate name |
+| `mode` | No | Mode: `auto`, `selfsigned`, `letsencrypt`, or `imported` |
+| `challenge_type` | For LE | Challenge type: `http-01` or `dns-01` |
+| `webroot` | For HTTP-01 | Webroot path |
+| `dns_provider` | For DNS-01 | DNS provider name |
+| `src_cert` | For import | Source certificate file |
+| `src_key` | For import | Source private key file |
+
+**Documentation:** [Certificates Role README](roles/certificates/README.md)
+
 ## Playbooks
 
 The collection includes several pre-built playbooks for common scenarios:
@@ -207,7 +261,7 @@ The collection includes several pre-built playbooks for common scenarios:
 
 | Playbook | Description | Use Case |
 |----------|-------------|----------|
-| `web-server-setup` | Basic Apache + PHP setup | Single PHP version web server |
+| `apache-setup` | Orchestrated Apache + PHP + SSL | Complete web server setup with multi-phase execution for SSL challenges |
 | `web-server-multi-php` | Apache + Multiple PHP versions | Multi-version PHP environment |
 | `php-install` | PHP installation only | Add PHP to existing server |
 | `php-upgrade` | PHP version upgrade | Migrate between PHP versions |
@@ -217,7 +271,48 @@ The collection includes several pre-built playbooks for common scenarios:
 
 ## Common Use Cases
 
-### 1. Basic LAMP Stack
+### 1. Orchestrated Web Server Setup (Recommended)
+
+The `apache-setup.yml` playbook provides a robust, multi-phase setup that handles the "chicken-and-egg" problem of generating SSL certificates for new domains.
+
+```yaml
+# inventory/hosts.yml
+all:
+  children:
+    webservers:
+      hosts:
+        myserver:
+      vars:
+        # Enable orchestration
+        certificate_generation: true
+
+        # PHP Configuration
+        php_version: "8.3"
+        php_fpm_enabled: true
+
+        # Apache Configuration
+        apache_server_name: "example.com"
+        apache_ssl_enabled: true
+        apache_php_fpm_integration: true
+
+        # Virtual Hosts
+        apache_virtual_hosts:
+          - name: example.com
+            server_name: example.com
+            document_root: /var/www/example
+            http:
+              custom_directives: "Redirect permanent / https://example.com/"
+            https:
+              certificate_file: /etc/letsencrypt/live/example.com/fullchain.pem
+              certificate_key_file: /etc/letsencrypt/live/example.com/privkey.pem
+```
+
+Run the playbook:
+```bash
+ansible-playbook -i inventory playbooks/apache-setup.yml
+```
+
+### 2. Basic LAMP Stack
 
 ```yaml
 ---
@@ -225,12 +320,7 @@ The collection includes several pre-built playbooks for common scenarios:
   hosts: webservers
   become: true
   roles:
-    - role: jlira.web_server.apache
-      vars:
-        apache_server_name: "lamp.example.com"
-        apache_ssl_enabled: true
-        apache_php_fpm_integration: true
-
+    # Install PHP first
     - role: jlira.web_server.php
       vars:
         php_version: "8.4"
@@ -241,9 +331,17 @@ The collection includes several pre-built playbooks for common scenarios:
           - "php8.4-mysql"
           - "php8.4-mbstring"
           - "php8.4-xml"
+
+    # Then configure Apache with PHP integration
+    - role: jlira.web_server.apache
+      vars:
+        apache_server_name: "lamp.example.com"
+        apache_ssl_enabled: true
+        apache_php_fpm_integration: true
+        apache_php_fpm_version: "{{ php_version }}"
 ```
 
-### 2. Virtual Host with SSL
+### 3. Virtual Host with SSL
 
 ```yaml
 ---
@@ -260,16 +358,20 @@ The collection includes several pre-built playbooks for common scenarios:
               - www.myapp.com
             document_root: /var/www/myapp
             http:
-              enabled: true
               custom_directives: |
                 Redirect permanent / https://myapp.com/
             https:
-              enabled: true
               certificate_file: /etc/ssl/certs/myapp.crt
               certificate_key_file: /etc/ssl/private/myapp.key
+              custom_directives: |
+                <Directory /var/www/myapp>
+                    Options -Indexes +FollowSymLinks
+                    AllowOverride All
+                    Require all granted
+                </Directory>
 ```
 
-### 3. Multiple PHP Versions
+### 4. Multiple PHP Versions
 
 ```yaml
 ---
@@ -293,15 +395,16 @@ The collection includes several pre-built playbooks for common scenarios:
         php_fpm_enabled: true
         php_cli_set_as_default_version: true
 
-    # Configure Apache with PHP-FPM
+    # Configure Apache with default PHP version
     - ansible.builtin.include_role:
         name: jlira.web_server.apache
       vars:
         apache_php_fpm_integration: true
         apache_php_fpm_version: "8.4"
+        apache_php_fpm_set_default: true
 ```
 
-### 4. Development Environment
+### 5. Development Environment
 
 ```yaml
 ---
@@ -337,7 +440,7 @@ The collection includes several pre-built playbooks for common scenarios:
           enabled: true
 ```
 
-### 5. Production Hardened Setup
+### 6. Production Hardened Setup
 
 ```yaml
 ---
@@ -378,6 +481,49 @@ The collection includes several pre-built playbooks for common scenarios:
             type: bool
 ```
 
+### 7. Automated Let's Encrypt Certificates
+
+```yaml
+---
+- name: Web server with automated Let's Encrypt certificates
+  hosts: webservers
+  become: true
+  roles:
+    # First, generate Let's Encrypt certificates
+    - role: jlira.web_server.certificates
+      vars:
+        certificates_certbot_email: admin@example.com
+        certificates_items:
+          - name: example.com
+            mode: letsencrypt
+            challenge_type: http-01
+            webroot: /var/www/html
+            san:
+              - www.example.com
+
+    # Then configure Apache with the certificates
+    - role: jlira.web_server.apache
+      vars:
+        apache_server_name: example.com
+        apache_ssl_enabled: true
+        apache_virtual_hosts:
+          - name: example.com
+            server_name: example.com
+            document_root: /var/www/example
+            http:
+              custom_directives: |
+                Redirect permanent / https://example.com/
+            https:
+              certificate_file: /etc/letsencrypt/live/example.com/fullchain.pem
+              certificate_key_file: /etc/letsencrypt/live/example.com/privkey.pem
+              custom_directives: |
+                <Directory /var/www/example>
+                    Options -Indexes +FollowSymLinks
+                    AllowOverride All
+                    Require all granted
+                </Directory>
+```
+
 ## Testing
 
 The collection uses [Molecule](https://molecule.readthedocs.io/) for role testing.
@@ -388,11 +534,17 @@ The collection uses [Molecule](https://molecule.readthedocs.io/) for role testin
 # From collection root
 cd extensions
 
+# Test Apache Setup Playbook (Orchestrated)
+molecule test -s apache-setup-playbook
+
 # Test Apache role
 molecule test -s apache
 
 # Test PHP role
 molecule test -s php
+
+# Test Certificates role
+molecule test -s certificates
 ```
 
 ### Development Testing
@@ -510,5 +662,6 @@ This collection is licensed under the [GPL-2.0-or-later](https://spdx.org/licens
 **Project Links:**
 - [Apache Role Documentation](roles/apache/README.md)
 - [PHP Role Documentation](roles/php/README.md)
+- [Certificates Role Documentation](roles/certificates/README.md)
 - [Playbook Examples](playbooks/README.md)
 - [Development Guide](CLAUDE.md)

@@ -663,6 +663,7 @@
       - "HTTPS Ports: {{ apache_https_ports | join(', ') }}"
       - "Modules Enabled: {{ apache_modules_enabled | length }}"
       - "Virtual Hosts: {{ apache_virtual_hosts | length }}"
+      - "Virtual Hosts from Templates: {{ apache_vhosts_from_template | length }}"
       - "Main Settings: {{ apache_main_settings | length }}"
       - "Security Settings: {{ apache_security_settings | length }}"
       - "Htpasswd Files: {{ apache_htpasswd_files | length }}"

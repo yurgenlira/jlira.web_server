@@ -1,0 +1,66 @@
+---
+- name: Check imported certificate file exists
+  ansible.builtin.stat:
+    path: /etc/ssl/certs/imported.test.crt
+  register: imported_cert_stat
+
+- name: Verify imported certificate file exists
+  ansible.builtin.assert:
+    that:
+      - imported_cert_stat.stat.exists
+      - imported_cert_stat.stat.mode == '0644'
+    fail_msg: "Imported certificate file does not exist or has wrong permissions"
+
+- name: Check imported private key file exists
+  ansible.builtin.stat:
+    path: /etc/ssl/private/imported.test.key
+  register: imported_key_stat
+
+- name: Verify imported private key file exists
+  ansible.builtin.assert:
+    that:
+      - imported_key_stat.stat.exists
+      - imported_key_stat.stat.mode == '0600'
+    fail_msg: "Imported private key file does not exist or has wrong permissions"
+
+- name: Get certificate details
+  ansible.builtin.command: openssl x509 -in /etc/ssl/certs/imported.test.crt -noout -subject -issuer
+  register: imported_cert_details
+  changed_when: false
+
+- name: Verify imported certificate details
+  ansible.builtin.assert:
+    that:
+      - "'CN = imported.test' in imported_cert_details.stdout"
+      - "'O = Import Test Corp' in imported_cert_details.stdout"
+    fail_msg: "Imported certificate does not have expected details"
+
+- name: Verify certificate and key match
+  ansible.builtin.shell: |
+    set -o pipefail
+    cert_modulus=$(openssl x509 -noout -modulus -in /etc/ssl/certs/imported.test.crt | openssl md5)
+    key_modulus=$(openssl rsa -noout -modulus -in /etc/ssl/private/imported.test.key | openssl md5)
+    [ "$cert_modulus" = "$key_modulus" ]
+  args:
+    executable: /bin/bash
+  changed_when: false
+  failed_when: false
+  register: modulus_check
+
+- name: Assert certificate and key match
+  ansible.builtin.assert:
+    that:
+      - modulus_check.rc == 0
+    fail_msg: "Certificate and private key do not match"
+
+- name: Check imported chain file exists
+  ansible.builtin.stat:
+    path: /etc/ssl/certs/imported.test.chain.crt
+  register: imported_chain_stat
+
+- name: Verify imported chain file exists
+  ansible.builtin.assert:
+    that:
+      - imported_chain_stat.stat.exists
+      - imported_chain_stat.stat.mode == '0644'
+    fail_msg: "Imported chain file does not exist or has wrong permissions"

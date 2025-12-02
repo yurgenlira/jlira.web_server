@@ -1,0 +1,25 @@
+---
+- name: Install Certbot
+  ansible.builtin.apt:
+    name:
+      - certbot
+    state: present
+    update_cache: true
+
+- name: Install Certbot DNS provider plugins
+  ansible.builtin.apt:
+    name: "python3-certbot-dns-{{ item }}"
+    state: present
+    update_cache: true
+  loop: >-
+    {{ certificates_prepared_items | selectattr('dns_provider', 'defined')
+    | map(attribute='dns_provider') | reject('equalto', 'custom') | reject('equalto', '') | unique | list }}
+  when: >-
+    certificates_prepared_items | selectattr('dns_provider', 'defined')
+    | map(attribute='dns_provider') | reject('equalto', 'custom') | reject('equalto', '') | list | length > 0
+
+- name: Ensure Certbot timer is enabled
+  ansible.builtin.service:
+    name: certbot.timer
+    state: started
+    enabled: true

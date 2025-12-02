@@ -1,0 +1,175 @@
+---
+# ============================================================================
+# General Configuration
+# ============================================================================
+# Directory where certificates will be stored.
+# Type: String
+certificates_cert_dir: "/etc/ssl/certs"
+
+# Directory where private keys will be stored.
+# Type: String
+certificates_key_dir: "/etc/ssl/private"
+
+# List of certificates to manage
+# Each item is a dictionary defining a certificate to be created or imported.
+# Keys:
+# - name: (Required) Common Name of the certificate (e.g., example.com).
+# - mode: (Optional) 'selfsigned', 'letsencrypt', or 'imported'. Auto-detected if missing.
+# - challenge_type: (Optional) 'http-01' or 'dns-01' (for Let's Encrypt). Default: 'http-01'.
+# - dns_provider: (Optional) DNS provider for dns-01 (e.g., 'cloudflare', 'route53', 'custom').
+# - dns_credentials: (Optional) Path to DNS credentials file (for plugin-based providers).
+# - auth_hook: (Optional) Path to auth script (for dns_provider: 'custom').
+# - cleanup_hook: (Optional) Path to cleanup script (for dns_provider: 'custom').
+# - deploy_hook: (Optional) Path to script to run after cert issuance.
+# - webroot: (Optional) Webroot path for http-01 challenge. Default: '/var/www/html'.
+# - san: (Optional) List of Subject Alternative Names.
+# - src_cert: (Required for imported) Path to source certificate file.
+# - src_key: (Required for imported) Path to source key file.
+# - src_chain: (Optional for imported) Path to source chain file.
+# Type: List of Dictionaries
+
+# ============================================================================
+# Certificate List Examples
+# ============================================================================
+
+# Example 1: Auto-detection based on TLD (mode field optional)
+# certificates_items:
+#   - name: test.example
+#     # mode auto-detected as 'selfsigned' (.example is RFC-defined local TLD)
+#
+#   - name: app.test
+#     # mode auto-detected as 'selfsigned' (.test is RFC-defined local TLD)
+#
+#   - name: example.com
+#     # mode auto-detected as 'letsencrypt' (public TLD)
+
+# Example 2: Self-signed certificate with custom subject fields
+# certificates_items:
+#   - name: internal.local
+#     mode: selfsigned
+#     country: US
+#     state: Texas
+#     locality: Austin
+#     organization: My Company
+#     organizational_unit: DevOps
+#     email: admin@internal.local
+#     san:
+#       - DNS:internal.local
+#       - DNS:*.internal.local
+
+# Example 3: Let's Encrypt with HTTP-01 challenge
+# certificates_items:
+#   - name: example.com
+#     mode: letsencrypt
+#     challenge_type: http-01
+#     webroot: /var/www/html
+#     san:
+#       - DNS:www.example.com
+#       - DNS:api.example.com
+
+# Example 4: Let's Encrypt with DNS-01 (Cloudflare plugin)
+# certificates_items:
+#   - name: example.com
+#     mode: letsencrypt
+#     challenge_type: dns-01
+#     dns_provider: cloudflare
+#     dns_credentials: /etc/letsencrypt/cloudflare.ini
+#     san:
+#       - DNS:*.example.com
+
+# Example 5: Let's Encrypt with DNS-01 (custom hooks)
+# certificates_items:
+#   - name: example.com
+#     mode: letsencrypt
+#     challenge_type: dns-01
+#     dns_provider: custom
+#     auth_hook: /usr/local/bin/dns-auth.sh
+#     cleanup_hook: /usr/local/bin/dns-cleanup.sh
+#     deploy_hook: /usr/local/bin/reload-services.sh
+
+# Example 6: Imported certificate
+# certificates_items:
+#   - name: external.com
+#     mode: imported
+#     src_cert: /path/to/external.com.crt
+#     src_key: /path/to/external.com.key
+#     src_chain: /path/to/external.com.chain.crt
+
+# Example 7: Mixed configuration
+# certificates_items:
+#   - name: app.local
+#     mode: selfsigned
+#   - name: example.com
+#     mode: letsencrypt
+#     challenge_type: http-01
+#   - name: wildcard.example.com
+#     mode: letsencrypt
+#     challenge_type: dns-01
+#     dns_provider: route53
+#     dns_credentials: /etc/letsencrypt/route53.ini
+
+certificates_items: []
+
+# ============================================================================
+# Selfsigned Defaults for Certificates
+# ============================================================================
+# Default values for self-signed certificates.
+
+# Subject Information (grouped as they are related)
+# Type: Dictionary
+certificates_selfsigned_subject:
+  country: ""
+  state: ""
+  locality: ""
+  organization: ""
+  organizational_unit: ""
+  email: ""
+
+# Technical Parameters (grouped)
+# Type: Dictionary
+certificates_selfsigned_key_params:
+  size: 4096
+  type: "RSA"
+  digest: "sha256"
+
+# Type: Integer
+certificates_selfsigned_validity_days: 365
+
+# ============================================================================
+# Let's Encrypt (Certbot) Defaults
+# ============================================================================
+# Default values for Let's Encrypt certificates using Certbot.
+
+# ACME Environment ('production', 'staging', or 'test')
+# Type: String
+certificates_certbot_environment: "production"
+
+# Email address for ACME registration and recovery
+# Type: String
+certificates_certbot_email: "{{ certificates_selfsigned_subject.email }}"
+
+# ACME Directory URL (required if environment is 'test', auto-selected otherwise)
+# Type: String
+certificates_certbot_server_url: >-
+  {{ 'https://acme-v02.api.letsencrypt.org/directory' if certificates_certbot_environment == 'production'
+  else 'https://acme-staging-v02.api.letsencrypt.org/directory' }}
+
+# DNS provider for dns-01 challenges (e.g., 'cloudflare', 'route53', 'custom')
+# Type: String
+certificates_certbot_dns_provider: ""
+
+# Path to DNS provider credentials file (not used for 'custom')
+# Type: String
+certificates_certbot_dns_credentials: ""
+
+# Path to authentication hook script (only for dns_provider: 'custom')
+# Type: String
+certificates_certbot_auth_hook: ""
+
+# Path to cleanup hook script (only for dns_provider: 'custom')
+# Type: String
+certificates_certbot_cleanup_hook: ""
+
+# Path to deploy hook script (runs after cert issuance)
+# Type: String
+certificates_certbot_deploy_hook: ""

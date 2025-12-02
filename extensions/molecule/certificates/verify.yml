@@ -1,0 +1,18 @@
+---
+- name: Verify
+  hosts: certificates-instance
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Include setup tests
+      ansible.builtin.include_tasks: "tests/setup.yml"
+
+    - name: Include selfsigned tests
+      ansible.builtin.include_tasks: "tests/selfsigned.yml"
+
+    - name: Include import tests
+      ansible.builtin.include_tasks: "tests/import.yml"
+
+    - name: Include letsencrypt tests
+      ansible.builtin.include_tasks: "tests/letsencrypt.yml"

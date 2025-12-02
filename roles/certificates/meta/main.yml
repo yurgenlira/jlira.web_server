@@ -1,0 +1,35 @@
+galaxy_info:
+  author: Julio Lira
+  description: Role for managing SSL/TLS certificates (Self-Signed, Let's Encrypt, Imported)
+  company: Personal Project
+  namespace: jlira
+  role_name: certificates
+
+  license: MIT
+
+  min_ansible_version: "2.9"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+
+  galaxy_tags:
+    - certificates
+    - ssl
+    - tls
+    - security
+    - crypto
+    - selfsigned
+    - x509
+    - openssl
+
+dependencies: []
+
+collections:
+  - community.crypto

@@ -16,8 +16,8 @@
 {% if item.https.error_log is defined %}
     ErrorLog {{ item.https.error_log }}
 {% endif %}
-{% if item.https.access_log is defined %}
-    CustomLog {{ item.https.access_log }}
+{% if item.https.custom_log is defined %}
+    CustomLog {{ item.https.custom_log }}
 {% endif %}
 
     # SSL Configuration

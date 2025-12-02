@@ -1,0 +1,61 @@
+---
+- name: Initialize prepared certificates list
+  ansible.builtin.set_fact:
+    certificates_prepared_items: []
+
+- name: Normalize certificate modes and apply defaults
+  ansible.builtin.set_fact:
+    certificates_prepared_items: >-
+      {{ certificates_prepared_items + [_normalized_item] }}
+  vars:
+    _tld: "{{ certificates_item.name.split('.')[-1] }}"
+    _auto_mode: >-
+      {{ 'selfsigned' if _tld in ['test', 'example', 'local', 'invalid', 'localhost'] else 'letsencrypt' }}
+    _mode: "{{ certificates_item.mode | default(_auto_mode) }}"
+    _challenge_type: "{{ certificates_item.challenge_type | default('http-01' if _mode == 'letsencrypt' else '') }}"
+    _base_item: >-
+      {{ certificates_item | combine({
+        'mode': _mode
+      }) }}
+    _letsencrypt_fields: >-
+      {{ ({
+        'challenge_type': _challenge_type,
+        'deploy_hook': certificates_item.deploy_hook | default(certificates_certbot_deploy_hook)
+      } | combine({'san': certificates_item.san}
+          if certificates_item.san is defined else {}))
+        if _mode == 'letsencrypt' else {} }}
+    _http01_fields: >-
+      {{ {
+        'webroot': certificates_item.webroot | default('/var/www/html')
+      } if (_mode == 'letsencrypt' and _challenge_type == 'http-01') else {} }}
+    _dns01_fields: >-
+      {{ {
+        'dns_provider': certificates_item.dns_provider | default(certificates_certbot_dns_provider),
+        'dns_credentials': certificates_item.dns_credentials | default(certificates_certbot_dns_credentials),
+        'auth_hook': certificates_item.auth_hook | default(certificates_certbot_auth_hook),
+        'cleanup_hook': certificates_item.cleanup_hook | default(certificates_certbot_cleanup_hook)
+      } if (_mode == 'letsencrypt' and _challenge_type == 'dns-01') else {} }}
+    _selfsigned_fields: >-
+      {{ ({
+        'country': certificates_item.country | default(certificates_selfsigned_subject.country),
+        'state': certificates_item.state | default(certificates_selfsigned_subject.state),
+        'locality': certificates_item.locality | default(certificates_selfsigned_subject.locality),
+        'organization': certificates_item.organization | default(certificates_selfsigned_subject.organization),
+        'organizational_unit':
+          certificates_item.organizational_unit
+          | default(certificates_selfsigned_subject.organizational_unit),
+        'email': certificates_item.email | default(certificates_selfsigned_subject.email),
+        'key_size': certificates_item.key_size | default(certificates_selfsigned_key_params.size),
+        'validity_days': certificates_item.validity_days | default(certificates_selfsigned_validity_days)
+      } | combine({'san': certificates_item.san}
+          if certificates_item.san is defined else {}))
+        if _mode == 'selfsigned' else {} }}
+    _normalized_item: >-
+      {{ _base_item
+         | combine(_letsencrypt_fields)
+         | combine(_http01_fields)
+         | combine(_dns01_fields)
+         | combine(_selfsigned_fields) }}
+  loop: "{{ certificates_items }}"
+  loop_control:
+    loop_var: certificates_item

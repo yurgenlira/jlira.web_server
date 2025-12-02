@@ -1,0 +1,55 @@
+---
+- name: Prepare
+  hosts: webservers
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Ensure required testing utilities (logrotate) are installed
+      ansible.builtin.package:
+        name: logrotate
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    # =============================================================================
+    # Configure Pebble ACME Server Trust
+    # =============================================================================
+    - name: Update package cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      become: true
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+        state: present
+        update_cache: true
+
+    - name: Download Pebble root CA certificate
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/letsencrypt/pebble/main/test/certs/pebble.minica.pem
+        dest: /usr/local/share/ca-certificates/pebble-root.crt
+        mode: '0644'
+      become: true
+      register: pebble_ca_download
+      retries: 3
+      delay: 5
+      until: pebble_ca_download is succeeded
+
+    - name: Update CA certificates trust store
+      ansible.builtin.command: update-ca-certificates
+      become: true
+      changed_when: false
+
+    - name: Wait for Pebble ACME server to be ready
+      ansible.builtin.uri:
+        url: https://pebble:14000/dir
+        validate_certs: false
+        return_content: true
+      register: pebble_health
+      until: pebble_health.status == 200
+      retries: 30
+      delay: 10

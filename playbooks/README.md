@@ -41,7 +41,7 @@ ansible-playbook -i inventory playbooks/web-server-setup.yml \
 
 # Skip confirmation prompts
 ansible-playbook -i inventory playbooks/web-server-setup.yml \
-  -e "web_server_skip_confirm=true"
+  -e "skip_confirm=true"
 ```
 
 ---
@@ -73,7 +73,7 @@ ansible-playbook -i inventory playbooks/web-server-multi-php.yml \
 
 # Skip confirmation prompts
 ansible-playbook -i inventory playbooks/web-server-multi-php.yml \
-  -e "web_server_skip_confirm=true"
+  -e "skip_confirm=true"
 ```
 
 **Configuration:**
