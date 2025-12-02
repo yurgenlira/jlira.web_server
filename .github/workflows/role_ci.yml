@@ -15,6 +15,22 @@ on:
         required: false
         type: string
         default: '3.12'
+  workflow_dispatch:
+    inputs:
+      role-name:
+        description: 'Role name to test (e.g., apache, php, certificates)'
+        required: true
+        type: string
+      runner-os:
+        description: 'Runner OS'
+        required: false
+        type: string
+        default: 'ubuntu-24.04'
+      python-version:
+        description: 'Python version'
+        required: false
+        type: string
+        default: '3.12'
 
 jobs:
   lint:
@@ -58,6 +74,12 @@ jobs:
 
       - name: Install molecule test dependencies
         run: pip install -r extensions/requirements-test.txt
+
+      - name: Build collection
+        run: ansible-galaxy collection build --force
+
+      - name: Install collection from build
+        run: ansible-galaxy collection install jlira-web_server-*.tar.gz --force
 
       # The 'extensions' directory contains Ansible roles for Molecule testing.
       - name: Run molecule test for ${{ inputs.role-name }} role
