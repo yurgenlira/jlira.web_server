@@ -34,7 +34,7 @@ on:
 
 jobs:
   lint:
-    name: Lint code for ${{ inputs.role-name }} role
+    name: Lint code for ${{ inputs.role-name }}
     runs-on: ${{ inputs.runner-os }}
 
     steps:
@@ -56,9 +56,8 @@ jobs:
       - name: Run ansible lint
         run: ansible-lint roles/${{ inputs.role-name }} extensions/molecule/${{ inputs.role-name }}
 
-
   test:
-    name: Run molecule tests for ${{ inputs.role-name }} role
+    name: Run molecule tests for ${{ inputs.role-name }}
     runs-on: ${{ inputs.runner-os }}
 
     steps:
@@ -82,6 +81,6 @@ jobs:
         run: ansible-galaxy collection install jlira-web_server-*.tar.gz --force
 
       # The 'extensions' directory contains Ansible roles for Molecule testing.
-      - name: Run molecule test for ${{ inputs.role-name }} role
+      - name: Run molecule test for ${{ inputs.role-name }}
         working-directory: extensions
         run: molecule test -s ${{ inputs.role-name }}
