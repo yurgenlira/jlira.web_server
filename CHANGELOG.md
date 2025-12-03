@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2025-12-03
+### Fixed
+- **Apache Role**:
+  - Fixed missing `error_log` and `custom_log` attributes causing failures when not defined in virtual host configurations
+  - Added default values for log paths to prevent errors
+  - Improved status page module management using `community.general.apache2_module`
+  - Fixed status page configuration idempotence with proper state checking
+- **Playbooks**:
+  - Renamed `apache-setup.yml` to `apache_setup.yml` for consistency with Ansible naming conventions
+  - Added `target` variable to define target hosts with default value `apache`
+  - Added support for running playbook via collection namespace: `jlira.web_server.apache_setup`
+
+### Changed
+- Updated all documentation to reflect `apache_setup` playbook name
+- Improved playbook documentation with collection namespace usage examples
+
 ## [1.0.0] - 2025-12-02
 ### Added
 - New `certificates` role for automated SSL/TLS certificate management
