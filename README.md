@@ -134,7 +134,7 @@ Install the built collection and its dependencies:
 ansible-galaxy collection install jlira-web_server-*.tar.gz
 
 # Install dependencies
-ansible-galaxy collection install -r galaxy.yml
+ansible-galaxy collection install -r requirements.yml
 ```
 
 **Note**: When installing from a local tarball, dependencies are not installed automatically. You must manually install them using the second command.

@@ -5,7 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'playbooks/apache_setup.yml'
-      - 'extensions/molecule/apache-setup-playbook/**'
+      - 'extensions/molecule/apache_setup_playbook/**'
       - 'roles/apache/**'
       - 'roles/php/**'
       - 'roles/certificates/**'
@@ -13,7 +13,7 @@ on:
     branches: [ main ]
     paths:
       - 'playbooks/apache_setup.yml'
-      - 'extensions/molecule/apache-setup-playbook/**'
+      - 'extensions/molecule/apache_setup_playbook/**'
       - 'roles/apache/**'
       - 'roles/php/**'
       - 'roles/certificates/**'

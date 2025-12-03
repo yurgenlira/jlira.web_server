@@ -1,0 +1,7 @@
+---
+# Collection dependencies for jlira.web_server
+collections:
+  - name: community.crypto
+    version: ">=2.0.0"
+  - name: community.general
+    version: ">=3.0.0"
