@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added support for running playbook via collection namespace: `jlira.web_server.apache_setup`
 - **CI/CD**:
   - Fixed CI workflow to use correct playbook name (`apache_setup.yml`)
-  - Updated test workflow to install collection dependencies using `ansible-galaxy collection install -r galaxy.yml`
+  - Updated test workflow to install collection dependencies using `ansible-galaxy collection install -r requirements.yml`
+  - Renamed Molecule scenario directory from `apache-setup-playbook` to `apache_setup_playbook` for consistency
 
 ### Changed
 - **Documentation**:
