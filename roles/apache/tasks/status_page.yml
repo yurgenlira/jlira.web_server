@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: MIT-0
 ---
 - name: Enable status module
-  ansible.builtin.command:
-    cmd: a2enmod status
-  register: apache_enable_status_module_result
-  changed_when: "'Enabling module' in apache_enable_status_module_result.stdout"
+  community.general.apache2_module:
+    name: status
+    state: present
   when: apache_status_page.enabled
   notify: Reload apache
 
@@ -14,14 +13,22 @@
     dest: /etc/apache2/conf-available/status.conf
     mode: "0644"
   when: apache_status_page.enabled
-  notify: Reload apache
+
+- name: Check if status page configuration is enabled
+  ansible.builtin.command:
+    cmd: a2query -c status
+  register: apache_check_status_conf_result
+  changed_when: false
+  ignore_errors: true
 
 - name: Enable status page configuration
   ansible.builtin.command:
     cmd: a2enconf status
   register: apache_enable_status_conf_result
   changed_when: "'Enabling conf' in apache_enable_status_conf_result.stdout"
-  when: apache_status_page.enabled
+  when:
+    - apache_status_page.enabled
+    - "'disabled' in apache_check_status_conf_result.stderr"
   notify: Reload apache
 
 - name: Disable status page configuration
@@ -29,14 +36,23 @@
     cmd: a2disconf status
   register: apache_disable_status_conf_result
   changed_when:
-    - "'Conf' in apache_disable_status_conf_result.stdout"
     - "'disabled' in apache_disable_status_conf_result.stdout"
-  when: not apache_status_page.enabled
+  when:
+    - not apache_status_page.enabled
+    - "'(enabled' in apache_check_status_conf_result.stdout"
   notify: Reload apache
 
 - name: Remove status page configuration
   ansible.builtin.file:
     path: /etc/apache2/conf-available/status.conf
+    state: absent
+  when:
+    - not apache_status_page.enabled
+  notify: Reload apache
+
+- name: Disable status module
+  community.general.apache2_module:
+    name: status
     state: absent
   when: not apache_status_page.enabled
   notify: Reload apache

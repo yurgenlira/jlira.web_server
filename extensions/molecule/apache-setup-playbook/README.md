@@ -1,6 +1,6 @@
 # Apache Setup Playbook Molecule Testing Scenario
 
-This Molecule scenario tests the `apache-setup.yml` playbook, which demonstrates a multi-phase execution pattern for setting up a complete web server with Apache, PHP-FPM, and SSL certificates.
+This Molecule scenario tests the `apache_setup.yml` playbook, which demonstrates a multi-phase execution pattern for setting up a complete web server with Apache, PHP-FPM, and SSL certificates.
 
 ## What This Tests
 
@@ -81,7 +81,7 @@ The scenario is integrated into the CI/CD pipeline.
 
 **Triggers**:
 - Pull requests that modify:
-  - `playbooks/apache-setup.yml`
+  - `playbooks/apache_setup.yml`
   - Any role used in orchestration (apache, php, certificates)
   - The scenario itself
 - Pushes to `main` branch
@@ -191,7 +191,7 @@ php_version: "8.3"
 
 ## Related Documentation
 
-- [Apache Setup Playbook](../../../playbooks/apache-setup.yml)
+- [Apache Setup Playbook](../../../playbooks/apache_setup.yml)
 - [Apache Role README](../../../roles/apache/README.md)
 - [PHP Role README](../../../roles/php/README.md)
 - [Certificates Role README](../../../roles/certificates/README.md)

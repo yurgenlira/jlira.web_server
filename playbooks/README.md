@@ -6,41 +6,50 @@ This directory contains example playbooks for managing web server infrastructure
 
 ### Web Server Setup
 
-#### 1. web-server-setup.yml
-Complete web server setup with Apache and PHP integration.
+#### 1. apache_setup.yml
+Complete web server setup with Apache, PHP integration, and optional SSL certificate generation.
 
 **Use when:**
 - Setting up a new web server
 - Installing Apache with PHP-FPM support
 - Creating a standard LAMP-like environment
+- Generating SSL certificates (self-signed or Let's Encrypt)
 
 **Features:**
 - Apache web server installation and configuration
 - PHP installation with FPM support
 - Automatic PHP-FPM integration with Apache
-- SSL support (enabled by default)
+- SSL support with automated certificate generation
+- Multi-phase execution for Let's Encrypt HTTP-01 challenges
 - Customizable ports and server name
+- Idempotent certificate generation
 
 **Example:**
 ```bash
-# Basic installation (Apache + PHP 8.4 with FPM)
-ansible-playbook -i inventory playbooks/web-server-setup.yml
+# Basic installation (Apache + PHP 8.4 with FPM, auto-generated certificates)
+ansible-playbook jlira.web_server.apache_setup -i inventory
+# or
+ansible-playbook -i inventory playbooks/apache_setup.yml
+
+# Target specific hosts (default: apache group)
+ansible-playbook jlira.web_server.apache_setup -i inventory \
+  -e "target=webservers"
 
 # With custom PHP version
-ansible-playbook -i inventory playbooks/web-server-setup.yml \
+ansible-playbook jlira.web_server.apache_setup -i inventory \
   -e "php_version=8.3"
 
-# With custom Apache server name
-ansible-playbook -i inventory playbooks/web-server-setup.yml \
-  -e "apache_server_name=example.com"
+# Without certificate generation (single-phase)
+ansible-playbook jlira.web_server.apache_setup -i inventory \
+  -e "certificate_generation=false"
 
 # Without PHP-FPM integration
-ansible-playbook -i inventory playbooks/web-server-setup.yml \
+ansible-playbook jlira.web_server.apache_setup -i inventory \
   -e "apache_php_fpm_integration=false" \
   -e "php_fpm_enabled=false"
 
 # Skip confirmation prompts
-ansible-playbook -i inventory playbooks/web-server-setup.yml \
+ansible-playbook jlira.web_server.apache_setup -i inventory \
   -e "skip_confirm=true"
 ```
 

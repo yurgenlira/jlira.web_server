@@ -78,7 +78,7 @@
       ansible.builtin.shell: |
         set -o pipefail
         source /etc/apache2/envvars
-        logpath=$(echo "{{ item.http.error_log }}" | envsubst)
+        logpath=$(echo "{{ item.http.error_log | default('${APACHE_LOG_DIR}/error.log') }}" | envsubst)
         echo $(dirname "$logpath")
       args:
         executable: /bin/bash
@@ -118,7 +118,7 @@
       ansible.builtin.shell: |
         set -o pipefail
         source /etc/apache2/envvars
-        logpath=$(echo "{{ item.http.custom_log }}" | envsubst)
+        logpath=$(echo "{{ item.http.custom_log | default('${APACHE_LOG_DIR}/access.log') }}" | envsubst)
         echo $(dirname "$logpath")
       args:
         executable: /bin/bash
@@ -158,7 +158,7 @@
       ansible.builtin.shell: |
         set -o pipefail
         source /etc/apache2/envvars
-        logpath=$(echo "{{ item.https.error_log }}" | envsubst)
+        logpath=$(echo "{{ item.https.error_log | default('${APACHE_LOG_DIR}/error.log') }}" | envsubst)
         echo $(dirname "$logpath")
       args:
         executable: /bin/bash
@@ -198,7 +198,7 @@
       ansible.builtin.shell: |
         set -o pipefail
         source /etc/apache2/envvars
-        logpath=$(echo "{{ item.https.custom_log }}" | envsubst)
+        logpath=$(echo "{{ item.https.custom_log | default('${APACHE_LOG_DIR}/access.log') }}" | envsubst)
         echo $(dirname "$logpath")
       args:
         executable: /bin/bash

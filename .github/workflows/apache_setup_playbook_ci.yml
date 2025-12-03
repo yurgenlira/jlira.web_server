@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'playbooks/apache-setup.yml'
+      - 'playbooks/apache_setup.yml'
       - 'extensions/molecule/apache-setup-playbook/**'
       - 'roles/apache/**'
       - 'roles/php/**'
@@ -12,7 +12,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'playbooks/apache-setup.yml'
+      - 'playbooks/apache_setup.yml'
       - 'extensions/molecule/apache-setup-playbook/**'
       - 'roles/apache/**'
       - 'roles/php/**'

@@ -226,15 +226,15 @@ apache_custom_configs: []
 # HTTP Configuration:
 # - `http`: HTTP-specific configuration (optional)
 #   - `listen`: List of the address:port or port to listen on. Default: "*:80"
-#   - `error_log`: Path to the error log file. Default: ${APACHE_LOG_DIR}/<name>-error.log
-#   - `custom_log`: Path to the access log file. Default: ${APACHE_LOG_DIR}/<name>-access.log combined
+#   - `error_log`: Path to the error log file. Default: ${APACHE_LOG_DIR}/error.log
+#   - `custom_log`: Path to the access log file. Default: ${APACHE_LOG_DIR}/access.log combined
 #   - `custom_directives`: Additional Apache directives for HTTP only (optional).
 #
 # HTTPS Configuration:
 # - `https`: HTTPS-specific configuration (optional)
 #   - `listen`: List of the address:port or port to listen on. Default: "*:443"
-#   - `error_log`: Path to the error log file. Default: ${APACHE_LOG_DIR}/<name>-ssl-error.log
-#   - `custom_log`: Path to the access log file. Default: ${APACHE_LOG_DIR}/<name>-ssl-access.log combined
+#   - `error_log`: Path to the error log file. Default: ${APACHE_LOG_DIR}/error.log
+#   - `custom_log`: Path to the access log file. Default: ${APACHE_LOG_DIR}/access.log combined
 #   - `certificate_file`: Path to the SSL certificate file (required for HTTPS).
 #   - `certificate_key_file`: Path to the SSL certificate key file (required for HTTPS).
 #   - `certificate_chain_file`: Path to the SSL certificate chain file (optional).

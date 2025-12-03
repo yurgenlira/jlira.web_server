@@ -181,7 +181,7 @@ The collection includes ready-to-use playbooks:
 
 ```bash
 # Basic web server (Apache + PHP)
-ansible-playbook -i inventory jlira.web_server.playbooks.apache-setup
+ansible-playbook jlira.web_server.apache_setup -i inventory
 
 # Multi-PHP version setup
 ansible-playbook -i inventory jlira.web_server.playbooks.web-server-multi-php
@@ -261,7 +261,7 @@ The collection includes several pre-built playbooks for common scenarios:
 
 | Playbook | Description | Use Case |
 |----------|-------------|----------|
-| `apache-setup` | Orchestrated Apache + PHP + SSL | Complete web server setup with multi-phase execution for SSL challenges |
+| `apache_setup` | Orchestrated Apache + PHP + SSL | Complete web server setup with multi-phase execution for SSL challenges |
 | `web-server-multi-php` | Apache + Multiple PHP versions | Multi-version PHP environment |
 | `php-install` | PHP installation only | Add PHP to existing server |
 | `php-upgrade` | PHP version upgrade | Migrate between PHP versions |
@@ -273,7 +273,7 @@ The collection includes several pre-built playbooks for common scenarios:
 
 ### 1. Orchestrated Web Server Setup (Recommended)
 
-The `apache-setup.yml` playbook provides a robust, multi-phase setup that handles the "chicken-and-egg" problem of generating SSL certificates for new domains.
+The `apache_setup.yml` playbook provides a robust, multi-phase setup that handles the "chicken-and-egg" problem of generating SSL certificates for new domains.
 
 ```yaml
 # inventory/hosts.yml
@@ -309,7 +309,7 @@ all:
 
 Run the playbook:
 ```bash
-ansible-playbook -i inventory playbooks/apache-setup.yml
+ansible-playbook -i inventory playbooks/apache_setup.yml
 ```
 
 ### 2. Basic LAMP Stack
