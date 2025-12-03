@@ -96,6 +96,9 @@ jobs:
       - name: Install collection from build
         run: ansible-galaxy collection install jlira-web_server-*.tar.gz --force
 
+      - name: Install collection dependencies
+        run: ansible-galaxy collection install -r galaxy.yml
+
       - name: Run molecule test for role
         if: inputs.test-type == 'role'
         working-directory: extensions

@@ -28,7 +28,9 @@
   changed_when: "'Enabling conf' in apache_enable_status_conf_result.stdout"
   when:
     - apache_status_page.enabled
-    - "'disabled' in apache_check_status_conf_result.stderr"
+    - >-
+      'disabled' in apache_check_status_conf_result.stderr or
+      'No conf matches status' in apache_check_status_conf_result.stderr
   notify: Reload apache
 
 - name: Disable status page configuration

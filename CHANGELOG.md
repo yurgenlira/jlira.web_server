@@ -6,20 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.0.1] - 2025-12-03
+### Added
+- **Dependencies**:
+  - Added `community.general` (>= 3.0.0) as a collection dependency for Apache module management
+
 ### Fixed
 - **Apache Role**:
   - Fixed missing `error_log` and `custom_log` attributes causing failures when not defined in virtual host configurations
-  - Added default values for log paths to prevent errors
-  - Improved status page module management using `community.general.apache2_module`
-  - Fixed status page configuration idempotence with proper state checking
+  - Added default values for log paths (`${APACHE_LOG_DIR}/error.log` and `${APACHE_LOG_DIR}/access.log`)
+  - Improved status page module management using `community.general.apache2_module` instead of shell commands
+  - Fixed status page configuration idempotence with proper state checking using `a2query`
+  - Fixed status page enable logic to handle both disabled and non-existent configurations
 - **Playbooks**:
   - Renamed `apache-setup.yml` to `apache_setup.yml` for consistency with Ansible naming conventions
   - Added `target` variable to define target hosts with default value `apache`
   - Added support for running playbook via collection namespace: `jlira.web_server.apache_setup`
+- **CI/CD**:
+  - Fixed CI workflow to use correct playbook name (`apache_setup.yml`)
+  - Updated test workflow to install collection dependencies using `ansible-galaxy collection install -r galaxy.yml`
 
 ### Changed
-- Updated all documentation to reflect `apache_setup` playbook name
-- Improved playbook documentation with collection namespace usage examples
+- **Documentation**:
+  - Updated all documentation to reflect `apache_setup` playbook name
+  - Improved playbook documentation with collection namespace usage examples
+  - Enhanced Installation section with detailed dependency information
+  - Fixed Contributing section to reference correct requirements files
+  - Updated README with comprehensive installation instructions for Galaxy, source, and requirements.yml methods
+- **CI/CD**:
+  - Unified role and playbook CI workflows into single `test_ci.yml` for better maintainability
+  - Improved dependency installation in CI pipeline
 
 ## [1.0.0] - 2025-12-02
 ### Added

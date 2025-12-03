@@ -105,20 +105,39 @@ The `jlira.web_server` collection simplifies web server deployment and managemen
 
 ## Installation
 
-### From Ansible Galaxy
+### From Ansible Galaxy (Recommended)
+
+Install the collection from Ansible Galaxy. Dependencies will be installed automatically:
 
 ```bash
 ansible-galaxy collection install jlira.web_server
 ```
 
+This will automatically install the required dependencies:
+- `community.crypto` (>= 2.0.0)
+- `community.general` (>= 3.0.0)
+
 ### From Source
+
+Clone the repository and build the collection:
 
 ```bash
 git clone https://github.com/yurgenlira/jlira.web_server.git
 cd jlira.web_server
 ansible-galaxy collection build
-ansible-galaxy collection install jlira-web_server-*.tar.gz
 ```
+
+Install the built collection and its dependencies:
+
+```bash
+# Install the collection
+ansible-galaxy collection install jlira-web_server-*.tar.gz
+
+# Install dependencies
+ansible-galaxy collection install -r galaxy.yml
+```
+
+**Note**: When installing from a local tarball, dependencies are not installed automatically. You must manually install them using the second command.
 
 ### Using requirements.yml
 
@@ -128,7 +147,7 @@ Create a `requirements.yml` file:
 ---
 collections:
   - name: jlira.web_server
-    version: ">=0.0.1"
+    version: ">=1.0.0"
 ```
 
 Install the collection:
@@ -136,6 +155,8 @@ Install the collection:
 ```bash
 ansible-galaxy collection install -r requirements.yml
 ```
+
+Dependencies (`community.crypto` and `community.general`) will be installed automatically when installing from Ansible Galaxy.
 
 ## Quick Start
 
@@ -630,14 +651,17 @@ cd jlira.web_server
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install test dependencies
+pip install -r extensions/requirements-test.txt
+
+# Install lint dependencies
+pip install -r extensions/requirements-lint.txt
 
 # Make changes and test
+cd extensions
 molecule test -s apache
 
 # Run linters
-yamllint .
 ansible-lint
 ```
 
