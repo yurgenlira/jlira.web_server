@@ -1,0 +1,8 @@
+test multiphp playbook
+rename playbook (replace - with _)
+test all in dry-run mode
+
+apache role
+allow disable modules to disable /etc/apache2/mods-available/autoindex.conf
+security to disable index in default vhost (disable indexes by default)
+Update banners adding more usefull information (for example installation summary)

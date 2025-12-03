@@ -26,5 +26,5 @@ jobs:
   call-test-ci:
     uses: ./.github/workflows/test_ci.yml
     with:
-      test-name: 'apache-setup'
+      test-name: 'apache_setup'
       test-type: 'playbook'
