@@ -556,7 +556,7 @@ The collection uses [Molecule](https://molecule.readthedocs.io/) for role testin
 cd extensions
 
 # Test Apache Setup Playbook (Orchestrated)
-molecule test -s apache-setup-playbook
+molecule test -s apache_setup_playbook
 
 # Test Apache role
 molecule test -s apache

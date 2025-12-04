@@ -92,7 +92,7 @@ ansible:
     verify: verify.yml
 
 scenario:
-  name: apache-setup-playbook
+  name: apache_setup_playbook
   test_sequence:
     - dependency
     - cleanup
