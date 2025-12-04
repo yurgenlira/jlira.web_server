@@ -69,7 +69,7 @@ jobs:
 
       - name: Run ansible lint for playbook
         if: inputs.test-type == 'playbook'
-        run: ansible-lint playbooks/${{ inputs.test-name }}.yml extensions/molecule/${{ inputs.test-name }}-playbook
+        run: ansible-lint playbooks/${{ inputs.test-name }}.yml extensions/molecule/${{ inputs.test-name }}_playbook
 
 
   test:
@@ -96,6 +96,9 @@ jobs:
       - name: Install collection from build
         run: ansible-galaxy collection install jlira-web_server-*.tar.gz --force
 
+      - name: Install collection dependencies
+        run: ansible-galaxy collection install -r requirements.yml
+
       - name: Run molecule test for role
         if: inputs.test-type == 'role'
         working-directory: extensions
@@ -104,4 +107,4 @@ jobs:
       - name: Run molecule test for playbook
         if: inputs.test-type == 'playbook'
         working-directory: extensions
-        run: molecule test -s ${{ inputs.test-name }}-playbook
+        run: molecule test -s ${{ inputs.test-name }}_playbook

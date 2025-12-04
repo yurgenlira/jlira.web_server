@@ -105,20 +105,39 @@ The `jlira.web_server` collection simplifies web server deployment and managemen
 
 ## Installation
 
-### From Ansible Galaxy
+### From Ansible Galaxy (Recommended)
+
+Install the collection from Ansible Galaxy. Dependencies will be installed automatically:
 
 ```bash
 ansible-galaxy collection install jlira.web_server
 ```
 
+This will automatically install the required dependencies:
+- `community.crypto` (>= 2.0.0)
+- `community.general` (>= 3.0.0)
+
 ### From Source
+
+Clone the repository and build the collection:
 
 ```bash
 git clone https://github.com/yurgenlira/jlira.web_server.git
 cd jlira.web_server
 ansible-galaxy collection build
-ansible-galaxy collection install jlira-web_server-*.tar.gz
 ```
+
+Install the built collection and its dependencies:
+
+```bash
+# Install the collection
+ansible-galaxy collection install jlira-web_server-*.tar.gz
+
+# Install dependencies
+ansible-galaxy collection install -r requirements.yml
+```
+
+**Note**: When installing from a local tarball, dependencies are not installed automatically. You must manually install them using the second command.
 
 ### Using requirements.yml
 
@@ -128,7 +147,7 @@ Create a `requirements.yml` file:
 ---
 collections:
   - name: jlira.web_server
-    version: ">=0.0.1"
+    version: ">=1.0.0"
 ```
 
 Install the collection:
@@ -136,6 +155,8 @@ Install the collection:
 ```bash
 ansible-galaxy collection install -r requirements.yml
 ```
+
+Dependencies (`community.crypto` and `community.general`) will be installed automatically when installing from Ansible Galaxy.
 
 ## Quick Start
 
@@ -181,7 +202,7 @@ The collection includes ready-to-use playbooks:
 
 ```bash
 # Basic web server (Apache + PHP)
-ansible-playbook -i inventory jlira.web_server.playbooks.apache-setup
+ansible-playbook jlira.web_server.apache_setup -i inventory
 
 # Multi-PHP version setup
 ansible-playbook -i inventory jlira.web_server.playbooks.web-server-multi-php
@@ -261,7 +282,7 @@ The collection includes several pre-built playbooks for common scenarios:
 
 | Playbook | Description | Use Case |
 |----------|-------------|----------|
-| `apache-setup` | Orchestrated Apache + PHP + SSL | Complete web server setup with multi-phase execution for SSL challenges |
+| `apache_setup` | Orchestrated Apache + PHP + SSL | Complete web server setup with multi-phase execution for SSL challenges |
 | `web-server-multi-php` | Apache + Multiple PHP versions | Multi-version PHP environment |
 | `php-install` | PHP installation only | Add PHP to existing server |
 | `php-upgrade` | PHP version upgrade | Migrate between PHP versions |
@@ -273,7 +294,7 @@ The collection includes several pre-built playbooks for common scenarios:
 
 ### 1. Orchestrated Web Server Setup (Recommended)
 
-The `apache-setup.yml` playbook provides a robust, multi-phase setup that handles the "chicken-and-egg" problem of generating SSL certificates for new domains.
+The `apache_setup.yml` playbook provides a robust, multi-phase setup that handles the "chicken-and-egg" problem of generating SSL certificates for new domains.
 
 ```yaml
 # inventory/hosts.yml
@@ -309,7 +330,7 @@ all:
 
 Run the playbook:
 ```bash
-ansible-playbook -i inventory playbooks/apache-setup.yml
+ansible-playbook -i inventory playbooks/apache_setup.yml
 ```
 
 ### 2. Basic LAMP Stack
@@ -535,7 +556,7 @@ The collection uses [Molecule](https://molecule.readthedocs.io/) for role testin
 cd extensions
 
 # Test Apache Setup Playbook (Orchestrated)
-molecule test -s apache-setup-playbook
+molecule test -s apache_setup_playbook
 
 # Test Apache role
 molecule test -s apache
@@ -630,14 +651,17 @@ cd jlira.web_server
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install test dependencies
+pip install -r extensions/requirements-test.txt
+
+# Install lint dependencies
+pip install -r extensions/requirements-lint.txt
 
 # Make changes and test
+cd extensions
 molecule test -s apache
 
 # Run linters
-yamllint .
 ansible-lint
 ```
 

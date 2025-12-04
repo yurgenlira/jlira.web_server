@@ -1,4 +1,0 @@
----
-# Import the apache-setup-playbook playbook for testing
-- name: Import apache-setup-playbook playbook
-  ansible.builtin.import_playbook: ../../../playbooks/apache-setup.yml

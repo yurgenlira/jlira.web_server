@@ -1,6 +1,6 @@
 # Apache Setup Playbook Molecule Testing Scenario
 
-This Molecule scenario tests the `apache-setup.yml` playbook, which demonstrates a multi-phase execution pattern for setting up a complete web server with Apache, PHP-FPM, and SSL certificates.
+This Molecule scenario tests the `apache_setup.yml` playbook, which demonstrates a multi-phase execution pattern for setting up a complete web server with Apache, PHP-FPM, and SSL certificates.
 
 ## What This Tests
 
@@ -52,27 +52,27 @@ Validates each phase:
 ### Full Test Suite
 ```bash
 cd extensions
-molecule test -s apache-setup-playbook
+molecule test -s apache_setup_playbook
 ```
 
 ### Development Workflow
 ```bash
 # Create instance
-molecule create -s apache-setup-playbook
+molecule create -s apache_setup_playbook
 
 # Run playbook
-molecule converge -s apache-setup-playbook
+molecule converge -s apache_setup_playbook
 
 # Verify all phases
-molecule verify -s apache-setup-playbook
+molecule verify -s apache_setup_playbook
 
 # Clean up
-molecule destroy -s apache-setup-playbook
+molecule destroy -s apache_setup_playbook
 ```
 
 ### Quick Iteration
 ```bash
-molecule converge -s apache-setup-playbook && molecule verify -s apache-setup-playbook
+molecule converge -s apache_setup_playbook && molecule verify -s apache_setup_playbook
 ```
 
 ## CI/CD Integration
@@ -81,7 +81,7 @@ The scenario is integrated into the CI/CD pipeline.
 
 **Triggers**:
 - Pull requests that modify:
-  - `playbooks/apache-setup.yml`
+  - `playbooks/apache_setup.yml`
   - Any role used in orchestration (apache, php, certificates)
   - The scenario itself
 - Pushes to `main` branch
@@ -123,17 +123,17 @@ Tests run on Ubuntu 24.04 using Docker with systemd support.
 
 **Check logs**:
 ```bash
-molecule verify -s apache-setup-playbook -- -vvv
+molecule verify -s apache_setup_playbook -- -vvv
 ```
 
 **Login to container**:
 ```bash
-molecule login -s apache-setup-playbook
+molecule login -s apache_setup_playbook
 ```
 
 **Check services**:
 ```bash
-molecule login -s apache-setup-playbook
+molecule login -s apache_setup_playbook
 $ systemctl status apache2
 $ systemctl status php8.3-fpm
 $ ls -la /etc/ssl/certs/secure.example.local.crt
@@ -152,7 +152,7 @@ $ ls -la /etc/apache2/sites-enabled/
 
 **Port conflicts**:
 - Ensure no other containers are using ports 80/443
-- Run `molecule destroy -s apache-setup-playbook` to clean up
+- Run `molecule destroy -s apache_setup_playbook` to clean up
 
 ## Extending Tests
 
@@ -191,7 +191,7 @@ php_version: "8.3"
 
 ## Related Documentation
 
-- [Apache Setup Playbook](../../../playbooks/apache-setup.yml)
+- [Apache Setup Playbook](../../../playbooks/apache_setup.yml)
 - [Apache Role README](../../../roles/apache/README.md)
 - [PHP Role README](../../../roles/php/README.md)
 - [Certificates Role README](../../../roles/certificates/README.md)

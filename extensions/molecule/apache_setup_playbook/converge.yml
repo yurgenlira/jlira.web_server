@@ -1,0 +1,6 @@
+---
+# Import the apache_setup_playbook playbook for testing
+- name: Import apache_setup_playbook playbook
+  ansible.builtin.import_playbook: ../../../playbooks/apache_setup.yml
+  vars:
+    target: webservers

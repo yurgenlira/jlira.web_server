@@ -4,16 +4,16 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'playbooks/apache-setup.yml'
-      - 'extensions/molecule/apache-setup-playbook/**'
+      - 'playbooks/apache_setup.yml'
+      - 'extensions/molecule/apache_setup_playbook/**'
       - 'roles/apache/**'
       - 'roles/php/**'
       - 'roles/certificates/**'
   push:
     branches: [ main ]
     paths:
-      - 'playbooks/apache-setup.yml'
-      - 'extensions/molecule/apache-setup-playbook/**'
+      - 'playbooks/apache_setup.yml'
+      - 'extensions/molecule/apache_setup_playbook/**'
       - 'roles/apache/**'
       - 'roles/php/**'
       - 'roles/certificates/**'
@@ -26,5 +26,5 @@ jobs:
   call-test-ci:
     uses: ./.github/workflows/test_ci.yml
     with:
-      test-name: 'apache-setup'
+      test-name: 'apache_setup'
       test-type: 'playbook'
